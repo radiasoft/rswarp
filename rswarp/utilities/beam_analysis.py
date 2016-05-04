@@ -17,7 +17,7 @@ def convertunits(particlearray):
     """
     dat = deepcopy(particlearray)  # Don't copy by reference
     dat[:, 1] = dat[:, 1] / dat[:, 5]
-    dat[:, 2] = dat[:, 2] / dat[:, 5]
+    dat[:, 3] = dat[:, 3] / dat[:, 5]
     dat[:, 5] = dat[:, 5] / 5.344286E-22
 
     return dat
