@@ -3,90 +3,114 @@ import os
 import h5py as h5
 import matplotlib.pyplot as plt
 
+class FieldDiagnostic(object):
+    """
+    Common functionality for field diagnostic classes
+    """
+    def __init__(self, solver, top):
+        self.solver = solver
+        self.top = top
 
-class ElectrostaticFields:
-	"""
-		Produce an HDF5 file with electric fields and potential.
-		File tree:
-		/mesh
-			/x
-			/y
-			/z
-		attributes: nx, ny, nz
+    def gathermesh(self):
+        self.nx = self.solver.nx
+        self.ny = self.solver.ny
+        self.nz = self.solver.nz
 
-		/potential
-			/electric - [xdim,ydim,zdim]
-		/fields
-			/electric - [fieldaxis,xdim,ydim,zdim]
+        self.xmesh = self.solver.xmesh
+        self.ymesh = self.solver.ymesh
+        self.zmesh = self.solver.zmesh
 
-		Parameters:
-			solver: Must be a Multigrid3D object.
-			top: Object representing Warp's top package.
-	"""
+    def write(self, prefix='field'):
+        outdir = os.path.split(prefix)[0]
+        print(outdir)
+        if outdir is not '' and not os.path.lexists(outdir):
+            os.makedirs(outdir)
 
-	def __init__(self, solver, top):
+        step = str(self.top.it)
+        filename = '%s%s.h5' % (prefix, step.zfill(5))
 
-		self.solver = solver
-		self.top = top
+        self.file = h5.File(filename, 'w')
 
+        self.gathermesh()
+        self.file.create_dataset('mesh/x', data=self.xmesh)
+        self.file.create_dataset('mesh/y', data=self.ymesh)
+        self.file.create_dataset('mesh/z', data=self.zmesh)
 
-	def gatherfields(self):
-		self.efield = self.solver.getselfe()
-
-		return self.efield
-
-	def gatherpotential(self):
-		self.phi = self.solver.getphi()
-
-
-	def gathermesh(self):
-		self.nx = self.solver.nx
-		self.ny = self.solver.ny
-		self.nz = self.solver.nz
-
-		self.xmesh = self.solver.xmesh
-		self.ymesh = self.solver.ymesh
-		self.zmesh = self.solver.zmesh
-
-	def write(self,filename = 'efield.h5'):
-
-		self.gatherfields()
-		self.gatherpotential()
-		self.gathermesh()
-
-		filename = os.path.splitext(filename)
-		step = str(self.top.it)
-		filename = '%s%s%s' % (filename[0],step.zfill(5),filename[1]) 
-
-		f = h5.File(filename, 'w')
-
-		f.create_dataset('mesh/x', data=self.xmesh)
-		f.create_dataset('mesh/y', data=self.ymesh)
-		f.create_dataset('mesh/z', data=self.zmesh)
-
-		f.attrs['nx'] = self.nx
-		f.attrs['ny'] = self.ny
-		f.attrs['nz'] = self.nz
-
-		f.create_dataset('fields/electric', data=self.efield)
-		f.create_dataset('potential/electric', data=self.phi)
+        self.file.attrs['nx'] = self.nx
+        self.file.attrs['ny'] = self.ny
+        self.file.attrs['nz'] = self.nz
 
 
-if __name__ == '__main__':
-	f0 = h5.File('efield00051.h5', 'r')
+class ElectrostaticFields(FieldDiagnostic):
+    """
+        Produce an HDF5 file with electric fields and potential.
+        File tree:
+        /mesh
+            /x
+            /y
+            /z
+        attributes: nx, ny, nz
 
-	xi = f0['mesh/x']
-	yi = f0['mesh/y']
-	zi = f0['mesh/z']
+        /potential
+            /electric - [xdim,ydim,zdim]
+        /fields
+            /electric - [fieldaxis,xdim,ydim,zdim]
 
-	phi = f0['potential/electric']
+        Parameters:
+            solver: Must be a Multigrid3D object.
+            top: Object representing Warp's top package.
+    """
 
-	plt.contourf(xi,yi,phi[:,:,10],cmap=plt.cm.viridis)
+    def gatherfields(self):
+        self.efield = self.solver.getselfe()
+        return self.efield
 
-	plt.colorbar()
+    def gatherpotential(self):
+        self.phi = self.solver.getphi()
 
-	plt.show()
+    def write(self, prefix='diags/fields/electric/efield'):
+        super(ElectrostaticFields, self).write(prefix)
+        self.gatherfields()
+        self.gatherpotential()
 
+        self.file.create_dataset('fields/electric', data=self.efield)
+        self.file.create_dataset('potential/electric', data=self.phi)
 
+        self.file.close()
 
+class MagnetostaticFields(FieldDiagnostic):
+    """
+        Produce an HDF5 file with magnetic fields and vector potential.
+        File tree:
+        /mesh
+            /x
+            /y
+            /z
+        attributes: nx, ny, nz
 
+        /potential
+            /vector - [vectoraxis,xdim,ydim,zdim]
+        /fields
+            /magnetic - [fieldaxis,xdim,ydim,zdim]
+
+        Parameters:
+            solver: Must be a MagnetostaticMG object.
+            top: Object representing Warp's top package.
+    """
+
+    def gatherfields(self):
+        self.bfield = self.solver.getb()
+        return self.bfield
+
+    def gathervectorpotential(self):
+        self.a = self.solver.geta()
+
+    def write(self,prefix='diags/fields/magnetic/bfield'):
+        super(MagnetostaticFields, self).write(prefix)
+        self.gatherfields()
+        self.gathervectorpotential()
+
+        self.file.create_dataset('fields/magnetic', data=self.bfield)
+        self.file.create_dataset('potential/vector', data=self.a)
+
+        self.file.close()
