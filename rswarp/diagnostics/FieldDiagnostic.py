@@ -22,7 +22,6 @@ class FieldDiagnostic(object):
 
     def write(self, prefix='field'):
         outdir = os.path.split(prefix)[0]
-        print(outdir)
         if outdir is not '' and not os.path.lexists(outdir):
             os.makedirs(outdir)
 
