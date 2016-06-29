@@ -34,6 +34,9 @@ def readparticles(filename):
         print "Warning!: Not an openPMD file. This may not work."
 
     step = f['data'].keys()[0]
+    time = f['data/%s' % step].attrs["time"]
+    dt = f['data/%s' % step].attrs["dt"]
+
     species_list = f['data/%s/particles' % step].keys()
 
     for species in species_list:
@@ -42,6 +45,8 @@ def readparticles(filename):
             parray = np.column_stack((parray, f['data/%s/particles/%s/' % (step, species) + dim]))
 
         particle_arrays[species] = parray
+        particle_arrays['time'] = time
+        particle_arrays['dt'] = dt
 
     return particle_arrays
 
