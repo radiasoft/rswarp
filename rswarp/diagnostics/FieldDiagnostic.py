@@ -7,9 +7,10 @@ class FieldDiagnostic(object):
     """
     Common functionality for field diagnostic classes
     """
-    def __init__(self, solver, top):
+    def __init__(self, solver, top, period=None):
         self.solver = solver
         self.top = top
+        self.period = period
 
     def gathermesh(self):
         self.nx = self.solver.nx
@@ -21,6 +22,9 @@ class FieldDiagnostic(object):
         self.zmesh = self.solver.zmesh
 
     def write(self, prefix='field'):
+        if self.period and self.top.it % self.period != 0:
+            return False
+
         outdir = os.path.split(prefix)[0]
         if outdir is not '' and not os.path.lexists(outdir):
             os.makedirs(outdir)
@@ -68,7 +72,9 @@ class ElectrostaticFields(FieldDiagnostic):
         self.phi = self.solver.getphi()
 
     def write(self, prefix='diags/fields/electric/efield'):
-        super(ElectrostaticFields, self).write(prefix)
+        if not super(ElectrostaticFields, self).write(prefix):
+            return False
+            
         self.gatherfields()
         self.gatherpotential()
 
@@ -105,7 +111,8 @@ class MagnetostaticFields(FieldDiagnostic):
         self.a = self.solver.geta()
 
     def write(self,prefix='diags/fields/magnetic/bfield'):
-        super(MagnetostaticFields, self).write(prefix)
+        if not super(MagnetostaticFields, self).write(prefix):
+            return False
         self.gatherfields()
         self.gathervectorpotential()
 
