@@ -3,6 +3,7 @@ import os
 import h5py as h5
 import matplotlib.pyplot as plt
 
+
 class FieldDiagnostic(object):
     """
     Common functionality for field diagnostic classes
@@ -43,6 +44,8 @@ class FieldDiagnostic(object):
         self.file.attrs['ny'] = self.ny
         self.file.attrs['nz'] = self.nz
 
+        return True
+
 
 class ElectrostaticFields(FieldDiagnostic):
     """
@@ -74,7 +77,7 @@ class ElectrostaticFields(FieldDiagnostic):
     def write(self, prefix='diags/fields/electric/efield'):
         if not super(ElectrostaticFields, self).write(prefix):
             return False
-            
+
         self.gatherfields()
         self.gatherpotential()
 
@@ -82,6 +85,7 @@ class ElectrostaticFields(FieldDiagnostic):
         self.file.create_dataset('potential/electric', data=self.phi)
 
         self.file.close()
+
 
 class MagnetostaticFields(FieldDiagnostic):
     """
@@ -110,9 +114,10 @@ class MagnetostaticFields(FieldDiagnostic):
     def gathervectorpotential(self):
         self.a = self.solver.geta()
 
-    def write(self,prefix='diags/fields/magnetic/bfield'):
+    def write(self, prefix='diags/fields/magnetic/bfield'):
         if not super(MagnetostaticFields, self).write(prefix):
             return False
+            
         self.gatherfields()
         self.gathervectorpotential()
 
