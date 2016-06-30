@@ -1,10 +1,25 @@
 #!/usr/bin/env python
+"""
+Ionization class derived from Warp's Ionization, with some improvements.
+
+6/30/2016 - Added support for emitted_energy0 and emitted_energy_sigma to be passed in as functions.
+"""
 from warp import *
 from warp.particles import ionization
+import numpy as np
 import time
 import types
 
 __all__ = ['Ionization']
+
+
+def tryFunctionalForm(f,*args,**kwargs):
+    try:
+        res = f(*args,**kwargs)
+    except TypeError:
+        res = f
+    return res
+
 
 class Ionization(ionization.Ionization):
     def generate(self,dt=None):
@@ -261,8 +276,8 @@ class Ionization(ionization.Ionization):
 
                   if self.inter[incident_species]['emitted_energy0'][it][ie] is not None:
                     # --- Create new velocities for the emitted particles.
-                    ek0ionel = self.inter[incident_species]['emitted_energy0'][it][ie]
-                    esigionel = self.inter[incident_species]['emitted_energy_sigma'][it][ie]
+                    ek0ionel = tryFunctionalForm(self.inter[incident_species]['emitted_energy0'][it][ie],vi)
+                    esigionel = tryFunctionalForm(self.inter[incident_species]['emitted_energy_sigma'][it][ie],vi)
                     if esigionel==0.:
                       ek = zeros(nnew)
                     else:
@@ -273,7 +288,9 @@ class Ionization(ionization.Ionization):
                     u=clight*sqrt(ek*fact*(gamma+1.))
                     # velocity direction: random in (x-y) plane plus small longitudinal component:
                     phi=2.*pi*ranf(u)
-                    vx=cos(phi); vy=sin(phi); vz=0.01*ranf(u)
+                    vx=cos(phi);
+                    vy=sin(phi);
+                    vz=0.01*ranf(u)
                     # convert into a unit vector:
                     vu=sqrt(vx**2+vy**2+vz**2)
                     # renormalize:
