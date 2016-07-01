@@ -55,8 +55,9 @@ class Ionization(ionization.Ionization):
               if nptarget==0:continue
               self.ndensc[...]=0.
               ndens[...]=0.
+
               for jstarget in target_species.jslist:
-                depositTargetSpecies(jstarget)
+                  self.depositTargetSpecies(jstarget)
     #          if w3d.l2symtry or w3d.l4symtry:self.ndens[:,0,:]*=2.
     #          if w3d.l4symtry:self.ndens[0,:,:]*=2.
 
