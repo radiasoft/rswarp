@@ -56,39 +56,7 @@ class Ionization(ionization.Ionization):
               self.ndensc[...]=0.
               ndens[...]=0.
               for jstarget in target_species.jslist:
-                i1 = tpg.ins[jstarget] - 1
-                i2 = tpg.ins[jstarget] + tpg.nps[jstarget] - 1
-                xt=tpg.xp[i1:i2]
-                yt=tpg.yp[i1:i2]
-                zt=tpg.zp[i1:i2]
-                git=tpg.gaminv[i1:i2]
-                vxt=tpg.uxp[i1:i2]*git
-                vyt=tpg.uyp[i1:i2]*git
-                vzt=tpg.uzp[i1:i2]*git
-                fact=1.
-                if w3d.l4symtry:
-                  xt=abs(xt)
-                  fact=0.25
-                elif w3d.l2symtry:
-                  fact=0.5
-                if w3d.l2symtry or w3d.l4symtry:yt=abs(yt)
-                if top.wpid==0:
-                  weights=ones(tpg.nps[jstarget],'d')
-                else:
-                  weights=tpg.pid[i1:i2,top.wpid-1]
-                # --- deposit density
-                deposgrid3d(1,tpg.nps[jstarget],xt,yt,zt,
-                            tpg.sw[jstarget]*self.invvol*fact*weights,
-                            self.nx,self.ny,self.nz,ndens,self.ndensc,
-                            self.xmin,self.xmax,self.ymin,self.ymax,
-                            self.zmin,self.zmax)
-                # --- computes target fluid velocity
-                deposgrid3dvect(0,tpg.nps[jstarget],xt,yt,zt,vxt,vyt,vzt,
-                            tpg.sw[jstarget]*self.invvol*fact*weights,
-                            self.nx,self.ny,self.nz,target_fluidvel,self.ndensc,
-                            self.xmin,self.xmax,self.ymin,self.ymax,
-                            self.zmin,self.zmax)
-
+                depositTargetSpecies(jstarget)
     #          if w3d.l2symtry or w3d.l4symtry:self.ndens[:,0,:]*=2.
     #          if w3d.l4symtry:self.ndens[0,:,:]*=2.
 
@@ -332,3 +300,40 @@ class Ionization(ionization.Ionization):
             processlostpart(top.pgroup,js+1,top.clearlostpart,top.time,top.zbeam)
 
             if self.l_timing:print 'time ionization = ',time.clock()-t1,'s'
+
+
+    def depositTargetSpecies(self, jstarget):
+        """ Depositing target species to the grid """
+        tpg=self.inter[incident_species]['target_pgroup']
+        i1 = tpg.ins[jstarget] - 1 # ins is index of first member of species
+        i2 = tpg.ins[jstarget] + tpg.nps[jstarget] - 1
+        xt=tpg.xp[i1:i2]
+        yt=tpg.yp[i1:i2]
+        zt=tpg.zp[i1:i2]
+        git=tpg.gaminv[i1:i2]
+        vxt=tpg.uxp[i1:i2]*git
+        vyt=tpg.uyp[i1:i2]*git
+        vzt=tpg.uzp[i1:i2]*git
+        fact=1.
+        if w3d.l4symtry:
+          xt=abs(xt)
+          fact=0.25
+        elif w3d.l2symtry:
+          fact=0.5
+        if w3d.l2symtry or w3d.l4symtry:yt=abs(yt)
+        if top.wpid==0:
+          weights=ones(tpg.nps[jstarget],'d')
+        else:
+          weights=tpg.pid[i1:i2,top.wpid-1]
+        # --- deposit density
+        deposgrid3d(1,tpg.nps[jstarget],xt,yt,zt,
+                    tpg.sw[jstarget]*self.invvol*fact*weights,
+                    self.nx,self.ny,self.nz,ndens,self.ndensc,
+                    self.xmin,self.xmax,self.ymin,self.ymax,
+                    self.zmin,self.zmax)
+        # --- computes target fluid velocity
+        deposgrid3dvect(0,tpg.nps[jstarget],xt,yt,zt,vxt,vyt,vzt,
+                    tpg.sw[jstarget]*self.invvol*fact*weights,
+                    self.nx,self.ny,self.nz,target_fluidvel,self.ndensc,
+                    self.xmin,self.xmax,self.ymin,self.ymax,
+                    self.zmin,self.zmax)
