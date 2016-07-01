@@ -245,29 +245,9 @@ class Ionization(ionization.Ionization):
 
                   if self.inter[incident_species]['emitted_energy0'][it][ie] is not None:
                     # --- Create new velocities for the emitted particles.
-                    ek0ionel = tryFunctionalForm(self.inter[incident_species]['emitted_energy0'][it][ie],vi)
-                    esigionel = tryFunctionalForm(self.inter[incident_species]['emitted_energy_sigma'][it][ie],vi)
-                    if esigionel==0.:
-                      ek = zeros(nnew)
-                    else:
-                      ek = SpRandom(0.,esigionel,nnew) #kinetic energy
-                    ek=abs(ek+ek0ionel) #kinetic energy
-                    fact = jperev/(emass*clight**2)
-                    gamma=ek*fact+1.
-                    u=clight*sqrt(ek*fact*(gamma+1.))
-                    # velocity direction: random in (x-y) plane plus small longitudinal component:
-                    phi=2.*pi*ranf(u)
-                    vx=cos(phi);
-                    vy=sin(phi);
-                    vz=0.01*ranf(u)
-                    # convert into a unit vector:
-                    vu=sqrt(vx**2+vy**2+vz**2)
-                    # renormalize:
-                    vx/=vu; vy/=vu; vz/=vu
-                    # find components of v*gamma:
-                    uxnew=u*vx
-                    uynew=u*vy
-                    uznew=u*vz
+                    emitted_energy0 = self.inter[incident_species]['emitted_energy0'][it][ie]
+                    emitted_energy_sigma = self.inter[incident_species]['emitted_energy_sigma'][it][ie]
+                    [uxnew, uynew, uznew] = self.generateEmittedVelocity(emitted_energy0, emitted_energy_sigma, vi, nnew)
                   else:
                     uxnew = uxnewsave
                     uynew = uynewsave
@@ -338,3 +318,29 @@ class Ionization(ionization.Ionization):
                     self.nx,self.ny,self.nz,target_fluidvel,self.ndensc,
                     self.xmin,self.xmax,self.ymin,self.ymax,
                     self.zmin,self.zmax)
+
+    def generateEmittedVelocity(self, emitted_energy0, emitted_energy_sigma, vi, nnew):
+        ek0ionel = tryFunctionalForm(emitted_energy0,vi)
+        esigionel = tryFunctionalForm(emitted_energy_sigma,vi)
+        if esigionel==0.:
+          ek = zeros(nnew)
+        else:
+          ek = SpRandom(0.,esigionel,nnew) #kinetic energy
+        ek=abs(ek+ek0ionel) #kinetic energy
+        fact = jperev/(emass*clight**2)
+        gamma=ek*fact+1.
+        u=clight*sqrt(ek*fact*(gamma+1.))
+        # velocity direction: random in (x-y) plane plus small longitudinal component:
+        phi=2.*pi*ranf(u)
+        vx=cos(phi);
+        vy=sin(phi);
+        vz=0.01*ranf(u)
+        # convert into a unit vector:
+        vu=sqrt(vx**2+vy**2+vz**2)
+        # renormalize:
+        vx/=vu; vy/=vu; vz/=vu
+        # find components of v*gamma:
+        uxnew=u*vx
+        uynew=u*vy
+        uznew=u*vz
+        return [uxnew, uynew, uznew]
