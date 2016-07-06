@@ -1,7 +1,11 @@
-import numpy as np
 import os
+
+import datetime
+from dateutil.tz import tzlocal
+
 import h5py as h5
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class FieldDiagnostic(object):
@@ -18,35 +22,48 @@ class FieldDiagnostic(object):
         self.top = top
         self.w3d = w3d
         self.period = period
-        self.gridsize = [self.solver.nx, self.solver.ny, self.solver.nz]
-        self.mesh = [self.solver.xmesh, self.solver.ymesh, self.solver.zmesh]
         self.geometryParameters = ''
 
         if self.solver.solvergeom == self.w3d.XYZgeom:
-            self.dims = ['x', 'y', 'z']
             self.geometry = 'cartesian'
+            self.dims = ['x', 'y', 'z']
+            self.gridsize = [self.solver.nx + 1, self.solver.ny + 1, self.solver.nz + 1]
+            self.mesh = [self.solver.xmesh, self.solver.ymesh, self.solver.zmesh]
         elif self.solver.solvergeom == self.w3d.RZgeom:
-            self.dims = ['r', 't', 'z']
             self.geometry = 'thetaMode'
             self.geometryParameters = 'm=0'
+            self.dims = ['r', 't', 'z']
+            self.gridsize = [self.solver.nx + 1, self.solver.ny + 1, self.solver.nz + 1]
+            self.mesh = [self.solver.xmesh, self.solver.ymesh, self.solver.zmesh]
         else:
-            raise Exception("No handler for geometry type %i" % self.solver.geomtype)
-
-    # Is it really necesary to gather the mesh here, or can it be done only in __init__?
-    def gathermesh(self):
-        self.mesh = [self.solver.xmesh, self.solver.ymesh, self.solver.zmesh]
-        if self.solver.solvergeom not in [self.w3d.XYZgeom, self.w3d.RZgeom]:
             raise Exception("No handler for geometry type %i" % self.solver.geomtype)
 
     def writeDataset(self, data, prefix, attrs={}):
-        if len(data.shape) == 3:  # Scalar data on the mesh
+        if len(data.shape) == len(self.dims):  # Scalar data on the mesh
             self.file[prefix] = data
-        elif len(data.shape) == 4:  # Vector data on the mesh
+            field = self.file[prefix]
+            field.attrs['position'] = [0.0, 0.0, 0.0]  # Report scalar as on the mesh elements
+            field.attrs['unitSI'] = 1.0
+        elif len(data.shape) == len(self.dims) + 1:  # Vector data on the mesh
             for i, v in enumerate(data):
                 self.file['%s/%s' % (prefix, self.dims[i])] = v
-                self.file['%s' % prefix].attrs['n%s' % self.dims[i]] = self.gridsize[i]
+                coord = self.file['%s/%s' % (prefix, self.dims[i])]
+                coord.attrs['position'] = [0.0, 0.0, 0.0]  # Report field as on the mesh elements
+                coord.attrs['unitSI'] = 1.0
+
+                field = self.file[prefix]
+                # field.attrs['n%s' % self.dims[i]] = self.gridsize[i]
         else:
-            raise Exception("Unknown data shape: %s" % data.shape)
+            raise Exception("Unknown data shape: %s" % repr(data.shape))
+
+        field.attrs['geometry'] = self.geometry
+        field.attrs['geometryParameters'] = self.geometryParameters
+        field.attrs['dataOrder'] = 'C'  # C-like order
+        field.attrs['axisLabels'] = self.dims
+        field.attrs['gridSpacing'] = [self.solver.dx, self.solver.dy, self.solver.dz]
+        field.attrs['gridGlobalOffset'] = [self.solver.xmmin, self.solver.ymmin, self.solver.zmmin]
+        field.attrs['gridUnitSI'] = 1.0
+        field.attrs['unitSI'] = 1.0
 
         for k, v in attrs.items():
             self.file[prefix].attrs[k] = v
@@ -62,13 +79,41 @@ class FieldDiagnostic(object):
         step = str(self.top.it)
         filename = '%s%s.h5' % (prefix, step.zfill(5))
 
-        self.file = h5.File(filename, 'w')
+        f = h5.File(filename, 'w')
 
-        self.gathermesh()
-        for i, v in enumerate(self.mesh):
-            self.file['/data/meshes/mesh/%s' % self.dims[i]] = v
-        self.file['/data/meshes/mesh'].attrs['geometry'] = self.geometry
-        self.file['/data/meshes/mesh'].attrs['geometryParameters'] = self.geometryParameters
+        # for i, v in enumerate(self.mesh):
+        #     f['/data/meshes/mesh/%s' % self.dims[i]] = v
+        # f['/data/meshes/mesh'].attrs['geometry'] = self.geometry
+        # f['/data/meshes/mesh'].attrs['geometryParameters'] = self.geometryParameters
+
+        # from warp.data_dumping.openpmd_diag.generic_diag
+        # This header information is from https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file
+        f.attrs["openPMD"] = np.string_("1.0.0")
+        f.attrs["openPMDextension"] = np.uint32(1)
+        f.attrs["software"] = np.string_("warp")
+        f.attrs["softwareVersion"] = np.string_("4")
+        f.attrs["date"] = np.string_(
+            datetime.datetime.now(tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z'))
+        f.attrs["meshesPath"] = np.string_("meshes/")
+        f.attrs["particlesPath"] = np.string_("particles/")
+        # Setup the basePath
+        f.attrs["basePath"] = np.string_("/data/%T/")
+        base_path = "/data/%d/" % self.top.it
+        bp = f.require_group(base_path)
+
+        # https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#required-attributes-for-the-basepath
+        bp.attrs["time"] = self.top.time
+        bp.attrs["dt"] = self.top.dt
+        bp.attrs["timeUnitSI"] = 1.
+
+        # https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#iterations-and-time-series
+        f.attrs["iterationEncoding"] = np.string_("fileBased")
+        f.attrs["iterationFormat"] =  np.string_("%s%%T.h5" % prefix)
+
+        self.basePath = base_path
+        self.meshPath = f.attrs["meshesPath"]
+        self.particlesPath = f.attrs["particlesPath"]
+        self.file = f
 
         return True
 
@@ -106,8 +151,8 @@ class ElectrostaticFields(FieldDiagnostic):
         self.gatherfields()
         self.gatherpotential()
 
-        self.writeDataset(self.efield, prefix='/data/meshes/fields/electric')
-        self.writeDataset(self.phi, prefix='/data/meshes/potential/electric')
+        self.writeDataset(self.efield, prefix='%s%sE' % (self.basePath, self.meshPath))
+        self.writeDataset(self.phi, prefix='%s%sphi' % (self.basePath, self.meshPath))
 
         self.file.close()
 
@@ -133,7 +178,11 @@ class MagnetostaticFields(FieldDiagnostic):
     """
 
     def gatherfields(self):
-        self.bfield = self.solver.getb()
+        field = self.solver.getb()
+        if self.geometry == 'thetaMode':
+            field = field.swapaxes(1, 2)  # For thetaMode, components stored in order of m,r,z
+
+        self.bfield = field
 
     def gathervectorpotential(self):
         self.a = self.solver.geta()
@@ -145,7 +194,7 @@ class MagnetostaticFields(FieldDiagnostic):
         self.gatherfields()
         self.gathervectorpotential()
 
-        self.writeDataset(self.bfield, prefix='/data/meshes/fields/magnetic')
-        self.writeDataset(self.a, prefix='/data/meshes/potential/vector')
+        self.writeDataset(self.bfield, prefix='%s%sB' % (self.basePath, self.meshPath))
+        self.writeDataset(self.a, prefix='%s%svector_potential' % (self.basePath, self.meshPath))
 
         self.file.close()
