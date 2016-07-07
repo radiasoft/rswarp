@@ -135,10 +135,11 @@ class ElectrostaticFields(FieldDiagnostic):
             Note that the coordinates will be replaced as appropriate for different
             solver geometries (e.g. xyz -> rtz for RZgeom).
 
-            /potential
-                /electric - [xdim,ydim,zdim]
-            /fields
-                /electric - [fieldaxis,xdim,ydim,zdim]
+            /phi
+            /E
+                /x
+                /y
+                /z
 
     """
 
@@ -174,10 +175,15 @@ class MagnetostaticFields(FieldDiagnostic):
             Note that the coordinates will be replaced as appropriate for different
             solver geometries (e.g. xyz -> rtz for RZgeom).
 
-            /potential
-                /vector - [vectoraxis,xdim,ydim,zdim]
-            /fields
-                /magnetic - [fieldaxis,xdim,ydim,zdim]
+            /vector_potential
+                /x
+                /y
+                /z
+
+            /B
+                /x
+                /y
+                /z
 
     """
 
