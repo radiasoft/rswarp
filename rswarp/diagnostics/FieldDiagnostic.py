@@ -42,36 +42,6 @@ class FieldDiagnostic(object):
         else:
             raise Exception("No handler for geometry type %i" % self.solver.geomtype)
 
-    def writeDataset(self, data, prefix, attrs={}):
-        if len(data.shape) == len(self.dims):  # Scalar data on the mesh
-            self.file[prefix] = data
-            field = self.file[prefix]
-            field.attrs['position'] = [0.0, 0.0, 0.0]  # Report scalar as on the mesh elements
-            field.attrs['unitSI'] = 1.0
-        elif len(data.shape) == len(self.dims) + 1:  # Vector data on the mesh
-            for i, v in enumerate(data):
-                self.file['%s/%s' % (prefix, self.dims[i])] = v
-                coord = self.file['%s/%s' % (prefix, self.dims[i])]
-                coord.attrs['position'] = [0.0, 0.0, 0.0]  # Report field as on the mesh elements
-                coord.attrs['unitSI'] = 1.0
-
-                field = self.file[prefix]
-                # field.attrs['n%s' % self.dims[i]] = self.gridsize[i]
-        else:
-            raise Exception("Unknown data shape: %s" % repr(data.shape))
-
-        field.attrs['geometry'] = self.geometry
-        field.attrs['geometryParameters'] = self.geometryParameters
-        field.attrs['dataOrder'] = 'C'  # C-like order
-        field.attrs['axisLabels'] = self.dims
-        field.attrs['gridSpacing'] = self.gridSpacing
-        field.attrs['gridGlobalOffset'] = self.gridGlobalOffset
-        field.attrs['gridUnitSI'] = 1.0
-        field.attrs['unitSI'] = 1.0
-
-        for k, v in attrs.items():
-            self.file[prefix].attrs[k] = v
-
     def write(self, prefix='field'):
         if self.period and self.top.it % self.period != 0:
             return False
@@ -121,6 +91,37 @@ class FieldDiagnostic(object):
 
         return True
 
+    def writeDataset(self, data, prefix, attrs={}):
+        if len(data.shape) == len(self.dims):  # Scalar data on the mesh
+            self.file[prefix] = data
+            field = self.file[prefix]
+            field.attrs['position'] = [0.0, 0.0, 0.0]  # Report scalar as on the mesh elements
+            field.attrs['unitSI'] = 1.0
+        elif len(data.shape) == len(self.dims) + 1:  # Vector data on the mesh
+            if self.geometry == 'thetaMode':
+                data = data.swapaxes(1, 2)  # For thetaMode, components stored in order of m,r,z
+            for i, v in enumerate(data):
+                self.file['%s/%s' % (prefix, self.dims[i])] = v
+                coord = self.file['%s/%s' % (prefix, self.dims[i])]
+                coord.attrs['position'] = [0.0, 0.0, 0.0]  # Report field as on the mesh elements
+                coord.attrs['unitSI'] = 1.0
+
+                field = self.file[prefix]
+                # field.attrs['n%s' % self.dims[i]] = self.gridsize[i]
+        else:
+            raise Exception("Unknown data shape: %s" % repr(data.shape))
+
+        field.attrs['geometry'] = self.geometry
+        field.attrs['geometryParameters'] = self.geometryParameters
+        field.attrs['dataOrder'] = 'C'  # C-like order
+        field.attrs['axisLabels'] = self.dims
+        field.attrs['gridSpacing'] = self.gridSpacing
+        field.attrs['gridGlobalOffset'] = self.gridGlobalOffset
+        field.attrs['gridUnitSI'] = 1.0
+        field.attrs['unitSI'] = 1.0
+
+        for k, v in attrs.items():
+            self.file[prefix].attrs[k] = v
 
 class ElectrostaticFields(FieldDiagnostic):
     """
@@ -188,11 +189,7 @@ class MagnetostaticFields(FieldDiagnostic):
     """
 
     def gatherfields(self):
-        field = self.solver.getb()
-        if self.geometry == 'thetaMode':
-            field = field.swapaxes(1, 2)  # For thetaMode, components stored in order of m,r,z
-
-        self.bfield = field
+        self.bfield = self.solver.getb()
 
     def gathervectorpotential(self):
         self.a = self.solver.geta()
