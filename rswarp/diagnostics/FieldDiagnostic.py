@@ -28,12 +28,16 @@ class FieldDiagnostic(object):
             self.geometry = 'cartesian'
             self.dims = ['x', 'y', 'z']
             self.gridsize = [self.solver.nx + 1, self.solver.ny + 1, self.solver.nz + 1]
+            self.gridSpacing = [self.solver.dx, self.solver.dy, self.solver.dz]
+            self.gridGlobalOffset = [self.solver.xmmin, self.solver.ymmin, self.solver.zmmin]
             self.mesh = [self.solver.xmesh, self.solver.ymesh, self.solver.zmesh]
         elif self.solver.solvergeom == self.w3d.RZgeom:
             self.geometry = 'thetaMode'
             self.geometryParameters = 'm=0'
             self.dims = ['r', 't', 'z']
-            self.gridsize = [self.solver.nx + 1, self.solver.ny + 1, self.solver.nz + 1]
+            self.gridsize = [self.solver.nx + 1, self.solver.nz + 1]
+            self.gridSpacing = [self.solver.dx, self.solver.dz]
+            self.gridGlobalOffset = [self.solver.xmmin, self.solver.zmmin]
             self.mesh = [self.solver.xmesh, self.solver.ymesh, self.solver.zmesh]
         else:
             raise Exception("No handler for geometry type %i" % self.solver.geomtype)
@@ -60,8 +64,8 @@ class FieldDiagnostic(object):
         field.attrs['geometryParameters'] = self.geometryParameters
         field.attrs['dataOrder'] = 'C'  # C-like order
         field.attrs['axisLabels'] = self.dims
-        field.attrs['gridSpacing'] = [self.solver.dx, self.solver.dy, self.solver.dz]
-        field.attrs['gridGlobalOffset'] = [self.solver.xmmin, self.solver.ymmin, self.solver.zmmin]
+        field.attrs['gridSpacing'] = self.gridSpacing
+        field.attrs['gridGlobalOffset'] = self.gridGlobalOffset
         field.attrs['gridUnitSI'] = 1.0
         field.attrs['unitSI'] = 1.0
 
