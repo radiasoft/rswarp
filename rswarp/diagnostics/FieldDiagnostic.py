@@ -13,7 +13,7 @@ class FieldDiagnostic(object):
         Common functionality for field diagnostic classes
 
         Parameters:
-            solver: Must be a Multigrid3D object.
+            solver: Solver containing fields to be output
             top: Object representing Warp's top package.
             w3d: Object representing Warp's w3d package.
     """
@@ -38,9 +38,9 @@ class FieldDiagnostic(object):
             self.gridsize = [self.solver.nx + 1, self.solver.nz + 1]
             self.gridSpacing = [self.solver.dx, self.solver.dz]
             self.gridGlobalOffset = [self.solver.xmmin, self.solver.zmmin]
-            self.mesh = [self.solver.xmesh, self.solver.ymesh, self.solver.zmesh]
+            self.mesh = [self.solver.xmesh, self.solver.zmesh]
         else:
-            raise Exception("No handler for geometry type %i" % self.solver.geomtype)
+            raise Exception("No handler for geometry type %i" % self.solver.solvergeom)
 
     def write(self, prefix='field'):
         if self.period and self.top.it % self.period != 0:
@@ -92,18 +92,20 @@ class FieldDiagnostic(object):
         return True
 
     def writeDataset(self, data, prefix, attrs={}):
+
         if len(data.shape) == len(self.dims):  # Scalar data on the mesh
             self.file[prefix] = data
             field = self.file[prefix]
-            field.attrs['position'] = [0.0, 0.0, 0.0]  # Report scalar as on the mesh elements
+            field.attrs['position'] = [0.0]*len(self.dims)  # Report scalar as on the mesh elements
             field.attrs['unitSI'] = 1.0
         elif len(data.shape) == len(self.dims) + 1:  # Vector data on the mesh
+
             if self.geometry == 'thetaMode':
                 data = data.swapaxes(1, 2)  # For thetaMode, components stored in order of m,r,z
             for i, v in enumerate(data):
                 self.file['%s/%s' % (prefix, self.dims[i])] = v
                 coord = self.file['%s/%s' % (prefix, self.dims[i])]
-                coord.attrs['position'] = [0.0, 0.0, 0.0]  # Report field as on the mesh elements
+                coord.attrs['position'] = [0.0]*len(self.dims)  # Report field as on the mesh elements
                 coord.attrs['unitSI'] = 1.0
 
                 field = self.file[prefix]
@@ -156,6 +158,17 @@ class ElectrostaticFields(FieldDiagnostic):
 
         self.gatherfields()
         self.gatherpotential()
+
+        if self.solver.__class__.__name__ == 'MultiGrid2D':
+            # Kludge to make 2D electrostatic solver compatible with thetaMode
+            # output (which is currently the only relevant option)
+            self.efield = self.efield[:, :, np.newaxis, :]
+
+            # this is particularly awful, because there is no decomposition for
+            # the potential, but it's the only way to shoehorn the data into
+            # OpenPMD compliance right now.
+            self.phi = self.phi[np.newaxis, :, :]
+
 
         self.writeDataset(self.efield, prefix='%s%sE' % (self.basePath, self.meshPath))
         self.writeDataset(self.phi, prefix='%s%sphi' % (self.basePath, self.meshPath))
