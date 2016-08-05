@@ -23,7 +23,7 @@ def convertunits(particlearray):
     return dat
 
 def plotphasespace(particlearray,color='b',decorator=None):
-    fig = plt.figure(figsize=(12, 8))
+    fig = plt.figure(figsize=(12, 8),facecolor='white')
 
     ax0 = plt.subplot(2, 3, 1)
     ax0.scatter(particlearray[:, 0], particlearray[:, 1], c=color)
