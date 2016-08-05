@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """
 Ionization class derived from Warp's Ionization, with some improvements.
-
-6/30/2016 - Added support for emitted_energy0 and emitted_energy_sigma to be passed in as functions.
 """
+
 from warp import *
 from warp.particles import ionization
 import numpy as np
@@ -13,16 +12,16 @@ import types
 __all__ = ['Ionization']
 
 
-def tryFunctionalForm(f,*args,**kwargs):
+def tryFunctionalForm(f, *args, **kwargs):
     try:
-        res = f(*args,**kwargs)
+        res = f(*args, **kwargs)
     except TypeError:
         res = f
     return res
 
 
 class Ionization(ionization.Ionization):
-    def generate(self,dt=None):
+    def generate(self, dt=None):
         if dt is None:dt=top.dt
         if self.l_timing:t1 = time.clock()
         for target_species in self.target_dens:
@@ -327,20 +326,23 @@ class Ionization(ionization.Ionization):
         else:
           ek = SpRandom(0.,esigionel,nnew) #kinetic energy
         ek=abs(ek+ek0ionel) #kinetic energy
+
+        frac_trans = ranf(ek) # fraction of kinetic energy in the transverse direction
+        frac_long = 1.0 - frac_trans
+
         fact = jperev/(emass*clight**2)
-        gamma=ek*fact+1.
-        u=clight*sqrt(ek*fact*(gamma+1.))
-        # velocity direction: random in (x-y) plane plus small longitudinal component:
-        phi=2.*pi*ranf(u)
-        vx=cos(phi);
-        vy=sin(phi);
-        vz=0.01*ranf(u)
-        # convert into a unit vector:
-        vu=sqrt(vx**2+vy**2+vz**2)
-        # renormalize:
-        vx/=vu; vy/=vu; vz/=vu
+
+        ek_trans = frac_trans * ek
+        ek_long = frac_long * ek
+        gamma_trans = ek_trans * fact + 1
+        gamma_long = ek_long * fact + 1
+        u_trans = clight*sqrt(1 - 1/gamma_trans**2)
+        u_long = np.sign(2.*ranf(ek)-1) * clight*sqrt(1 - 1/gamma_long**2)
+
+        # velocity direction: random in (x-y) plane
+        phi = 2. * pi * ranf(ek)
         # find components of v*gamma:
-        uxnew=u*vx
-        uynew=u*vy
-        uznew=u*vz
+        uxnew=u_trans*cos(phi)
+        uynew=u_trans*sin(phi)
+        uznew=u_long
         return [uxnew, uynew, uznew]
