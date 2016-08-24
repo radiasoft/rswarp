@@ -319,15 +319,15 @@ class Ionization(ionization.Ionization):
                     self.zmin,self.zmax)
 
     def generateEmittedVelocity(self, emitted_energy0, emitted_energy_sigma, vi, nnew):
-        ek0ionel = tryFunctionalForm(emitted_energy0,vi)
-        esigionel = tryFunctionalForm(emitted_energy_sigma,vi)
-        if esigionel==0.:
-          ek = zeros(nnew)
+        ek0ionel = tryFunctionalForm(emitted_energy0, vi=vi, nnew=nnew)
+        esigionel = tryFunctionalForm(emitted_energy_sigma, vi=vi, nnew=nnew)
+        if esigionel == 0.:
+            ek = zeros(nnew)
         else:
-          ek = SpRandom(0.,esigionel,nnew) #kinetic energy
-        ek=abs(ek+ek0ionel) #kinetic energy
+            ek = SpRandom(0., esigionel, nnew)  # kinetic energy
+        ek = abs(ek+ek0ionel)  # kinetic energy
 
-        frac_trans = ranf(ek) # fraction of kinetic energy in the transverse direction
+        frac_trans = ranf(ek)  # fraction of kinetic energy in the transverse direction
         frac_long = 1.0 - frac_trans
 
         fact = jperev/(emass*clight**2)
@@ -342,7 +342,7 @@ class Ionization(ionization.Ionization):
         # velocity direction: random in (x-y) plane
         phi = 2. * pi * ranf(ek)
         # find components of v*gamma:
-        uxnew=u_trans*cos(phi)
-        uynew=u_trans*sin(phi)
-        uznew=u_long
+        uxnew = u_trans*cos(phi)
+        uynew = u_trans*sin(phi)
+        uznew = u_long
         return [uxnew, uynew, uznew]
