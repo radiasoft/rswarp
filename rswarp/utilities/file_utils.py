@@ -13,6 +13,41 @@ def explore(filename):
 
     return f.visit(_printname)
 
+def cleanupPrevious(particleDirectory = diagDir, fieldDirectory = diagFDir):
+
+    """
+    Remove old diagnostic files.
+
+    Parameters:
+            particleDirectory (str): Path to particle diagnostics
+
+    """
+    if os.path.exists(particleDirectory):
+        files = os.listdir(particleDirectory)
+        for file in files:
+            if file.endswith('.h5'):
+                os.remove(os.path.join(particleDirectory,file))
+    if isinstance(fielDirectory,dict):
+        for key in fieldDirectory:
+            if os.path.exists(fieldDirectory[key]):
+                files = os.listdir(fieldDirectory[key])
+                for file in files:
+                    if file.endswith('.h5'):
+                        os.remove(os.path.join(fieldDirectory[key],file))
+    elif isinstance(fieldDirectory, list):
+        for directory in fieldDirectory:
+            if os.path.exists(directory):
+                files = os.listdir(directory)
+                for file in files:
+                    if file.endswith('.h5'):
+                        os.remove(os.path.join(directory, file))
+    elif isinstance(fieldDirectory, str):
+            if os.path.exists(fieldDirectory):
+                files = os.listdir(fieldDirectory)
+                for file in files:
+                    if file.endswith('.h5'):
+                        os.remove(os.path.join(fieldDirectory, file))
+
 
 def readparticles(filename):
     """
