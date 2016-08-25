@@ -13,7 +13,7 @@ def explore(filename):
 
     return f.visit(_printname)
 
-def cleanupPrevious(particleDirectory = diagDir, fieldDirectory = diagFDir):
+def cleanupPrevious(particleDirectory, fieldDirectory):
 
     """
     Remove old diagnostic files.
@@ -27,7 +27,7 @@ def cleanupPrevious(particleDirectory = diagDir, fieldDirectory = diagFDir):
         for file in files:
             if file.endswith('.h5'):
                 os.remove(os.path.join(particleDirectory,file))
-    if isinstance(fielDirectory,dict):
+    if isinstance(fieldDirectory,dict):
         for key in fieldDirectory:
             if os.path.exists(fieldDirectory[key]):
                 files = os.listdir(fieldDirectory[key])
