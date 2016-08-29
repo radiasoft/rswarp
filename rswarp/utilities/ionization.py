@@ -321,10 +321,10 @@ class Ionization(ionization.Ionization):
     def generateEmittedVelocity(self, emitted_energy0, emitted_energy_sigma, vi, nnew):
         ek0ionel = tryFunctionalForm(emitted_energy0, vi=vi, nnew=nnew)
         esigionel = tryFunctionalForm(emitted_energy_sigma, vi=vi, nnew=nnew)
-        if esigionel == 0.:
-            ek = zeros(nnew)
+        if esigionel > 0:
+            ek = random.normal(0., esigionel, nnew)
         else:
-            ek = SpRandom(0., esigionel, nnew)  # kinetic energy
+            ek = zeros(nnew)
         ek = abs(ek+ek0ionel)  # kinetic energy
 
         frac_trans = ranf(ek)  # fraction of kinetic energy in the transverse direction
