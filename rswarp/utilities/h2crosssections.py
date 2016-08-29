@@ -10,9 +10,14 @@ Utility module for calculating ionization cross-sections, a la:
     for 200-1500-eV e-+ H2 collisions," Physical Review A, vol. 47, no. 3,
     pp. 1866, 1993. http://dx.doi.org/10.1103/PhysRevA.47.1866
 """
+from __future__ import division
 import time
-from warp import *
 import numpy as np
+# any import from warp will trigger arg parsing, which will fail without this
+# in a notebook context (or anything else with non-warp commandline args)
+import warpoptions
+warpoptions.ignoreUnknownArgs = True
+from warp import emass, clight, jperev
 
 bohr_radius = 5.29177e-11  # Bohr Radius
 I = 15.42593  # Threshold ionization energy (in eV), from the NIST Standard Reference Database (via NIST Chemistry WebBook)
@@ -26,7 +31,7 @@ def F(t):
     a1 = 0.74
     a2 = 0.87
     a3 = -0.60
-    return np.divide(1,t) * (a1 * np.log(t) + a2 + np.divide(1,t) * a3)
+    return np.divide(1, t) * (a1 * np.log(t) + a2 + np.divide(1, t) * a3)
 
 
 def f_1(w, t, n=fitparametern):
