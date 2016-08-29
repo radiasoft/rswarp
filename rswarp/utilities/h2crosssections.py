@@ -35,7 +35,7 @@ def F(t):
 
 
 def f_1(w, t, n=fitparametern):
-    return np.divide(1,(w+1)**n) + np.divide(1,(t-w)**n) - np.divide(1,((w+1) * (t-w))**(n/2))
+    return np.divide(1, (w+1)**n) + np.divide(1, (t-w)**n) - np.divide(1, ((w+1) * (t-w))**(n/2))
 
 
 def normalizedKineticEnergy(vi=None):
@@ -60,6 +60,7 @@ def h2_ioniz_ddcs(vi=None, vo=None, ke_emitted=None):
     # w = ke_emitted / I
     # sigma = G1 * (f_BE + G4*f_b)
     # return np.nan_to_num(sigma)
+
 
 def h2_ioniz_sdcs(vi=None, vo=None):
     """
@@ -86,6 +87,7 @@ def h2_ioniz_crosssection(vi=None):
 
     sigma = S * F(t) * g1(t, n)
     return np.nan_to_num(sigma)
+
 
 def ejectedEnergy(vi, nnew):
     """
