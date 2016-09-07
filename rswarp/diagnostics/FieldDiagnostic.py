@@ -2,7 +2,6 @@ import os
 
 import datetime
 from dateutil.tz import tzlocal
-
 import h5py as h5
 import matplotlib.pyplot as plt
 import numpy as np
@@ -31,6 +30,13 @@ class FieldDiagnostic(object):
             self.gridSpacing = [self.solver.dx, self.solver.dy, self.solver.dz]
             self.gridGlobalOffset = [self.solver.xmmin, self.solver.ymmin, self.solver.zmmin]
             self.mesh = [self.solver.xmesh, self.solver.ymesh, self.solver.zmesh]
+        elif self.solver.solvergeom == self.w3d.XZgeom:
+            self.geometry = 'cartesian2D'
+            self.dims = ['x', 'y', 'z']
+            self.gridsize = [self.solver.nx + 1, self.solver.nz + 1]
+            self.gridSpacing = [self.solver.dx, self.solver.dz]
+            self.gridGlobalOffset = [self.solver.xmmin, self.solver.zmmin]
+            self.mesh = [self.solver.xmesh, self.solver.zmesh]
         elif self.solver.solvergeom == self.w3d.RZgeom:
             self.geometry = 'thetaMode'
             self.geometryParameters = 'm=0'
@@ -92,13 +98,13 @@ class FieldDiagnostic(object):
         return True
 
     def writeDataset(self, data, prefix, attrs={}):
-
-        if len(data.shape) == len(self.dims):  # Scalar data on the mesh
+        # print "Shape in writeDataset", self.efield.shape
+        if len(data.shape) == len(self.dims) or (self.geometry == 'cartesian2D' and len(data.shape) == len(self.dims) - 1):  # Scalar data on the mesh
             self.file[prefix] = data
             field = self.file[prefix]
             field.attrs['position'] = [0.0]*len(self.dims)  # Report scalar as on the mesh elements
             field.attrs['unitSI'] = 1.0
-        elif len(data.shape) == len(self.dims) + 1:  # Vector data on the mesh
+        elif len(data.shape) == len(self.dims) + 1 or (self.geometry == 'cartesian2D' and len(data.shape) == len(self.dims)):  # Vector data on the mesh
 
             if self.geometry == 'thetaMode':
                 data = data.swapaxes(1, 2)  # For thetaMode, components stored in order of m,r,z
@@ -125,8 +131,10 @@ class FieldDiagnostic(object):
         for k, v in attrs.items():
             self.file[prefix].attrs[k] = v
 
+
 class ElectrostaticFields(FieldDiagnostic):
     """
+        Test
         Produce an HDF5 file with electric fields and potential.
         File tree:
         /data/meshes
@@ -169,9 +177,8 @@ class ElectrostaticFields(FieldDiagnostic):
             # OpenPMD compliance right now.
             self.phi = self.phi[np.newaxis, :, :]
 
-
-        self.writeDataset(self.efield, prefix='%s%sE' % (self.basePath, self.meshPath))
-        self.writeDataset(self.phi, prefix='%s%sphi' % (self.basePath, self.meshPath))
+            self.writeDataset(self.efield, prefix='%s%sE' % (self.basePath, self.meshPath))
+            self.writeDataset(self.phi, prefix='%s%sphi' % (self.basePath, self.meshPath))
 
         self.file.close()
 
