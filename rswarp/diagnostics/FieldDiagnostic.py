@@ -56,7 +56,8 @@ class FieldDiagnostic(object):
 
         outdir = os.path.split(prefix)[0]
         if outdir is not '' and not os.path.lexists(outdir):
-            os.makedirs(outdir)
+            if comm_world.rank == 0:
+                os.makedirs(outdir)
 
         step = str(self.top.it)
         filename = '%s%s.h5' % (prefix, step.zfill(5))
