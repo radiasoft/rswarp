@@ -3,8 +3,8 @@ import os
 import datetime
 from dateutil.tz import tzlocal
 import h5py as h5
-import matplotlib.pyplot as plt
 import numpy as np
+from warp import getselfe, getphi, getb, geta
 
 
 class FieldDiagnostic(object):
@@ -15,11 +15,13 @@ class FieldDiagnostic(object):
             solver: Solver containing fields to be output
             top: Object representing Warp's top package.
             w3d: Object representing Warp's w3d package.
+            comm_world: Object representing Warp's MPI communicator.
     """
-    def __init__(self, solver, top, w3d, period=None):
+    def __init__(self, solver, top, w3d, comm_world, period=None):
         self.solver = solver
         self.top = top
         self.w3d = w3d
+        self.lparallel = comm_world.Get_size()
         self.period = period
         self.geometryParameters = ''
 
@@ -155,10 +157,20 @@ class ElectrostaticFields(FieldDiagnostic):
     """
 
     def gatherfields(self):
-        self.efield = self.solver.getselfe()
+        if self.lparallel == 1:
+            self.efield = self.solver.getselfe()
+        else:
+            self.efield = []
+            for dim in ['x','y','z']:
+                self.efield.append(getselfe(comp=dim))
+
+            self.efield = np.array(self.efield)
 
     def gatherpotential(self):
-        self.phi = self.solver.getphi()
+        if self.lparallel == 1:
+            self.phi = self.solver.getphi()
+        else:
+            self.phi = getphi()
 
     def write(self, prefix='diags/fields/electric/efield'):
         if not super(ElectrostaticFields, self).write(prefix):
@@ -209,10 +221,24 @@ class MagnetostaticFields(FieldDiagnostic):
     """
 
     def gatherfields(self):
-        self.bfield = self.solver.getb()
+        if self.lparallel == 1:
+            self.bfield = self.solver.getb()
+        else:
+            self.bfield = []
+            for dim in ['x','y','z']:
+                self.bfield.append(getb(comp=dim))
+
+            self.bfield = np.array(self.bfield)
 
     def gathervectorpotential(self):
-        self.a = self.solver.geta()
+        if self.lparallel == 1:
+            self.a = self.solver.geta()
+        else:
+            self.a = []
+            for dim in ['x','y','z']:
+                self.a.append(geta(comp=dim))
+
+            self.a = np.array(self.a)
 
     def write(self, prefix='diags/fields/magnetic/bfield'):
         if not super(MagnetostaticFields, self).write(prefix):
