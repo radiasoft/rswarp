@@ -21,6 +21,7 @@ class FieldDiagnostic(object):
         self.solver = solver
         self.top = top
         self.w3d = w3d
+        self.comm_world = comm_world
         self.lparallel = comm_world.Get_size()
         self.period = period
         self.geometryParameters = ''
@@ -56,7 +57,7 @@ class FieldDiagnostic(object):
 
         outdir = os.path.split(prefix)[0]
         if outdir is not '' and not os.path.lexists(outdir):
-            if comm_world.rank == 0:
+            if self.comm_world.rank == 0:
                 os.makedirs(outdir)
 
         step = str(self.top.it)
