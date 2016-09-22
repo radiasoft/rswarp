@@ -176,7 +176,6 @@ class ElectrostaticFields(FieldDiagnostic):
             self.phi = getphi()
 
     def write(self, prefix='diags/fields/electric/efield'):
-        print "TRYING TO WRITE NOW"
         if not super(ElectrostaticFields, self).write(prefix):
             return False
 
@@ -193,7 +192,6 @@ class ElectrostaticFields(FieldDiagnostic):
             # OpenPMD compliance right now.
             self.phi = self.phi[np.newaxis, :, :]
         if self.comm_world.rank == 0:
-            print "WRITING NOW"
             self.writeDataset(self.efield, prefix='%s%sE' % (self.basePath, self.meshPath))
             self.writeDataset(self.phi, prefix='%s%sphi' % (self.basePath, self.meshPath))
             self.file.close()
