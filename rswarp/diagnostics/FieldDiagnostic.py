@@ -63,41 +63,42 @@ class FieldDiagnostic(object):
         step = str(self.top.it)
         filename = '%s%s.h5' % (prefix, step.zfill(5))
 
-        f = h5.File(filename, 'w')
+        if self.comm_world.rank == 0:
+            f = h5.File(filename, 'w')
 
-        # for i, v in enumerate(self.mesh):
-        #     f['/data/meshes/mesh/%s' % self.dims[i]] = v
-        # f['/data/meshes/mesh'].attrs['geometry'] = self.geometry
-        # f['/data/meshes/mesh'].attrs['geometryParameters'] = self.geometryParameters
+            # for i, v in enumerate(self.mesh):
+            #     f['/data/meshes/mesh/%s' % self.dims[i]] = v
+            # f['/data/meshes/mesh'].attrs['geometry'] = self.geometry
+            # f['/data/meshes/mesh'].attrs['geometryParameters'] = self.geometryParameters
 
-        # from warp.data_dumping.openpmd_diag.generic_diag
-        # This header information is from https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file
-        f.attrs["openPMD"] = np.string_("1.0.0")
-        f.attrs["openPMDextension"] = np.uint32(1)
-        f.attrs["software"] = np.string_("warp")
-        f.attrs["softwareVersion"] = np.string_("4")
-        f.attrs["date"] = np.string_(
-            datetime.datetime.now(tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z'))
-        f.attrs["meshesPath"] = np.string_("meshes/")
-        f.attrs["particlesPath"] = np.string_("particles/")
-        # Setup the basePath
-        f.attrs["basePath"] = np.string_("/data/%T/")
-        base_path = "/data/%d/" % self.top.it
-        bp = f.require_group(base_path)
+            # from warp.data_dumping.openpmd_diag.generic_diag
+            # This header information is from https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file
+            f.attrs["openPMD"] = np.string_("1.0.0")
+            f.attrs["openPMDextension"] = np.uint32(1)
+            f.attrs["software"] = np.string_("warp")
+            f.attrs["softwareVersion"] = np.string_("4")
+            f.attrs["date"] = np.string_(
+                datetime.datetime.now(tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z'))
+            f.attrs["meshesPath"] = np.string_("meshes/")
+            f.attrs["particlesPath"] = np.string_("particles/")
+            # Setup the basePath
+            f.attrs["basePath"] = np.string_("/data/%T/")
+            base_path = "/data/%d/" % self.top.it
+            bp = f.require_group(base_path)
 
-        # https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#required-attributes-for-the-basepath
-        bp.attrs["time"] = self.top.time
-        bp.attrs["dt"] = self.top.dt
-        bp.attrs["timeUnitSI"] = 1.
+            # https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#required-attributes-for-the-basepath
+            bp.attrs["time"] = self.top.time
+            bp.attrs["dt"] = self.top.dt
+            bp.attrs["timeUnitSI"] = 1.
 
-        # https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#iterations-and-time-series
-        f.attrs["iterationEncoding"] = np.string_("fileBased")
-        f.attrs["iterationFormat"] =  np.string_("%s%%T.h5" % prefix)
+            # https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#iterations-and-time-series
+            f.attrs["iterationEncoding"] = np.string_("fileBased")
+            f.attrs["iterationFormat"] =  np.string_("%s%%T.h5" % prefix)
 
-        self.basePath = base_path
-        self.meshPath = f.attrs["meshesPath"]
-        self.particlesPath = f.attrs["particlesPath"]
-        self.file = f
+            self.basePath = base_path
+            self.meshPath = f.attrs["meshesPath"]
+            self.particlesPath = f.attrs["particlesPath"]
+            self.file = f
 
         return True
 
@@ -175,6 +176,7 @@ class ElectrostaticFields(FieldDiagnostic):
             self.phi = getphi()
 
     def write(self, prefix='diags/fields/electric/efield'):
+        print "TRYING TO WRITE NOW"
         if not super(ElectrostaticFields, self).write(prefix):
             return False
 
@@ -190,11 +192,11 @@ class ElectrostaticFields(FieldDiagnostic):
             # the potential, but it's the only way to shoehorn the data into
             # OpenPMD compliance right now.
             self.phi = self.phi[np.newaxis, :, :]
-
+        if self.comm_world.rank == 0:
+            print "WRITING NOW"
             self.writeDataset(self.efield, prefix='%s%sE' % (self.basePath, self.meshPath))
             self.writeDataset(self.phi, prefix='%s%sphi' % (self.basePath, self.meshPath))
-
-        self.file.close()
+            self.file.close()
 
 
 class MagnetostaticFields(FieldDiagnostic):
@@ -248,8 +250,8 @@ class MagnetostaticFields(FieldDiagnostic):
 
         self.gatherfields()
         self.gathervectorpotential()
-
-        self.writeDataset(self.bfield, prefix='%s%sB' % (self.basePath, self.meshPath))
-        self.writeDataset(self.a, prefix='%s%svector_potential' % (self.basePath, self.meshPath))
+        if self.comm_world.rank == 0:
+            self.writeDataset(self.bfield, prefix='%s%sB' % (self.basePath, self.meshPath))
+            self.writeDataset(self.a, prefix='%s%svector_potential' % (self.basePath, self.meshPath))
 
         self.file.close()
