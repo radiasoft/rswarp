@@ -17,13 +17,21 @@ class FieldDiagnostic(object):
             w3d: Object representing Warp's w3d package.
             comm_world: Object representing Warp's MPI communicator.
     """
-    def __init__(self, solver, top, w3d, comm_world, period=None):
+    def __init__(self, solver, top, w3d, comm_world, period=None, write_dir=None):
         self.solver = solver
         self.top = top
         self.w3d = w3d
         self.comm_world = comm_world
-        self.lparallel = comm_world.Get_size()
+        if self.comm_world is None:
+            self.lparallel = 0
+        else:
+            self.lparallel = comm_world.Get_size()
+
         self.period = period
+        if write_dir is not None:
+            self.write_dir = write_dir
+        else:
+            write_dir = 'diags/fields/field'
         self.geometryParameters = ''
 
         if self.solver.solvergeom == self.w3d.XYZgeom:
@@ -51,17 +59,18 @@ class FieldDiagnostic(object):
         else:
             raise Exception("No handler for geometry type %i" % self.solver.solvergeom)
 
-    def write(self, prefix='field'):
+    def write(self, write_dir=None):
         if self.period and self.top.it % self.period != 0:
             return False
+        if write_dir is None:
+            write_dir = self.write_dir
 
-        outdir = os.path.split(prefix)[0]
-        if outdir is not '' and not os.path.lexists(outdir):
+        if not os.path.lexists(write_dir):
             if self.comm_world.rank == 0:
-                os.makedirs(outdir)
+                os.makedirs(write_dir)
 
         step = str(self.top.it)
-        filename = '%s%s.h5' % (prefix, step.zfill(5))
+        filename = '%s/data%s.h5' % (write_dir, step.zfill(5))
 
         if self.comm_world.rank == 0:
             f = h5.File(filename, 'w')
@@ -93,7 +102,7 @@ class FieldDiagnostic(object):
 
             # https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#iterations-and-time-series
             f.attrs["iterationEncoding"] = np.string_("fileBased")
-            f.attrs["iterationFormat"] =  np.string_("%s%%T.h5" % prefix)
+            f.attrs["iterationFormat"] =  np.string_("%s%%T.h5" % write_dir)
 
             self.basePath = base_path
             self.meshPath = f.attrs["meshesPath"]
@@ -140,7 +149,7 @@ class FieldDiagnostic(object):
 class ElectrostaticFields(FieldDiagnostic):
     """
         Test
-        Produce an HDF5 file with electric fields and potential.
+        Produce an HDF5 file with electric fields and potential .
         File tree:
         /data/meshes
             /mesh
@@ -164,7 +173,7 @@ class ElectrostaticFields(FieldDiagnostic):
             self.efield = self.solver.getselfe()
         else:
             self.efield = []
-            for dim in ['x','y','z']:
+            for dim in ['x', 'y', 'z']:
                 self.efield.append(getselfe(comp=dim))
 
             self.efield = np.array(self.efield)
@@ -175,9 +184,12 @@ class ElectrostaticFields(FieldDiagnostic):
         else:
             self.phi = getphi()
 
-    def write(self, prefix='diags/fields/electric/efield'):
-        if not super(ElectrostaticFields, self).write(prefix):
+    def write(self, write_dir=None):
+        if not super(ElectrostaticFields, self).write(write_dir):
             return False
+        if write_dir is None:
+            write_dir = self.write_dir
+            # write_dir = 'diags/fields/electric/efield'
 
         self.gatherfields()
         self.gatherpotential()
@@ -227,7 +239,7 @@ class MagnetostaticFields(FieldDiagnostic):
             self.bfield = self.solver.getb()
         else:
             self.bfield = []
-            for dim in ['x','y','z']:
+            for dim in ['x', 'y', 'z']:
                 self.bfield.append(getb(comp=dim))
 
             self.bfield = np.array(self.bfield)
@@ -237,14 +249,16 @@ class MagnetostaticFields(FieldDiagnostic):
             self.a = self.solver.geta()
         else:
             self.a = []
-            for dim in ['x','y','z']:
+            for dim in ['x', 'y', 'z']:
                 self.a.append(geta(comp=dim))
 
             self.a = np.array(self.a)
 
-    def write(self, prefix='diags/fields/magnetic/bfield'):
-        if not super(MagnetostaticFields, self).write(prefix):
+    def write(self, write_dir=None):
+        if not super(MagnetostaticFields, self).write(write_dir):
             return False
+        if write_dir is None:
+            write_dir = self.write_dir
 
         self.gatherfields()
         self.gathervectorpotential()
