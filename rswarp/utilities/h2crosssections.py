@@ -19,10 +19,11 @@ import warpoptions
 warpoptions.ignoreUnknownArgs = True
 from warp import emass, clight, jperev
 
-bohr_radius = 5.29177e-11  # Bohr Radius
+bohr_radius = 5.29177e-11  # Bohr Radius (in m)
 I = 15.42593  # Threshold ionization energy (in eV), from the NIST Standard Reference Database (via NIST Chemistry WebBook)
 R = 13.60569  # Rydberg energy (in eV)
-S = 4 * np.pi * bohr_radius**2 * (R/I)**2
+N = 2  # number of electrons in target (H2)
+S = 4 * np.pi * bohr_radius**2 * N * (R/I)**2
 fitparametern = 2.4  # species-dependent fitting parameter
 
 
@@ -31,7 +32,7 @@ def F(t):
     a1 = 0.74
     a2 = 0.87
     a3 = -0.60
-    return np.divide(1, t) * (a1 * np.log(t) + a2 + np.divide(1, t) * a3)
+    return np.divide(1, t) * (a1 * np.log(t) + a2 + a3 * np.divide(1, t))
 
 
 def f_1(w, t, n=fitparametern):
@@ -76,10 +77,11 @@ def h2_ioniz_sdcs(vi=None, vo=None):
 
 def h2_ioniz_crosssection(vi=None):
     """
-    Compute the total cross-section for impact ionization of H2 by e-, per David's formula
+    Compute the total cross-section for impact ionization of H2 by e-
     vi - incident electron velocity in m/s; this is passed in from warp as vxi=uxi*gaminvi etc.
     """
     t = normalizedKineticEnergy(vi)
+
     n = fitparametern
 
     def g1(t, n):
