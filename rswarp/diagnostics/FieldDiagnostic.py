@@ -12,10 +12,15 @@ class FieldDiagnostic(object):
         Common functionality for field diagnostic classes
 
         Parameters:
-            solver: Solver containing fields to be output
-            top: Object representing Warp's top package.
-            w3d: Object representing Warp's w3d package.
-            comm_world: Object representing Warp's MPI communicator.
+            solver: A solver object containing fields to be output.
+            top: The object representing Warp's top package.
+            w3d: The object representing Warp's w3d package.
+            comm_world: Object representing an MPI communicator.
+            period (int): Sets the period in steps of data writeout by the diagnostic.
+                Defaults to writeout on every step if not set.
+            write_dir (str): Relative path to place data output of the diagnostic.
+                Defaults to 'diags/fields/electric' for electric fields/potentials, and 'diags/fields/magnetic'
+                for magnetic fields/vector potentials if not set.
     """
     def __init__(self, solver, top, w3d, comm_world, period=None, write_dir=None):
         self.solver = solver
@@ -28,10 +33,11 @@ class FieldDiagnostic(object):
             self.lparallel = comm_world.Get_size()
 
         self.period = period
-        if write_dir is not None:
-            self.write_dir = write_dir
+        if not write_dir:
+            self.write_dir = None
         else:
-            write_dir = 'diags/fields/field'
+            self.write_dir = write_dir
+
         self.geometryParameters = ''
 
         if self.solver.solvergeom == self.w3d.XYZgeom:
@@ -184,12 +190,14 @@ class ElectrostaticFields(FieldDiagnostic):
         else:
             self.phi = getphi()
 
-    def write(self, write_dir=None):
+    def write(self):
+        if not self.write_dir:
+            write_dir = 'diags/fields/electric'
+        else:
+            write_dir = self.write_dir
+
         if not super(ElectrostaticFields, self).write(write_dir):
             return False
-        if write_dir is None:
-            write_dir = self.write_dir
-            # write_dir = 'diags/fields/electric/efield'
 
         self.gatherfields()
         self.gatherpotential()
@@ -254,11 +262,14 @@ class MagnetostaticFields(FieldDiagnostic):
 
             self.a = np.array(self.a)
 
-    def write(self, write_dir=None):
-        if not super(MagnetostaticFields, self).write(write_dir):
-            return False
-        if write_dir is None:
+    def write(self):
+        if not self.write_dir:
+            write_dir = 'diags/fields/magnetic'
+        else:
             write_dir = self.write_dir
+
+        if not super(MagnetostaticFields, self).write(write_dir):
+            return Falser
 
         self.gatherfields()
         self.gathervectorpotential()
