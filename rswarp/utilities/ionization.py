@@ -9,6 +9,8 @@ from rswarp.utilities.beam_manipulation import rotateVec
 import numpy as np
 import time
 import types
+from shutil import os
+import h5py
 
 __all__ = ['Ionization']
 
@@ -25,7 +27,6 @@ class Ionization(ionization.Ionization):
     """
     Extension of Warp's Ionization class including provisions for more detailed ionization physics.
     """
-
     def generateEmittedVelocity(self, nnew, emitted_energy0, emitted_energy_sigma=None):
         """
         Generate array of emitted particle velocities
@@ -77,18 +78,15 @@ class Ionization(ionization.Ionization):
         uold = sqrt(uxi**2 + uyi**2 + uzi**2)
         gaminvi = gaminvinew
         uscale = unew / uold
-        # uxi[io] *= uscale
-        # uyi[io] *= uscale
-        # uzi[io] *= uscale
-        with open('diag%s.npy' % top.it, 'wb') as f:
-            save(f, [Eold-(m*clight**2), Enew-(m*clight**2), emitted_energy0*jperev])
         return uscale
 
     def add(self, incident_species, emitted_species, cross_section=None,
             target_species=None, ndens=None, target_fluidvel=None,
             emitted_energy0=None, emitted_energy_sigma=None,
             incident_pgroup=top.pgroup, target_pgroup=top.pgroup, emitted_pgroup=top.pgroup,
-            l_remove_incident=None, l_remove_target=None, emitted_tag=None, sampleIncidentAngle=None, sampleEmittedAngle=None):
+            l_remove_incident=None, l_remove_target=None, emitted_tag=None,
+            sampleIncidentAngle=None, sampleEmittedAngle=None, writeAngleDataDir=None,
+            writeAnglePeriod=100):
         """
         Add a particular class of ionization event to the simulation.  Any given
         ionization event looks like:
@@ -105,6 +103,8 @@ class Ionization(ionization.Ionization):
             sampling scattering angles of incident species
         sampleIncidentAngle - callable (or array of len(emitted_species)) for
             sampling scattering angles of emitted species
+        writeAngleDataDir - directory used to write emission angle diagnostics
+        writeAnglePeriod - period to write out angle diagnostics
         """
         # Do all of Warp's normal initialization
         ionization.Ionization.add(self, incident_species, emitted_species, cross_section,
@@ -117,6 +117,11 @@ class Ionization(ionization.Ionization):
         # Extended class-specific operations following Warp's initialization
         self.sampleIncidentAngle = sampleIncidentAngle
         self.sampleEmittedAngle = sampleEmittedAngle
+        self.writeAngleDataDir = writeAngleDataDir
+        self.writeAnglePeriod = writeAnglePeriod
+
+        if self.writeAngleDataDir and not os.path.exists(self.writeAngleDataDir):
+            os.makedirs(self.writeAngleDataDir)
 
     def generate(self, dt=None):
         if dt is None:
@@ -326,6 +331,12 @@ class Ionization(ionization.Ionization):
                     ynew = yi
                     znew = zi
 
+                    incidentvelocities = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
+                    originalvelocities = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
+                    emissionangles = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
+                    emittedvelocities = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
+                    recoilangles = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
+
                     # --- Loop until there are no more collision events that need handling
                     while(nnew > 0):
 
@@ -371,11 +382,9 @@ class Ionization(ionization.Ionization):
                                 uznew = uznewsave
 
                             ui = np.vstack((uxi[io], uyi[io], uzi[io])).T
-                            with open('incidentvelocities.npy', 'w') as f:
-                                np.save(f, ui)
+                            incidentvelocities[emitted_species] = np.append(incidentvelocities[emitted_species], ui)
 
                             scale = self.scalePrimaryVelocities(incident_species, ipg, io, emitted_energy0, emitted_energy_sigma, i1)
-                            print("Setting emitted velocity along initial velocity...")
                             gnew = 1. + emitted_energy*jperev / (emass*clight**2)
                             bnew = np.sqrt(1 - 1/gnew**2)
                             norm = np.linalg.norm(ui, axis=1)
@@ -393,33 +402,32 @@ class Ionization(ionization.Ionization):
                             rotvec = np.cross(v1, v2)
 
                             gaminviold = ipg.gaminv[io * self.stride + i1]
-                            incident_energy = (incident_species.mass*clight**2) / ipg.gaminv[io * self.stride + i1] / jperev
+                            incident_ke = (incident_species.mass*clight**2)/jperev * (1. / ipg.gaminv[io * self.stride + i1] - 1.)
 
                             if hasattr(self.sampleEmittedAngle, '__call__'):
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
-                                with open('originalvelocities.npy', 'w') as f:
-                                    np.save(f, uemit)
-                                emissionangles = self.sampleEmittedAngle(nnew=nnew, emitted_energy=emitted_energy, incident_energy=incident_energy)
-                                with open('emissionangles.npy', 'w') as f:
-                                    np.save(f, emissionangles)
+                                angles = self.sampleEmittedAngle(nnew=nnew, emitted_energy=emitted_energy, incident_energy=incident_ke)
+                                if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
+                                    originalvelocities[emitted_species] = np.append(originalvelocities[emitted_species], uemit)
+                                    emissionangles[emitted_species] = np.append(emissionangles[emitted_species], angles)
 
                                 # Altitude
-                                uxnew, uynew, uznew = [l.flatten() for l in rotateVec(vec=uemit, rotaxis=rotvec, theta=emissionangles)]
+                                uxnew, uynew, uznew = [l.flatten() for l in rotateVec(vec=uemit, rotaxis=rotvec, theta=angles)]
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
 
                                 # Azimuth (random)
-                                # uxnew, uynew, uznew = [l.flatten() for l in rotateVec(vec=uemit, rotaxis=v1, theta=np.random.uniform(size=uemit.size)*2*np.pi)]
-                                # uemit = np.vstack((uxnew, uynew, uznew)).T
+                                uxnew, uynew, uznew = [l.flatten() for l in rotateVec(vec=uemit, rotaxis=v1, theta=np.random.uniform(size=uemit.shape[0])*2*np.pi)]
+                                uemit = np.vstack((uxnew, uynew, uznew)).T
 
                                 assert np.all(np.abs(uemit) < clight), "Vemit >= c"
-                                with open('emittedvelocities.npy', 'w') as f:
-                                    np.save(f, uemit)
+                                if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
+                                    emittedvelocities[emitted_species] = np.append(emittedvelocities[emitted_species], uemit)
                             elif hasattr(self.sampleIncidentAngle, '__call__'):
-                                recoilangles = self.sampleIncidentAngle(nnew=nnew, W=emitted_energy0, T=T, theta_e=emissionangles)
-                                with open('recoilangles.npy', 'w') as f:
-                                    np.save(f, recoilangles)
+                                rangles = self.sampleIncidentAngle(nnew=nnew, W=emitted_energy0, T=T, theta_e=emissionangles)
+                                if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
+                                    recoilangles[emitted_species] = np.append(recoilangles[emitted_species], rangles)
                                 vin = np.vstack((vxi, vyi, vzi)).T
-                                vxi, vyi, vzi = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=recoilangles)]
+                                vxi, vyi, vzi = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=rangles)]
 
                             ginew = 1. / sqrt(1. + (uxnew**2 + uynew ** 2 + uznew**2) / clight**2)
                             # --- get velocity in boosted frame if using a boosted frame of reference
@@ -439,6 +447,18 @@ class Ionization(ionization.Ionization):
                         ncoli = ncoli[io] - 1
                         io = arange(nnew)[ncoli > 0]
                         nnew = len(io)
+
+                    if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
+                        for em in self.inter[incident_species]['emitted_species'][it]:
+                            fmt = (int(top.it), incident_species.name, em.name)
+                            start = time.time()
+                            with h5py.File(os.path.join(self.writeAngleDataDir, 'angledata.h5'), 'a') as f:
+                                f['data/{}/{}/{}/incidentvelocities'.format(*fmt)] = incidentvelocities[em]
+                                f['data/{}/{}/{}/originalvelocities'.format(*fmt)] = originalvelocities[em]
+                                f['data/{}/{}/{}/emittedvelocities'.format(*fmt)] = emittedvelocities[em]
+                                f['data/{}/{}/{}/emissionangles'.format(*fmt)] = emissionangles[em]
+                                f['data/{}/{}/{}/recoilangles'.format(*fmt)] = recoilangles[em]
+                            print("Spent {} ms on hdf5 writing".format((time.time() - start)*1000))
 
         # make sure that all particles are added and cleared
         for pg in self.x:
