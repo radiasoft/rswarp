@@ -98,7 +98,8 @@ def loadparticlefiles(directory):
     step_arrays = {}
 
     for obj in os.listdir(directory):
-        if os.path.isfile(directory + obj) and os.path.splitext(obj)[1] == '.h5':
+        file_path = os.path.join(directory, obj)
+        if os.path.isfile(file_path) and os.path.splitext(obj)[1] == '.h5':
 
             step = int(re.findall(r'\d+', obj)[0])
 
