@@ -269,7 +269,7 @@ class MagnetostaticFields(FieldDiagnostic):
             write_dir = self.write_dir
 
         if not super(MagnetostaticFields, self).write(write_dir):
-            return Falser
+            return False
 
         self.gatherfields()
         self.gathervectorpotential()
