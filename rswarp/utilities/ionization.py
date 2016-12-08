@@ -422,12 +422,13 @@ class Ionization(ionization.Ionization):
                                 assert np.all(np.abs(uemit) < clight), "Vemit >= c"
                                 if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                     emittedvelocities[emitted_species] = np.append(emittedvelocities[emitted_species], uemit)
-                            elif hasattr(self.sampleIncidentAngle, '__call__'):
-                                rangles = self.sampleIncidentAngle(nnew=nnew, W=emitted_energy0, T=T, theta_e=emissionangles)
-                                if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
-                                    recoilangles[emitted_species] = np.append(recoilangles[emitted_species], rangles)
-                                vin = np.vstack((vxi, vyi, vzi)).T
-                                vxi, vyi, vzi = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=rangles)]
+
+                                if hasattr(self.sampleIncidentAngle, '__call__'):
+                                    rangles = self.sampleIncidentAngle(nnew=nnew, W=emitted_energy0, T=T, theta_e=emissionangles)
+                                    if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
+                                        recoilangles[emitted_species] = np.append(recoilangles[emitted_species], rangles)
+                                    vin = np.vstack((vxi, vyi, vzi)).T
+                                    vxi, vyi, vzi = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=rangles)]
 
                             ginew = 1. / sqrt(1. + (uxnew**2 + uynew ** 2 + uznew**2) / clight**2)
                             # --- get velocity in boosted frame if using a boosted frame of reference
