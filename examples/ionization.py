@@ -3,6 +3,10 @@ import numpy as np
 from warp import *
 from rswarp.utilities.ionization import Ionization
 from rswarp.utilities.beam_distributions import createKV
+
+import rsoopic.h2crosssections as h2crosssections
+from rsoopic.h2crosssections import h2_ioniz_crosssection
+
 import shutil
 from shutil import os
 
@@ -13,17 +17,16 @@ beam_gamma = beam_ke/511e3 + 1
 beam_beta = np.sqrt(1-1/beam_gamma**2)
 sw = 1
 
-# Weights are set to zero here to disable field solve in the interest of speed
-beam = Species(type=Electron, name='e-', weight=0)
+beam = Species(type=Electron, name='e-', weight=1)
 # These two species represent the emitted particles
-h2plus = Species(type=Dihydrogen, charge_state=+1, name='H2+', weight=0)
-emittedelec = Species(type=Electron, name='emitted e-', weight=0)
+h2plus = Species(type=Dihydrogen, charge_state=+1, name='H2+', weight=1)
+emittedelec = Species(type=Electron, name='emitted e-', weight=1)
 
 beam.ibeam = 1e-6
 
-top.dt = 0.1e-9
-ptcl_per_step = int(beam.ibeam * top.dt / echarge / sw)  # number of particles to inject on each step
 
+top.lrelativ = True
+top.relativity = 1
 
 def cleanupPrevious(outputDirectory='angleDiagnostic'):
     if os.path.exists(outputDirectory):
@@ -54,12 +57,10 @@ top.pboundxy = absorb
 
 Lz = (w3d.zmmax - w3d.zmmin)
 dz =  Lz / w3d.nz
-top.dt = (dz) / (beam_beta * clight) / 3  # 3 timesteps to cross a single cell
+top.dt = 0.1e-9
+ptcl_per_step = int(beam.ibeam * top.dt / echarge / sw)  # number of particles to inject on each step
 
 top.ibpush = 1  # 0:off, 1:fast, 2:accurate
-
-top.lrelativ = True
-top.relativity = 1
 
 # --- Other injection variables
 w3d.l_inj_exact = True
@@ -67,8 +68,8 @@ w3d.l_inj_area = False
 
 w3d.solvergeom = w3d.RZgeom
 
-w3d.bound0 = periodic
-w3d.boundnz = periodic
+w3d.bound0 = dirichlet
+w3d.boundnz = dirichlet
 w3d.boundxy = dirichlet
 
 package("w3d")
@@ -107,11 +108,6 @@ def injectelectrons(npart=ptcl_per_step, zoffset=w3d.dz/5):  # emitting surface 
 
 installuserinjection(injectelectrons)
 
-# --- Specify injection of the particles
-top.inject = 6                       # 2 means space-charge limited injection, 6 is user specified
-top.npinject = ptcl_per_step           # Approximate number of particles injected each step
-top.ainject = 0.0008                      # Must be set even for user defined injection, doesn't seem to do anything
-top.binject = 0.0008                      # Must be set even for user defined injection, doesn't seem to do anything
 
 ####################################
 # Ionization of background gas     #
@@ -128,25 +124,25 @@ if simulateIonization is True:
         xmax=w3d.xmmax,
         ymin=w3d.ymmin,
         ymax=w3d.ymmax,
-        zmin=(w3d.zmmin + w3d.zmmax)/2. - w3d.dz*3,
-        zmax=(w3d.zmmin + w3d.zmmax)/2. + w3d.dz*3,
+        zmin=w3d.zmmin,
+        zmax=w3d.zmmax,
         nx=w3d.nx,
         ny=w3d.ny,
         nz=w3d.nz,
         l_verbose=True
     )
 
-    # e + H2 -> 2e + H2+
+    # # e + H2 -> 2e + H2+
     ioniz.add(
         incident_species=beam,
         emitted_species=[h2plus, emittedelec],
-        cross_section=1e-25,
-        emitted_energy0=[0, lambda nnew, vi: 1./np.sqrt(1-((vi/2.)/clight)**2) * emass * clight**2],
-        emitted_energy_sigma=[0, lambda nnew, vi: 0],
-        sampleEmittedAngle=lambda nnew, emitE, incE: np.random.uniform(0, 2*np.pi),
-        sampleIncidentAngle=lambda nnew, emitE, incE, emitTheta: np.random.uniform(0, 2*np.pi),
-        writeAngleDataDir='angleDiagnostic',
-        writeAnglePeriod=100,
+        cross_section=1e-20,
+        emitted_energy0=[0, lambda nnew, vi: 100],
+        emitted_energy_sigma=[0, 0],
+        sampleEmittedAngle=lambda nnew, emitted_energy, incident_energy: np.random.uniform(0, 2*np.pi, size=nnew),
+        # sampleIncidentAngle=lambda nnew, emitted_energy, incident_energy, emitted_theta: np.random.uniform(0, 2*np.pi, size=nnew),
+        # writeAngleDataDir='angleDiagnostic',
+        # writeAnglePeriod=100,
         l_remove_incident=False,
         l_remove_target=False,
         ndens=target_density
