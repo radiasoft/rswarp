@@ -406,7 +406,7 @@ class Ionization(ionization.Ionization):
 
                             if hasattr(self.sampleEmittedAngle, '__call__'):
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
-                                angles = self.sampleEmittedAngle(nnew=nnew, emitted_energy=emitted_energy, incident_energy=incident_ke)
+                                angles = np.array(self.sampleEmittedAngle(nnew=nnew, emitted_energy=emitted_energy, incident_energy=incident_ke))
                                 if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                     originalvelocities[emitted_species] = np.append(originalvelocities[emitted_species], uemit)
                                     emissionangles[emitted_species] = np.append(emissionangles[emitted_species], angles)
@@ -424,7 +424,7 @@ class Ionization(ionization.Ionization):
                                     emittedvelocities[emitted_species] = np.append(emittedvelocities[emitted_species], uemit)
 
                                 if hasattr(self.sampleIncidentAngle, '__call__'):
-                                    rangles = self.sampleIncidentAngle(nnew=nnew, W=emitted_energy0, T=T, theta_e=emissionangles)
+                                    rangles = np.array(self.sampleIncidentAngle(nnew=nnew, emitted_energy=emitted_energy0, incident_energy=incident_ke, emitted_theta=emissionangles))
                                     if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                         recoilangles[emitted_species] = np.append(recoilangles[emitted_species], rangles)
                                     vin = np.vstack((vxi, vyi, vzi)).T
