@@ -37,8 +37,12 @@ def rotateVec(vec, rotaxis, theta):
     """
     Given a 3-vector vec, rotate about rotaxis by $\theta$
 
-    Also accepts iterable input if all arguments are compatible lengths
+    Also accepts iterable input for vec and rotaxis if the arguments are
+    compatible lengths.
     """
+    assert not (np.any(np.isnan(vec)) or
+                np.any(np.isnan(rotaxis)) or
+                np.any(np.isnan(theta))), "Inputs must not be NaN"
     if np.shape(vec) == (3, ):
         R = rotationMatrix3D(rotaxis, theta)
         norm = np.linalg.norm(vec)
@@ -56,7 +60,7 @@ def rotateVec(vec, rotaxis, theta):
             norm = np.linalg.norm(v)
             R = rotationMatrix3D(r, t)
             res[i] = np.dot(R, v)
-            assert np.isclose(np.linalg.norm(res[i]), norm), "Rotation changed vector norm"
+            assert np.isclose(np.linalg.norm(res[i]), norm), "Rotation changed vector norm: v={}, r={}, t={}, R={}".format(v, r, t, R)
         return np.hsplit(res, 3)
 
 
