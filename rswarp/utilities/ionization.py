@@ -65,16 +65,25 @@ class Ionization(ionization.Ionization):
         uznew = u_long
         return [uxnew, uynew, uznew]
 
-    def scalePrimaryVelocities(self, incident_species, ipg, io, emitted_energy0, emitted_energy_sigma, i1):
+    def scalePrimaryVelocities(self, incident_species, ipg, emitted_energy0,
+                               emitted_energy_sigma, i1, i2, io):
         m = incident_species.mass
-        uxi = ipg.uxp[io * self.stride + i1]
-        uyi = ipg.uxp[io * self.stride + i1]
-        uzi = ipg.uxp[io * self.stride + i1]
-        gaminviold = ipg.gaminv[io * self.stride + i1]
-        Eold = (m*clight**2)/gaminviold
-        Enew = Eold - emitted_energy0*jperev + (emitted_energy_sigma or 0)
-        gaminvinew = (m*clight**2)/Enew
-        unew = clight * sqrt(1/gaminvinew**2 - 1)
+        Erest = m*clight**2
+        uxi = ipg.uxp[i1:i2:self.stride][io]
+        uyi = ipg.uyp[i1:i2:self.stride][io]
+        uzi = ipg.uzp[i1:i2:self.stride][io]
+        gaminviold = ipg.gaminv[i1:i2:self.stride][io]
+        Eold = Erest * 1./gaminviold
+        Enew = Eold - (emitted_energy0 + (emitted_energy_sigma or 0)) * jperev
+        if np.any(Enew < Erest):
+            print("WARNING: requested emitted_energy0 would reduce energy of {} "
+                  "particles to less than rest mass, clamping incident energy "
+                  "to rest mass.".format(np.sum(Enew < Erest))
+                  )
+        Enew = np.maximum(Erest, Enew)
+        gaminvinew = np.minimum(Erest / Enew, 1.)
+        assert(np.all(gaminvinew <= 1)), "Gamma should be <= than 1"
+        unew = clight * sqrt(1 - gaminvinew**2)
         uold = sqrt(uxi**2 + uyi**2 + uzi**2)
         gaminvi = gaminvinew
         uscale = unew / uold
@@ -367,6 +376,9 @@ class Ionization(ionization.Ionization):
 
                         for ie, emitted_species in enumerate(self.inter[incident_species]['emitted_species'][it]):
 
+                            gaminviold = ipg.gaminv[io * self.stride + i1]
+                            incident_ke = (incident_species.mass*clight**2)/jperev * (1. / ipg.gaminv[io * self.stride + i1] - 1.)
+
                             if self.inter[incident_species]['emitted_energy0'][it][ie] is not None:
                                 # --- Create new velocities for the emitted particles.
                                 emitted_energy0 = tryFunctionalForm(self.inter[incident_species]['emitted_energy0'][it][ie], vi=vi, nnew=nnew)
@@ -384,7 +396,7 @@ class Ionization(ionization.Ionization):
                             ui = np.vstack((uxi[io], uyi[io], uzi[io])).T
                             incidentvelocities[emitted_species] = np.append(incidentvelocities[emitted_species], ui)
 
-                            scale = self.scalePrimaryVelocities(incident_species, ipg, io, emitted_energy0, emitted_energy_sigma, i1)
+                            scale = self.scalePrimaryVelocities(incident_species, ipg, emitted_energy0, emitted_energy_sigma, i1, i2, io)
                             gnew = 1. + emitted_energy*jperev / (emass*clight**2)
                             bnew = np.sqrt(1 - 1/gnew**2)
                             norm = np.linalg.norm(ui, axis=1)
@@ -401,8 +413,6 @@ class Ionization(ionization.Ionization):
                             v2[:, 2] = 0
                             rotvec = np.cross(v1, v2)
 
-                            gaminviold = ipg.gaminv[io * self.stride + i1]
-                            incident_ke = (incident_species.mass*clight**2)/jperev * (1. / ipg.gaminv[io * self.stride + i1] - 1.)
 
                             if hasattr(self.sampleEmittedAngle, '__call__'):
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
@@ -427,8 +437,8 @@ class Ionization(ionization.Ionization):
                                     rangles = np.array(self.sampleIncidentAngle(nnew=nnew, emitted_energy=emitted_energy0, incident_energy=incident_ke, emitted_theta=emissionangles))
                                     if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                         recoilangles[emitted_species] = np.append(recoilangles[emitted_species], rangles)
-                                    vin = np.vstack((vxi, vyi, vzi)).T
-                                    vxi, vyi, vzi = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=rangles)]
+                                    vin = np.vstack((vxi[io], vyi[io], vzi[io])).T
+                                    vxi[io], vyi[io], vzi[io] = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=rangles)]
 
                             ginew = 1. / sqrt(1. + (uxnew**2 + uynew ** 2 + uznew**2) / clight**2)
                             # --- get velocity in boosted frame if using a boosted frame of reference
