@@ -55,7 +55,6 @@ if simulateIonization is True:
 The initialization routine of the `Ionization` object is identical to Warp. We also calculate the number density of the target gas in terms of more useful engineering parameters here.
 
 ```python
-    # e + H2 -> 2e + H2+
     ioniz.add(
         incident_species=beam,
         emitted_species=[h2plus, emittedelec],
@@ -64,25 +63,28 @@ The initialization routine of the `Ionization` object is identical to Warp. We a
 If we replaced `emittedelec` with `beam` here, we would allow for an arbitrary number of additional ionization events.
 
 ```python
-        cross_section=1e-25,
-        emitted_energy0=[0, lambda nnew, vi: 1./np.sqrt(1-((vi/2.)/clight)**2) * emass * clight**2],
-        emitted_energy_sigma=[0, lambda nnew, vi: 0],
-        sampleEmittedAngle=lambda nnew, emitE, incE: np.random.uniform(0, 2*np.pi),
-        sampleIncidentAngle=lambda nnew, emitE, incE, emitTheta: np.random.uniform(0, 2*np.pi),
+        cross_section=h2crosssections.h2_ioniz_crosssection,
+        # cross_section=lambda nnew, vi: 1e-20,
+        emitted_energy0=[0, h2crosssections.ejectedEnergy],
+        # emitted_energy0=[0, lambda nnew, vi: 1./np.sqrt(1.-((vi/2.)/clight)**2) * emass*clight/jperev],
+        emitted_energy_sigma=[0, 0],
+        # sampleEmittedAngle=lambda nnew, emitted_energy, incident_energy: np.random.uniform(0, 2*np.pi, size=nnew),
+        sampleEmittedAngle=h2crosssections.generateAngle,
+        # sampleIncidentAngle=lambda nnew, emitted_energy, incident_energy, emitted_theta: np.random.uniform(0, 2*np.pi, size=nnew),
 ```
 
-Here, specify the influence of the total, singly-differential, and doubly-differential cross-sections.  Warp's built-in behavior allows specifying `cross_section` as either a constant, or a callable function with a single argument `vi`, an `ndarray` containing the velocities of the incident particles. In `rswarp`, this ability to pass a callable (or list thereof) also applies to `emitted_energy0` and `emitted_energy_sigma`, with the arguments as shown above. It is generally more convenient to define this function elsewhere and pass it in by name than to use a `lambda`, but the latter is used here for brevity's sake.
+Here, specify the influence of the total, singly-differential, and doubly-differential cross-sections.  Warp's built-in behavior allows specifying `cross_section` as either a constant, or a callable function with a single argument `vi`, an `ndarray` containing the velocities of the incident particles. In `rswarp`, this ability to pass a callable (or list thereof) also applies to `emitted_energy0` and `emitted_energy_sigma`, with the arguments as shown in the commented-out lambdas above. The example as written uses the [rsoopic](https://github.com/radiasoft/rsoopic) module for its functions describing these distributions for hydrogen.
 
 `sampleIncidentAngle` and `sampleEmittedAngle` allow the user to specify a callable for specifying the angles (relative to the incident particle's trajectory) of the incident and emitted particles after ionization, respectively. The arguments to these functions are the number of particles `nnew`, and the emitted and incident energies. `sampleIncidentAngle` also takes an additional argument for the angles given to the emitted particles after calling `sampleEmittedAngle` (this means `sampleIncidentAngle` will only be called if `sampleEmittedAngle` is specified). Together, these two functions allow the user to implement emission behavior that resolves momentum transferred to an emitted particle.
 
 Breaking from Warp's behavior, if these sample functions are *not* specified, the emitted particle will be traveling in the *same direction* as the incident particle, with a velocity appropriate to its selected energy.
 
 ```python
-        writeAngleDataDir='angleDiagnostic',
-        writeAnglePeriod=100,
+        writeAngleDataDir=diagDir + '/angleDiagnostic',
+        writeAnglePeriod=10,
 ```
 
-These parameters control writing out of angles of emitted particles. These diagnostics are moderatly *slow* at present, so it is best to leave them disabled unless benchmarking the class's behavior.
+These parameters control writing out of angles of emitted particles. These diagnostics are moderately *slow* at present, so it is best to leave them disabled unless benchmarking the class's behavior.
 
 ```python
         l_remove_incident=False,

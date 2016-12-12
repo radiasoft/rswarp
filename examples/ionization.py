@@ -1,26 +1,30 @@
 from __future__ import division
 import numpy as np
+
 from warp import *
+from warp.data_dumping.openpmd_diag.particle_diag import ParticleDiagnostic
+
 from rswarp.utilities.ionization import Ionization
 from rswarp.utilities.beam_distributions import createKV
 
 import rsoopic.h2crosssections as h2crosssections
-from rsoopic.h2crosssections import h2_ioniz_crosssection
 
 import shutil
 from shutil import os
 
 simulateIonization = True
 
-beam_ke = 100  # beam kinetic energy, in eV
+beam_ke = 1e3  # beam kinetic energy, in eV
 beam_gamma = beam_ke/511e3 + 1
 beam_beta = np.sqrt(1-1/beam_gamma**2)
 sw = 1
 
-beam = Species(type=Electron, name='e-', weight=1)
+diagDir = ("diags%.3fkeV" % (beam_ke/1e3))
+
+beam = Species(type=Electron, name='e-', weight=sw)
 # These two species represent the emitted particles
-h2plus = Species(type=Dihydrogen, charge_state=+1, name='H2+', weight=1)
-emittedelec = Species(type=Electron, name='emitted e-', weight=1)
+h2plus = Species(type=Dihydrogen, charge_state=+1, name='H2+', weight=sw)
+emittedelec = Species(type=Electron, name='emitted e-', weight=sw)
 
 beam.ibeam = 1e-6
 
@@ -136,13 +140,16 @@ if simulateIonization is True:
     ioniz.add(
         incident_species=beam,
         emitted_species=[h2plus, emittedelec],
-        cross_section=1e-20,
-        emitted_energy0=[0, lambda nnew, vi: 100],
+        cross_section=h2crosssections.h2_ioniz_crosssection,
+        # cross_section=lambda nnew, vi: 1e-20,
+        emitted_energy0=[0, h2crosssections.ejectedEnergy],
+        # emitted_energy0=[0, lambda nnew, vi: 1./np.sqrt(1.-((vi/2.)/clight)**2) * emass*clight/jperev],
         emitted_energy_sigma=[0, 0],
-        sampleEmittedAngle=lambda nnew, emitted_energy, incident_energy: np.random.uniform(0, 2*np.pi, size=nnew),
+        # sampleEmittedAngle=lambda nnew, emitted_energy, incident_energy: np.random.uniform(0, 2*np.pi, size=nnew),
+        sampleEmittedAngle=h2crosssections.generateAngle,
         # sampleIncidentAngle=lambda nnew, emitted_energy, incident_energy, emitted_theta: np.random.uniform(0, 2*np.pi, size=nnew),
-        # writeAngleDataDir='angleDiagnostic',
-        # writeAnglePeriod=100,
+        writeAngleDataDir=diagDir + '/angleDiagnostic',
+        writeAnglePeriod=10,
         l_remove_incident=False,
         l_remove_target=False,
         ndens=target_density
@@ -160,7 +167,28 @@ top.npinject = ptcl_per_step           # Approximate number of particles injecte
 top.ainject = 0.0008                      # Must be set even for user defined injection, doesn't seem to do anything
 top.binject = 0.0008                      # Must be set even for user defined injection, doesn't seem to do anything
 
+diagP = ParticleDiagnostic(
+    period=50,
+    top=top,
+    w3d=w3d,
+    species={species.name: species for species in listofallspecies},
+    comm_world=comm_world,
+    lparallel_output=False,
+    write_dir=diagDir + '/xySlice/'
+)
+
+diags = [diagP]
+
+def writeDiagnostics():
+    for d in diags:
+        d.write()
+
+installafterstep(writeDiagnostics)
+
 package("w3d")
 generate()
 
 stept(100e-9)  # Simulate 100 ns
+
+with open(diagDir + '/emitelec_ke.npy', 'w') as f:
+    np.save(f, emittedelec.getke())
