@@ -2,6 +2,7 @@ from copy import deepcopy
 import h5py as h5
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.constants import e, c, electron_mass
 
 
 def convertunits(particlearray):
@@ -22,42 +23,23 @@ def convertunits(particlearray):
 
     return dat
 
-def plotphasespace(particlearray,color='b',decorator=None):
-    fig = plt.figure(figsize=(12, 8),facecolor='white')
 
-    ax0 = plt.subplot(2, 3, 1)
-    ax0.scatter(particlearray[:, 0], particlearray[:, 1], c=color)
-    ax0.set_title("x-xp phase space")
-    ax0.set_xlabel("x (m)")
-    ax0.set_ylabel("xp (rad)")
+def get_zcurrent(particle_array, momenta, mesh, particle_weight, dz):
+    """
+    Find z-directed current on a per cell basis
 
-    ax1 = plt.subplot(2, 3, 2)
-    ax1.scatter(particlearray[:, 2], particlearray[:, 3], c=color)
-    ax1.set_title("y-yp phase space")
-    ax1.set_xlabel("y (m)")
-    ax1.set_ylabel("yp (rad)")
+    particle_array: z positions at a given step
+    momenta: particle momenta at a given step in SI units
+    mesh: Array of Mesh spacings
+    particle_weight: Weight from Warp
+    dz: Cell Size
+    """
 
-    ax2 = plt.subplot(2, 3, 3)
-    ax2.scatter(particlearray[:, 0], particlearray[:, 2], c=color)
-    ax2.set_title("x-y distribution")
-    ax2.set_xlabel("x (m)")
-    ax2.set_ylabel("y (m)")
+    current = np.zeros_like(mesh)
+    velocity = c * momenta / np.sqrt(momenta**2 + (electron_mass * c)**2)
 
-    ax3 = plt.subplot(2, 3, 4)
-    ax3.scatter(particlearray[:, 4], particlearray[:, 5], c=color)
-    ax3.set_title("z-pz phase space")
-    ax3.set_xlabel("z (m)")
-    ax3.set_ylabel("pz (MeV/c)")
+    for index, zval in enumerate(particle_array):
+        bucket = np.round(zval/dz)  # value of the bucket/index in the current array
+        current[int(bucket)] += velocity[index]
 
-    ax4 = plt.subplot(2, 3, 5)
-    ax4.scatter(particlearray[:, 4], particlearray[:, 0], c=color)
-    ax4.set_title("z-x phase space")
-    ax4.set_xlabel("z (m)")
-    ax4.set_ylabel("x (m)")
-
-    if decorator is not None:
-        decorator(fig)
-
-    # fig.tight_layout()
-    plt.show()
-    return fig
+    return current * e * particle_weight / dz
