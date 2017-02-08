@@ -1,7 +1,9 @@
-import subprocess
+from subprocess import Popen, PIPE
 from file_utils import cleanupPrevious
 import os
 
+# TODO Pipe stderror to a parameter when Warp fails
+# TODO
 
 class RunWarp():
     def __init__(self,runfile,cores=1,
@@ -19,7 +21,7 @@ class RunWarp():
             directories.
         """
 
-        self.runflag = True
+        self.runflag = False
         self.runfile = runfile
         self.cores = cores
         self.particle_path = particle_path
@@ -32,36 +34,62 @@ class RunWarp():
     def _set_runflag(self):
         if os.path.isdir(self.particle_path):
             self.runflag = False
-        elif isinstance(self.field_path, dict):
+        else:
+            self.runflag = True
+
+        if isinstance(self.field_path, dict):
             for key in self.field_path:
                 if os.path.isdir(self.field_path[key]):
                     self.runflag = False
+                else:
+                    self.runflag = True
         elif isinstance(self.field_path, list):
             for key in self.field_path:
                 if os.path.isdir(key):
                     self.runflag = False
+                else:
+                    self.runflag = True
         elif isinstance(self.field_path, str):
             if os.path.isdir(self.field_path):
                 self.runflag = False
+            else:
+                self.runflag = True
+
 
     def runwarp(self):
+
+        if self.runflag == False:
+            self._set_runflag()
+
+        stdout, stderr = False, False
 
         if self.runflag == True:
             if self.cores <= 1:
                 self.clean()
-                call = subprocess.call("python %s" % self.runfile, shell=True)
+                call = Popen("python %s" % self.runfile,
+                             stderr=PIPE, shell=True)
+                stdout, stderr = call.communicate()
             elif self.cores > 1:
                 self.clean()
-                call = subprocess.call("mpiexec -n %s python %s" % (self.cores, self.runfile), shell=True)
+                call = Popen("mpiexec -n %s python %s" % (self.cores, self.runfile),
+                             stderr=PIPE, shell=True)
+                stdout, stderr = call.communicate()
         elif self.runflag != True:
             print "Output directory already exists. Please change directory path to run." \
                   "\n To override this set attribute runflag to True"
-            call = 1
+            return
 
-        if call == 0:
+        if call.returncode == 0:
             print "Warp Run Completed"
             self.runflag = False
-        elif call != 0:
-            print "Warp Failed to Run"
 
+            return
+        elif call.returncode != 0:
+            print "Warp Failed to Run with Traceback:"
+            if stderr:
+                print
+                print stderr
+            else:
+                print "No Traceback Available"
 
+            return
