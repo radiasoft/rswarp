@@ -1,6 +1,7 @@
 from subprocess import Popen, PIPE
 from file_utils import cleanupPrevious
 import os
+import sys
 
 # TODO Pipe stderror to a parameter when Warp fails
 # TODO
@@ -64,7 +65,7 @@ class RunWarp():
         if self.runflag == True:
             if self.cores <= 1:
                 self.clean()
-                call = Popen("python %s" % self.runfile,
+                call = Popen("{} {}".format(sys.executable, self.runfile),
                              stderr=PIPE, shell=True)
                 stdout, stderr = call.communicate()
             elif self.cores > 1:
