@@ -17,8 +17,6 @@ class RunWarp():
             particle_path: Default: 'diags/xzsolver/hdf5/'. Can be changed to new directory.
             field_path (str, dict, or list):
             Default: {'magnetic':'diags/fields/magnetic','electric':'diags/fields/electric'}
-            The field_path can not currently be changed as the FieldDiagnostic class is hardcoded to write these
-            directories.
         """
 
         self.runflag = False
