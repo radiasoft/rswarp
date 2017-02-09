@@ -70,7 +70,7 @@ class RunWarp():
                 stdout, stderr = call.communicate()
             elif self.cores > 1:
                 self.clean()
-                call = Popen("mpiexec -n %s python %s" % (self.cores, self.runfile),
+                call = Popen("mpiexec -n {} {} {}".format(self.cores, sys.executable, self.runfile),
                              stderr=PIPE, shell=True)
                 stdout, stderr = call.communicate()
         elif self.runflag != True:
