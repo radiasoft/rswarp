@@ -1,1 +1,3 @@
 pykern
+matplotlib
+h5py
