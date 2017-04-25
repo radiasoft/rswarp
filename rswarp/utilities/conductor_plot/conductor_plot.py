@@ -52,21 +52,21 @@ class PlotConductors(object):
             self.zmax = zbounds[1]
 
         # Try to guess an ideal scaling
-        if abs(self.xmax - self.xmin) * 1e3 > 1.:
+        if abs(self.xmax - self.xmin) * 1. > 10.:
+            self.scale = 1.
+        elif abs(self.xmax - self.xmin) * 1e3 > 1.:
             self.scale = 1e3
         elif abs(self.xmax - self.xmin) * 1e6 > 1.:
             self.scale = 1e6
-        elif abs(self.xmax - self.xmin) * 1e9 > 1.:
-            self.scale = 1e9
         else:
-            self.scale = 1.
+            self.scale = 1e9
 
         self.fig = None
         self.artist = artist
         self.conductors = []
         self.voltages = []
         self.dielectrics = []
-
+        self.patches = None
         self.patch_colors = []
 
     @run_once
@@ -137,6 +137,11 @@ class PlotConductors(object):
         return p
 
     def create_artist(self):
+        """
+        Sets up the plotting region.
+        Returns:
+            None
+        """
 
         fig, ax1 = plt.subplots(1, 1)
 
