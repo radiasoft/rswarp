@@ -4,10 +4,28 @@ from warp import field_solvers
 from warp import w3d
 
 
+# TODO: Would be nice to have 'run_once' in a central repository location
+def run_once(f):
+    """
+        Decorator to ensure decorated function can only be run once.
+        Will return original output on subsequent calls.
+    """
+    def dec(*args, **kwargs):
+        if not dec.run:
+            dec.run = True
+            dec.out = f(*args, **kwargs)
+            return dec.out
+        else:
+            return dec.out
+
+    dec.run = False
+
+    return dec
+
+
 class PlotConductors(object):
-    conductor_types = {}
-    conductor_types['ZPlane'] = ['xcent', 'ycent']
-    conductor_types['Box'] = ['xcent', 'ycent', 'zcent', 'xsize', 'ysize', 'zsize']
+    # Supported conductor types
+    conductor_types = ['Box']
 
     # Attributes template
     conductor_attributes = {'xcent': None,
@@ -31,11 +49,20 @@ class PlotConductors(object):
 
         self.scale = 1.
 
+    @run_once
     def conductor_coordinates(self, solver):
+        """
+        Runs logic for finding which conductors can be plotted and run appropriate patch creation functions.
+        Args:
+            solver: Warp fieldsolver object containing conductors to be plotted.
+
+        Returns:
+                None
+        """
 
         # Iterate through all conductor lists in the solver
         for key in solver.installedconductorlists:
-            # Iterate through all condcutor objects
+            # Iterate through all conductor objects
             for conductor in solver.installedconductorlists[key]:
                 # Perform check to make sure this is a conductor the code knows how to handle
                 for obj_type in self.conductor_types:
@@ -50,7 +77,19 @@ class PlotConductors(object):
                         else:
                             self.dielectrics.append(self.set_rectangle_patch(conductor))
 
+    def conductor_collection(self):
+        d
+
     def set_rectangle_patch(self, conductor):
+        """
+        Creates a mpl.patches.Rectangle object to represent a box in the XZ plane.
+        Args:
+            conductor: Warp conductor object
+
+        Returns:
+            mpl.patches.Rectangle object
+
+        """
         try:
             x = conductor.zcent
             y = conductor.xcent
