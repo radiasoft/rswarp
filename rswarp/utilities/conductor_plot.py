@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.collections import PatchCollection
+from matplotlib.gridspec import GridSpec
 from warp import field_solvers
 from warp import w3d
 
-# TODO: Add color variation for different voltages
 # TODO: Configure dielectric patch characteristics (should only have outline)
 # TODO: Add legend setup
 # TODO: Run everything on call of class instance
@@ -81,11 +81,13 @@ class PlotConductors(object):
 
         self.fig = None
         self.artist = artist
+        self.legend_artist = None
         self.conductors = []
         self.voltages = []
         self.dielectrics = []
         self.patches = None
         self.patch_colors = []
+        self.legend_handles = []
 
         # Color options
         self.map = plt.cm.seismic
@@ -155,6 +157,14 @@ class PlotConductors(object):
         self.patches.set_color(self.patch_colors)
         self.artist.add_collection(self.patches)
 
+        self.create_legend()
+        self.legend_artist.legend(handles=self.legend_handles,
+                                  bbox_to_anchor=(2.25, 1.0),
+                                  borderaxespad=0.,
+                                  fontsize=5,
+                                  title='Voltage (V)')
+
+
     def set_rectangle_patch(self, conductor):
         """
         Creates a mpl.patches.Rectangle object to represent a box in the XZ plane.
@@ -191,7 +201,12 @@ class PlotConductors(object):
             None
         """
 
-        fig, ax1 = plt.subplots(1, 1)
+        fig = plt.figure()
+        gs = GridSpec(1, 2, width_ratios=[20, 1])
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax2 = fig.add_subplot(gs[0, 1])
+
+        ax2.axis('off')
 
         ax1.set_xlim(self.zmin * self.scale, self.zmax * self.scale)
         ax1.set_ylim(self.xmin * self.scale, self.xmax * self.scale)
@@ -204,3 +219,17 @@ class PlotConductors(object):
 
         self.fig = fig
         self.artist = ax1
+        self.legend_artist = ax2
+
+    @run_once
+    def create_legend(self):
+        voltage_sort = []
+        for voltage, color in zip(self.voltages, self.patch_colors):
+            if voltage not in voltage_sort:
+                legend_artist = patches.Patch(color=color, label=voltage)
+                self.legend_handles.append(legend_artist)
+                voltage_sort.append(voltage)
+
+        self.legend_handles = [i for (i, j) in sorted(zip(self.legend_handles, voltage_sort))]
+
+
