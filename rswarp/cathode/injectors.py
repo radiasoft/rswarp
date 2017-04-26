@@ -8,6 +8,7 @@ Authors: Nathan Cook and Chris Hall
 from __future__ import division
 import numpy as np
 import scipy
+import sources
 
 
 #Specify constants
@@ -46,7 +47,7 @@ class injectorUserDefined(object):
         
     def inject_thermionic(self):
         '''Define particle coordinates for thermionic injection. Note that this does not specify current, just macroparticle coordinates'''
-        v_coords = get_MB_velocities(self.ptcl_per_step,self.cathode_temp)
+        v_coords = sources.get_MB_velocities(self.ptcl_per_step,self.cathode_temp)
         x_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
         y_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
         z_vals = np.zeros(self.ptcl_per_step) + self.z_part_min #Add a minimum z coordinate to prevent absorption
@@ -54,9 +55,9 @@ class injectorUserDefined(object):
         self.beam.addparticles(x=ptclArray[:,0],y=ptclArray[:,2],z=ptclArray[:,4],
         vx=ptclArray[:,1],vy=ptclArray[:,3],vz=ptclArray[:,5])
         
-    def inject_electrons(self):
+    def inject_constant(self):
         '''Same as inject thermionic but with a very low default (4 K) temperature and no transverse velocities'''
-        v_coords = get_MB_velocities(self.ptcl_per_step,4)
+        v_coords = sources.get_MB_velocities(self.ptcl_per_step,4)
         v_coords[:,0] = np.zeros(self.ptcl_per_step) #no transverse
         v_coords[:,1] = np.zeros(self.ptcl_per_step) #no transverse
         x_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)

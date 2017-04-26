@@ -7,12 +7,12 @@ Authors: Nathan Cook and Chris Hall
 
 from __future__ import division
 import numpy as np
-import scipy
+from scipy.special import erfinv
 import injectors
 
 
 #Specify constants
-from scipy.constants import e, m_e, c, k
+from scipy.constants import e, m_e, c, k, epsilon_0
 kb_eV = 8.6173324e-5 #Bolztmann constant in eV/K
 kb_J = k #Boltzmann constant in J/K
 m = m_e #mass of electron
@@ -38,8 +38,8 @@ def cl_limit(cathode_phi, anode_wf, grid_bias, plate_spacing):
     '''    
     
     #Compute vacuum level prior to computing current
-    vacuum_level = cathode_wf - anode_wf + grid_bias
-    cl_limit = 4. * eps0 / 9. * np.sqrt(2. * echarge / emass) * abs(vacuum_level)**(3./2.) / plate_spacing**2
+    vacuum_level = cathode_phi - anode_wf + grid_bias
+    cl_limit = 4. * epsilon_0 / 9. * np.sqrt(2. * e / m_e) * abs(vacuum_level)**(3./2.) / plate_spacing**2
     
     return cl_limit
     
@@ -122,7 +122,7 @@ def compute_cutoff_beta(T, frac=0.99):
 ###### INSTANTIATIONS
 ##########################################    
 
-def constant_current(current, a0, b0):
+def constant_current(beam, channel_width, z_part_min, ptcl_per_step):
     '''
     Instantiate a beam with constant, user-specified current and zero temperature.
     
@@ -130,15 +130,18 @@ def constant_current(current, a0, b0):
         current (float)         : beam current in Amperes
         a0      (float)         : X-plane source radius in m
         b0      (float)         : Y-plane source radius in m FOR 3D SIMULATIONS
+        channel_width   (float) : width of domain in x/y plane
+        z_part_min      (float) : z coordinate of particles injected - provides separation from left boundary
+        ptcl_per_step   (int)   : number of macro particles injected per step
 
     '''
     #top.inject = 1 must be specified in main script
-    beam.ibeam  = current
-    beam.a0     = a0
-    beam.b0     = b0
+    #beam.ibeam  = current
+    #beam.a0     = a0
+    #beam.b0     = b0
     
     #fixed cathode temperature
-    myInjector = injectors.injectorUserDefined(self,beam, 4.0, channel_width, z_part_min, ptcl_per_step)
+    myInjector = injectors.injectorUserDefined(beam, 4.0, channel_width, z_part_min, ptcl_per_step)
     
     installuserinjection(myInjector.inject_electrons)
     
@@ -153,7 +156,8 @@ def constant_current(current, a0, b0):
     
     
 #def child_langmuir_current(current,cathode_phi,anode_wf,grid_bias):
-def child_langmuir_current(current, a0, b0):
+#def child_langmuir_current(current, a0, b0):
+def child_langmuir_current():    
     '''
     Instantiate a beam with (cold) Child-Langmuir limited current. Current must be computed using
     available geometry.
@@ -165,24 +169,27 @@ def child_langmuir_current(current, a0, b0):
     '''
     
     #top.inject = 2 must be specified in main script
-    beam.ibeam  = current
-    beam.a0     = a0
-    beam.b0     = b0
+    #beam.ibeam  = current
+    #beam.a0     = a0
+    #beam.b0     = b0
     #cold beam approximation 
     #beam.vthz   = 0
     #beam.vthperp= 0
     w3d.l_inj_exact = True #this is needed for top.inject=2
     
     
-def thermionic_current(current, a0, b0, beam, cathode_temp, channel_width, z_part_min, ptcl_per_step):
+#def thermionic_current(beam, cathode_temp, cathode_phi,cathode_area, a0, b0, channel_width, z_part_min, ptcl_per_step):
+def thermionic_current(beam, cathode_temp, channel_width, z_part_min, ptcl_per_step):
     '''Instantiate a beam with the Richardson-Dushmann current and a thermal distribution of velocities.
 
     Arguments:
-        current         (float) : beam current in Amperes
+        beam            (Warp)  : warp beam object (e.g. Species() call)
+        current         (float) : beam current in A
+        cathode_temp    (float) : cathode temperature in K
+        cathode_phi     (float) : cathode work function in V
+        cathode_area    (float) : cathode surface area in m^2
         a0              (float) : X-plane source radius in m
         b0              (float) : Y-plane source radius in m FOR 3D SIMULATIONS
-        beam            (Warp)  : warp beam object (e.g. Species() call)
-        cathode_temp    (float) : cathode temperature in K
         channel_width   (float) : width of domain in x/y plane
         z_part_min      (float) : z coordinate of particles injected - provides separation from left boundary
         ptcl_per_step   (int)   : number of macro particles injected per step        
@@ -191,19 +198,19 @@ def thermionic_current(current, a0, b0, beam, cathode_temp, channel_width, z_par
     '''    
     #top.inject = 6 must be specified in main script
     
-    beam.ibeam  = current
-    beam.a0     = a0
-    beam.b0     = b0
+    #beam.ibeam  = j_rd(cathode_temp,cathode_phi)*cathode_area
+    #beam.a0     = a0
+    #beam.b0     = b0
 
 
-    myInjector = injectors.injectorUserDefined(self,beam, cathode_temp, channel_width, z_part_min, ptcl_per_step)
+    myInjector = injectors.injectorUserDefined(beam, cathode_temp, channel_width, z_part_min, ptcl_per_step)
     
     installuserinjection(myInjector.inject_thermionic)
     
     # These must be set for user injection
     top.ainject = 1.0          
     top.binject = 1.0
-        
+
     
     
     
