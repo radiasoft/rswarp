@@ -4,6 +4,12 @@ from matplotlib.collections import PatchCollection
 from warp import field_solvers
 from warp import w3d
 
+# TODO: Add color variation for different voltages
+# TODO: Configure dielectric patch characteristics (should only have outline)
+# TODO: Add legend setup
+# TODO: Run everything on call of class instance
+# TODO: Allow for manual setup in auto-run fails?
+
 
 # TODO: Would be nice to have 'run_once' in a central repository location
 def run_once(f):
