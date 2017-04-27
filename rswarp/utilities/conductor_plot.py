@@ -7,8 +7,7 @@ from warp import field_solvers
 from warp import w3d
 
 # TODO: Configure dielectric patch characteristics (should only have outline)
-# TODO: Need Legend scaling and positioning to automatically be set
-# TODO: Run everything on call of class instance
+# TODO: Run everything on call?
 # TODO: Allow for manual setup in auto-run fails?
 # TODO: Would be nice to have 'run_once' in a central repository location
 
@@ -62,9 +61,19 @@ class PlotConductors(object):
             self.xmax = w3d.xmmax
             self.zmin = w3d.zmmin
             self.zmax = w3d.zmmax
-        except:
+        except (NameError, AttributeError):
+            try:
+                self.xmin = xbounds[0]
+                self.xmax = xbounds[1]
+                self.zmin = zbounds[0]
+                self.zmax = zbounds[1]
+            except TypeError:
+                raise TypeError("Must assign xbounds and zbounds")
+
+        if xbounds:
             self.xmin = xbounds[0]
             self.xmax = xbounds[1]
+        if zbounds:
             self.zmin = zbounds[0]
             self.zmax = zbounds[1]
 
@@ -87,6 +96,8 @@ class PlotConductors(object):
         self.patches = None
         self.patch_colors = []
         self.legend_handles = []
+        self.legend_fontsize = 5
+        self.legend_anchor = (2.25, 1.0)
 
         # Color options
         self.map = plt.cm.seismic
@@ -165,9 +176,9 @@ class PlotConductors(object):
         # Setup the legend and set data for legend axes
         self.create_legend()
         self.legend_axes.legend(handles=self.legend_handles,
-                                bbox_to_anchor=(2.25, 1.0),
+                                bbox_to_anchor=self.legend_anchor,
                                 borderaxespad=0.,
-                                fontsize=5,
+                                fontsize=self.legend_fontsize,
                                 title='Voltage (V)')
 
     def set_rectangle_patch(self, conductor):
@@ -236,5 +247,18 @@ class PlotConductors(object):
                 voltage_sort.append(voltage)
 
         self.legend_handles = [j for (i, j) in sorted(zip(voltage_sort, self.legend_handles))]
+
+    def set_legend_properties(self, fontsize=5, anchor=(2.25, 1.0)):
+        """
+        Adjust legend fontsize and anchor position. Can be used to fit legend into plotting region.
+        Args:
+            fontsize: Fontsize for legend descriptors. Default value: 5.
+            anchor (x, y):  Normalized position (0, 1) for legend. Default: (2.25, 1.0)
+
+        Returns:
+
+        """
+        self.legend_fontsize = fontsize
+        self.legend_anchor = anchor
 
 
