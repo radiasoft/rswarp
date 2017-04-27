@@ -6,9 +6,6 @@ import functools
 from warp import field_solvers
 from warp import w3d
 
-# TODO: Configure dielectric patch characteristics (should only have outline)
-# TODO: Run everything on call?
-# TODO: Allow for manual setup in auto-run fails?
 # TODO: Would be nice to have 'run_once' in a central repository location
 
 
@@ -106,6 +103,12 @@ class PlotConductors(object):
         self.ground_voltage = 'grey'
         self.variable_voltage_color = True  # If true use color that varies with voltage, else fixed color for +/-
 
+    def __call__(self, solver):
+
+        self.conductor_coordinates(solver)
+        self.create_axes()
+        self.conductor_collection()
+
     @run_once
     def conductor_coordinates(self, solver):
         """
@@ -132,6 +135,7 @@ class PlotConductors(object):
                             # TODO: Will add permittivity when it becomes available
 
     def conductor_collection(self):
+        # TODO: Once dielectrics register with solver add in loop to append them to dielectric array
         if not self.plot_axes:
             self.create_axes()
 
@@ -181,7 +185,7 @@ class PlotConductors(object):
                                 fontsize=self.legend_fontsize,
                                 title='Voltage (V)')
 
-    def set_rectangle_patch(self, conductor):
+    def set_rectangle_patch(self, conductor, dielectric=False):
         """
         Creates a mpl.patches.Rectangle object to represent a box in the XZ plane.
         Args:
@@ -202,11 +206,20 @@ class PlotConductors(object):
 
         xcorner = x - xlength / 2.
         ycorner = y - ylength / 2.
-
-        p = patches.Rectangle(
-            (xcorner * self.scale, ycorner * self.scale),
-            xlength * self.scale,
-            ylength * self.scale)
+        if dielectric:
+            p = patches.Rectangle(
+                (xcorner * self.scale, ycorner * self.scale),
+                xlength * self.scale,
+                ylength * self.scale,
+                fill=False,
+                lw=3,
+                color='k',
+                hatch='/')
+        else:
+            p = patches.Rectangle(
+                (xcorner * self.scale, ycorner * self.scale),
+                xlength * self.scale,
+                ylength * self.scale)
 
         return p
 
