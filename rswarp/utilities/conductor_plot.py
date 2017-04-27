@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.collections import PatchCollection
 from matplotlib.gridspec import GridSpec
+import functools
 from warp import field_solvers
 from warp import w3d
 
@@ -9,25 +10,23 @@ from warp import w3d
 # TODO: Add legend setup
 # TODO: Run everything on call of class instance
 # TODO: Allow for manual setup in auto-run fails?
-
-
 # TODO: Would be nice to have 'run_once' in a central repository location
+
+
 def run_once(f):
-    """
-        Decorator to ensure decorated function can only be run once.
-        Will return original output (if any) on subsequent calls.
-    """
-    def dec(*args, **kwargs):
-        if not dec.run:
-            dec.run = True
-            dec.out = f(*args, **kwargs)
-            return dec.out
-        else:
-            return dec.out
 
-    dec.run = False
+    @functools.wraps(f)
+    def f_pass(*args, **kwargs):
+        pass
 
-    return dec
+    @functools.wraps(f)
+    def run(self, *args, **kwargs):
+        try:
+            return f(self, *args, **kwargs)
+        finally:
+            setattr(self, f.__name__, f_pass)
+
+    return run
 
 
 class PlotConductors(object):
