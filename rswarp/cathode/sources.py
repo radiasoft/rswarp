@@ -62,7 +62,7 @@ def j_rd(T, phi):
 
     return A*T**2*np.exp(-1.*phi/(kb_eV*T))
 
-def get_MB_velocities(n_part, T):
+def get_MB_velocities(T, n_part):
     '''Return a distribution of particle velocities representing a Maxwell-Boltzmann 
     distribution. 
 
@@ -96,6 +96,16 @@ def get_MB_velocities(n_part, T):
             flag_array_full = True
         
     return pos_output[:n_part]
+    
+def compute_expected_velocity(T):
+    '''
+    Returns the expected value of the longitudinal velocity for the cathode with temperature T. Note that the
+    expected value <v> is given by <v> = (2/pi)*sqrt(variance).
+    '''
+    var_z = 2*kb_J*T/m
+    
+    return (2./np.pi)*np.sqrt(var_z)
+    
 
 def compute_cutoff_beta(T, frac=0.99):
     '''Returns the velocity for which the fraction frac of a beam emitted from a thermionic
@@ -116,7 +126,41 @@ def compute_cutoff_beta(T, frac=0.99):
 
     return multiplier*sigma/c 
     
+def compute_expected_time(beam, cathode_temp,Ez, zmin, zmax, dt):
+    '''
+    Returns the expected time of flight for a particle with average initial velocity across the gap.
+    
+    Arguments:
+        beam            (Warp)  : warp beam object (e.g. Species() call)
+        cathode_temp    (float) : cathode temperature in K
+        Ez              (scipy) : Interpolation (scipy.interpolate.interpolate.interp1d) of Ez field from initial solve
+        zmin            (float) : Minimum z-value in domain
+        zmax            (float) : Maximum z-value in domain
+        dt              (float) : step size in time (specified by top.dt)
 
+    Returns:
+        t_curr (float)     : final time value at which simulated particle reaches right boundary    
+    '''    
+    #Conditions at cathode edge
+    z0 = zmin
+    v0 = compute_expected_velocity(cathode_temp)
+    t0 = 0
+
+    #Conditions for initialization of algorithm
+    z_curr = z0
+    v_curr = v0 + ((beam.charge/beam.mass)*Ez(z0+v0*0.5*dt)*0.5*dt)#offset velocity by a half step
+    t_curr = t0
+
+
+    while z_curr < zmax:
+        #update velocity-this could be technically offset by 0.5v0dt
+        v_curr = v_curr + (beam.charge/beam.mass)*Ez(z_curr)*dt
+        #Update z
+        z_curr = z_curr + v_curr*dt
+        #Update t to get traversal time
+        t_curr = t_curr + dt
+        
+    return t_curr
 
 ##########################################
 ###### INSTANTIATIONS
@@ -136,10 +180,7 @@ def constant_current(beam, channel_width, z_part_min, ptcl_per_step):
 
     '''
     #top.inject = 1 must be specified in main script
-    #beam.ibeam  = current
-    #beam.a0     = a0
-    #beam.b0     = b0
-    
+
     #fixed cathode temperature
     myInjector = injectors.injectorUserDefined(beam, 4.0, channel_width, z_part_min, ptcl_per_step)
     
@@ -150,22 +191,12 @@ def constant_current(beam, channel_width, z_part_min, ptcl_per_step):
     top.binject = 1.0
     
     
-    #cold beam approximation
-    #beam.vthz   = 0
-    #beam.vthperp= 0
-    
-    
 #def child_langmuir_current(current,cathode_phi,anode_wf,grid_bias):
 #def child_langmuir_current(current, a0, b0):
 def child_langmuir_current():    
     '''
     Instantiate a beam with (cold) Child-Langmuir limited current. Current must be computed using
     available geometry.
-    
-    Arguments:
-        current (float): beam current in Amperes
-        a0      (float): X-plane source radius in m
-        b0      (float): Y-plane source radius in m FOR 3D SIMULATIONS
     '''
     
     #top.inject = 2 must be specified in main script
@@ -177,8 +208,7 @@ def child_langmuir_current():
     #beam.vthperp= 0
     w3d.l_inj_exact = True #this is needed for top.inject=2
     
-    
-#def thermionic_current(beam, cathode_temp, cathode_phi,cathode_area, a0, b0, channel_width, z_part_min, ptcl_per_step):
+
 def thermionic_current(beam, cathode_temp, channel_width, z_part_min, ptcl_per_step):
     '''Instantiate a beam with the Richardson-Dushmann current and a thermal distribution of velocities.
 
@@ -197,11 +227,6 @@ def thermionic_current(beam, cathode_temp, channel_width, z_part_min, ptcl_per_s
 
     '''    
     #top.inject = 6 must be specified in main script
-    
-    #beam.ibeam  = j_rd(cathode_temp,cathode_phi)*cathode_area
-    #beam.a0     = a0
-    #beam.b0     = b0
-
 
     myInjector = injectors.injectorUserDefined(beam, cathode_temp, channel_width, z_part_min, ptcl_per_step)
     
