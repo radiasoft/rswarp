@@ -62,7 +62,7 @@ def j_rd(T, phi):
 
     return A*T**2*np.exp(-1.*phi/(kb_eV*T))
 
-def get_MB_velocities(T, n_part):
+def get_MB_velocities(n_part, T):
     '''Return a distribution of particle velocities representing a Maxwell-Boltzmann 
     distribution. 
 
