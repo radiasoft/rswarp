@@ -8,8 +8,11 @@ import numpy as np
 import matplotlib.cm as cm
 
 
-def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz):
+def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz, xmmin, xmmax, zmmin, zmmax):
     """
+    Generates plots and a colorbar from lost particle data collected from Warp's scraper object.
+    Plots and the colorbar are automatically created on the axes specified.
+    It is the user's responsibility to make sure axes are suitably configured.
 
     Args:
         ax: matplotlib axis for overlaying scraper geometry
@@ -20,17 +23,22 @@ def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz):
         dx: x cell size (or desired discretization size in x)
         dz: z cell size (or desired discretization size in x)
     Returns:
-        List of scatter plots, colorbar
+        dictionary of gated data
 
     """
     cmap = cm.coolwarm
 
     gated_ids = {}
     for cond in scraper.conductors:
+        gated_ids[cond.condid] = {}
+
         if isinstance(cond, ZPlane):
+            zmin, zmax = cond.zcent - dz / 2., cond.zcent + dz / 2.
+            xmin, xmax = xmmin, xmmax
+            ids = np.where((zmin < zplost) & (zplost < zmax) & (xmin < xplost) & (xplost < xmax))
+            gated_ids[cond.condid]['left'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
             continue
 
-        gated_ids[cond.condid] = {}
         # top
         zmin, zmax = cond.zcent - cond.zsize / 2., cond.zcent + cond.zsize / 2.
         xmin, xmax = cond.xcent + cond.xsize / 2. - dx / 2., cond.xcent + cond.xsize / 2. + dx / 2.
@@ -63,7 +71,6 @@ def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz):
     max_density = 0
     for id in gated_ids:
         for side in gated_ids[id]:
-            print id, side
             pids = gated_ids[id][side]['pids']
             if side == 'top' or side == 'bottom':
                 gated_ids[id][side]['density'], gated_ids[id][side]['positions'] = np.histogram(zplost[pids], 'fd')
@@ -105,7 +112,9 @@ def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz):
                            zorder=50)
                 scatter_plots.append(plot)
 
-    return gated_ids, ColorbarBase(ax_color, cmap=cmap, norm=cmap_normalization)
+    ColorbarBase(ax_color, cmap=cmap, norm=cmap_normalization)
+
+    return gated_ids
 
 
 
