@@ -1,4 +1,5 @@
 from matplotlib.colors import Normalize
+from matplotlib.colors import SymLogNorm
 from matplotlib.colorbar import ColorbarBase
 from sys import maxint
 from scipy.interpolate import interp1d
@@ -22,6 +23,10 @@ def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz, xmmin, xm
         zplost: top.zplost array
         dx: x cell size (or desired discretization size in x)
         dz: z cell size (or desired discretization size in x)
+        xmmin: Lower bound x-position of the simulation domain (w3d.xmmin in warp)
+        xmmax: Upper bound x-position of the simulation domain (w3d.xmmax in warp)
+        xmmin: Lower bound z-position of the simulation domain (w3d.zmmin in warp)
+        xmmax: Upper bound z-position of the simulation domain (w3d.zmmax in warp)
     Returns:
         dictionary of gated data
 
@@ -69,6 +74,7 @@ def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz, xmmin, xm
 
     min_density = maxint
     max_density = 0
+
     for id in gated_ids:
         for side in gated_ids[id]:
             pids = gated_ids[id][side]['pids']
@@ -81,9 +87,11 @@ def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz, xmmin, xm
                 max_density = np.max(gated_ids[id][side]['density'])
             if np.min(gated_ids[id][side]['density']) < min_density:
                 min_density = np.min(gated_ids[id][side]['density'])
-
-            gated_ids[id][side]['interpolation'] = interp1d(np.arange(gated_ids[id][side]['density'].size),
+            try:
+                gated_ids[id][side]['interpolation'] = interp1d(np.arange(gated_ids[id][side]['density'].size),
                                                   gated_ids[id][side]['density'])
+            except ValueError:
+                gated_ids[id][side]['interpolation'] = None
 
     cmap_normalization = Normalize(min_density, max_density)
     scatter_plots = []
@@ -96,19 +104,29 @@ def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz, xmmin, xm
             if side == 'top' or side == 'bottom':
                 size = gated_ids[id][side]['density'].size
                 interp = gated_ids[id][side]['interpolation']
+                try:
+                    color_mapping = cmap(cmap_normalization(interp(np.linspace(0, size - 1, points))))
+                except:
+                    color_mapping = 'k'
                 plot = ax.scatter(np.linspace(zmin, zmax, points) * 1e6,
                            [(xmin + dx / 2.) * 1e6] * points,
-                           c=cmap(cmap_normalization(interp(np.linspace(0, size - 1, points)))),
+                           c=color_mapping,
                            s=1,
+                            # marker='|',
                            zorder=50)
                 scatter_plots.append(plot)
             if side == 'left' or side == 'right':
                 size = gated_ids[id][side]['density'].size
                 interp = gated_ids[id][side]['interpolation']
+                try:
+                    color_mapping = cmap(cmap_normalization(interp(np.linspace(0, size - 1, points))))
+                except:
+                    color_mapping = 'k'
                 plot = ax.scatter([(zmin + dz / 2.) * 1e6] * points,
                            np.linspace(xmin, xmax, points) * 1e6,
-                           c=cmap(cmap_normalization(interp(np.linspace(0, size - 1, points)))),
+                           c=color_mapping,
                            s=1,
+                            # marker='_',
                            zorder=50)
                 scatter_plots.append(plot)
 
