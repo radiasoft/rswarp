@@ -7,11 +7,133 @@ import numpy as np
 import matplotlib.cm as cm
 
 
-
 class PlotDensity(object):
 
-    def __init__(self, ax, top, w3d):
+    def __init__(self, ax, ax_color, scraper, top, w3d):
         self.ax = ax
+        self.ax_color = ax_color
+        self.scraper = scraper
+        self.top = top
+        self.w3d = w3d
+
+        self.gated_ids = {}
+        self.zplost = self.top.zplost
+        self.xplost = self.top.xplost
+        self.min_density = maxint
+        self.max_density = 0
+
+        self.cmap = cm.coolwarm
+        self.normalization = Normalize
+
+    def gate_scraped_particles(self, dx=None, dz=None):
+
+        dx = self.w3d.dx
+        xmmin = self.w3d.xmmin
+        xmmax = self.w3d.xmmax
+        dz = self.w3d.dz
+        zmmin = self.w3d.zmmin
+        zmmax = self.w3d.zmmax
+
+        for cond in self.scraper.conductors:
+            self.gated_ids[cond.condid] = {}
+
+            if isinstance(cond, ZPlane):
+                zmin, zmax = cond.zcent - dz / 2., cond.zcent + dz / 2.
+                xmin, xmax = xmmin, xmmax
+                ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
+                self.gated_ids[cond.condid]['left'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+                continue
+
+            # top
+            zmin, zmax = cond.zcent - cond.zsize / 2., cond.zcent + cond.zsize / 2.
+            xmin, xmax = cond.xcent + cond.xsize / 2. - dx / 2., cond.xcent + cond.xsize / 2. + dx / 2.
+
+            ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
+            self.gated_ids[cond.condid]['top'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+
+            # bottom
+            zmin, zmax = cond.zcent - cond.zsize / 2., cond.zcent + cond.zsize / 2.
+            xmin, xmax = cond.xcent - cond.xsize / 2. - dx / 2., cond.xcent - cond.xsize / 2. + dx / 2.
+
+            ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
+            self.gated_ids[cond.condid]['bottom'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+
+            # left
+            zmin, zmax = cond.zcent - cond.zsize / 2. - dz / 2., cond.zcent - cond.zsize / 2. + dz / 2.
+            xmin, xmax = cond.xcent - cond.xsize / 2., cond.xcent + cond.xsize / 2.
+
+            ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
+            self.gated_ids[cond.condid]['left'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+
+            # right
+            zmin, zmax = cond.zcent + cond.zsize / 2. - dz / 2., cond.zcent + cond.zsize / 2. + dz / 2.
+            xmin, xmax = cond.xcent - cond.xsize / 2., cond.xcent + cond.xsize / 2.
+
+            ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
+            self.gated_ids[cond.condid]['right'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+
+    def map_density(self):
+
+        for id in self.gated_ids:
+            for side in self.gated_ids[id]:
+                pids = self.gated_ids[id][side]['pids']
+                if side == 'top' or side == 'bottom':
+                    self.gated_ids[id][side]['density'], self.gated_ids[id][side]['positions'] = np.histogram(self.zplost[pids], 'fd')
+                if side == 'left' or side == 'right':
+                    self.gated_ids[id][side]['density'], self.gated_ids[id][side]['positions'] = np.histogram(self.xplost[pids], 'fd')
+
+                if np.max(self.gated_ids[id][side]['density']) > max_density:
+                    max_density = np.max(self.gated_ids[id][side]['density'])
+                if np.min(self.gated_ids[id][side]['density']) < min_density:
+                    min_density = np.min(self.gated_ids[id][side]['density'])
+                try:
+                    self.gated_ids[id][side]['interpolation'] = interp1d(np.arange(self.gated_ids[id][side]['density'].size),
+                                                                         self.gated_ids[id][side]['density'])
+                except ValueError:
+                    self.gated_ids[id][side]['interpolation'] = None
+
+    def generate_plots(self):
+        cmap_normalization = self.normalization(self.min_density, self.max_density)
+        scatter_plots = []
+        points = 1000
+        # TODO: Assuming um scale for now. Need to generalize.
+        for id in self.gated_ids:
+            for side in self.gated_ids[id]:
+                zmin, zmax = self.gated_ids[id][side]['limits'][0:2]
+                xmin, xmax = self.gated_ids[id][side]['limits'][2:4]
+                if side == 'top' or side == 'bottom':
+                    size = self.gated_ids[id][side]['density'].size
+                    interp = self.gated_ids[id][side]['interpolation']
+                    try:
+                        color_mapping = self.cmap(cmap_normalization(interp(np.linspace(0, size - 1, points))))
+                    except:
+                        color_mapping = 'k'
+                    plot = self.ax.scatter(np.linspace(zmin, zmax, points) * 1e6,
+                                    [(xmin + dx / 2.) * 1e6] * points,
+                                    c=color_mapping,
+                                    s=1,
+                                    linewidths=1,
+                                    # marker='|',
+                                    zorder=50)
+                    scatter_plots.append(plot)
+                if side == 'left' or side == 'right':
+                    size = gated_ids[id][side]['density'].size
+                    interp = gated_ids[id][side]['interpolation']
+                    try:
+                        color_mapping = cmap(cmap_normalization(interp(np.linspace(0, size - 1, points))))
+                    except:
+                        color_mapping = 'k'
+                    plot = ax.scatter([(zmin + dz / 2.) * 1e6] * points,
+                                      np.linspace(xmin, xmax, points) * 1e6,
+                                      c=color_mapping,
+                                      s=1,
+                                      linewidths=1,
+                                      # marker='_',
+                                      zorder=50)
+                    scatter_plots.append(plot)
+
+        ColorbarBase(ax_color, cmap=cmap, norm=cmap_normalization)
+
 
 def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz, xmmin, xmmax, zmmin, zmmax):
     """
@@ -35,107 +157,6 @@ def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz, xmmin, xm
         dictionary of gated data
 
     """
-    cmap = cm.coolwarm
-
-    gated_ids = {}
-    for cond in scraper.conductors:
-        gated_ids[cond.condid] = {}
-
-        if isinstance(cond, ZPlane):
-            zmin, zmax = cond.zcent - dz / 2., cond.zcent + dz / 2.
-            xmin, xmax = xmmin, xmmax
-            ids = np.where((zmin < zplost) & (zplost < zmax) & (xmin < xplost) & (xplost < xmax))
-            gated_ids[cond.condid]['left'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
-            continue
-
-        # top
-        zmin, zmax = cond.zcent - cond.zsize / 2., cond.zcent + cond.zsize / 2.
-        xmin, xmax = cond.xcent + cond.xsize / 2. - dx / 2., cond.xcent + cond.xsize / 2. + dx / 2.
-
-        ids = np.where((zmin < zplost) & (zplost < zmax) & (xmin < xplost) & (xplost < xmax))
-        gated_ids[cond.condid]['top'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
-
-        # bottom
-        zmin, zmax = cond.zcent - cond.zsize / 2., cond.zcent + cond.zsize / 2.
-        xmin, xmax = cond.xcent - cond.xsize / 2. - dx / 2., cond.xcent - cond.xsize / 2. + dx / 2.
-
-        ids = np.where((zmin < zplost) & (zplost < zmax) & (xmin < xplost) & (xplost < xmax))
-        gated_ids[cond.condid]['bottom'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
-
-        # left
-        zmin, zmax = cond.zcent - cond.zsize / 2. - dz / 2., cond.zcent - cond.zsize / 2. + dz / 2.
-        xmin, xmax = cond.xcent - cond.xsize / 2., cond.xcent + cond.xsize / 2.
-
-        ids = np.where((zmin < zplost) & (zplost < zmax) & (xmin < xplost) & (xplost < xmax))
-        gated_ids[cond.condid]['left'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
-
-        # right
-        zmin, zmax = cond.zcent + cond.zsize / 2. - dz / 2., cond.zcent + cond.zsize / 2. + dz / 2.
-        xmin, xmax = cond.xcent - cond.xsize / 2., cond.xcent + cond.xsize / 2.
-
-        ids = np.where((zmin < zplost) & (zplost < zmax) & (xmin < xplost) & (xplost < xmax))
-        gated_ids[cond.condid]['right'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
-
-    min_density = maxint
-    max_density = 0
-
-    for id in gated_ids:
-        for side in gated_ids[id]:
-            pids = gated_ids[id][side]['pids']
-            if side == 'top' or side == 'bottom':
-                gated_ids[id][side]['density'], gated_ids[id][side]['positions'] = np.histogram(zplost[pids], 'fd')
-            if side == 'left' or side == 'right':
-                gated_ids[id][side]['density'], gated_ids[id][side]['positions'] = np.histogram(xplost[pids], 'fd')
-
-            if np.max(gated_ids[id][side]['density']) > max_density:
-                max_density = np.max(gated_ids[id][side]['density'])
-            if np.min(gated_ids[id][side]['density']) < min_density:
-                min_density = np.min(gated_ids[id][side]['density'])
-            try:
-                gated_ids[id][side]['interpolation'] = interp1d(np.arange(gated_ids[id][side]['density'].size),
-                                                  gated_ids[id][side]['density'])
-            except ValueError:
-                gated_ids[id][side]['interpolation'] = None
-
-    cmap_normalization = Normalize(min_density, max_density)
-    scatter_plots = []
-    points = 1000
-    # TODO: Assuming um scale for now. Need to generalize.
-    for id in gated_ids:
-        for side in gated_ids[id]:
-            zmin, zmax = gated_ids[id][side]['limits'][0:2]
-            xmin, xmax = gated_ids[id][side]['limits'][2:4]
-            if side == 'top' or side == 'bottom':
-                size = gated_ids[id][side]['density'].size
-                interp = gated_ids[id][side]['interpolation']
-                try:
-                    color_mapping = cmap(cmap_normalization(interp(np.linspace(0, size - 1, points))))
-                except:
-                    color_mapping = 'k'
-                plot = ax.scatter(np.linspace(zmin, zmax, points) * 1e6,
-                           [(xmin + dx / 2.) * 1e6] * points,
-                           c=color_mapping,
-                           s=1,
-                            # marker='|',
-                           zorder=50)
-                scatter_plots.append(plot)
-            if side == 'left' or side == 'right':
-                size = gated_ids[id][side]['density'].size
-                interp = gated_ids[id][side]['interpolation']
-                try:
-                    color_mapping = cmap(cmap_normalization(interp(np.linspace(0, size - 1, points))))
-                except:
-                    color_mapping = 'k'
-                plot = ax.scatter([(zmin + dz / 2.) * 1e6] * points,
-                           np.linspace(xmin, xmax, points) * 1e6,
-                           c=color_mapping,
-                           s=1,
-                            # marker='_',
-                           zorder=50)
-                scatter_plots.append(plot)
-
-    ColorbarBase(ax_color, cmap=cmap, norm=cmap_normalization)
-
     return gated_ids
 
 
