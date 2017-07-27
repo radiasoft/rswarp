@@ -6,10 +6,41 @@ from warp.field_solvers.generateconductors import ZPlane
 import numpy as np
 import matplotlib.cm as cm
 
+# TODO: Add attributes:
+#   scale
+#   scatter points for surfaces?
 
 class PlotDensity(object):
+    """
+    Handles plotting of density of scraped particles on conducting objects.
+    Can evaluate density on each surface of a Box or ZPlane separately and produce shaded density plots.
+    To run automatically call an initialized PlotDensity object.
+
+    Warning: Only Box and ZPlane are supported at this time. Other conductor shapes will not be evaluated correctly.
+            Only for 2D XZ simulations at this time.
+
+    Useful plotting attributes:
+        ax: Matplotilb axes object for density plots
+        ax_colorbar: Matplotlib axes object for colorbar
+        scraper: Warp ParticleScraper object
+        zplost: Array of z-positions of lost particles. Defaults to top.zplost.
+        xplost: Array of x-positions of lost particles. Defaults to top.xplost.
+        dz, dx: z and x widths used to gate on particles collected by conductor side.
+            Defaults to w3d.dz and w3d.dx
+        cmap: matplotlib.cm colormap. Defaults to coolwarm.
+        normalization: matplotlib.colors normalization function. Defaults to Normalize (linear normalization).
+    """
 
     def __init__(self, ax, ax_colorbar, scraper, top, w3d):
+        """
+
+        Args:
+            ax: Matplotlib axes object for surface density plots.
+            ax_colorbar: Matplotlib axes object for colorbar.
+            scraper: Warp ParticleScraper object. Only used to acquire conductor positions and dimensions.
+            top: Warp top object.
+            w3d: Warp w3d object.
+        """
         self.ax = ax
         self.ax_colorbar = ax_colorbar
         self.scraper = scraper
@@ -27,12 +58,25 @@ class PlotDensity(object):
         self.cmap_normalization = None
 
     def __call__(self, *args, **kwargs):
+        """
+        Will produce produce matplotlib scatter plots and colorbar for density.
+        Args:
+            *args:
+            **kwargs:
+
+        Returns:
+
+        """
         self.gate_scraped_particles()
         self.map_density()
         self.generate_plots()
 
     def gate_scraped_particles(self):
+        """
+        Isolate particle PIDs for each conductor surface.
+        Returns:
 
+        """
         xmmin = self.w3d.xmmin
         xmmax = self.w3d.xmmax
         zmmin = self.w3d.zmmin
@@ -78,6 +122,12 @@ class PlotDensity(object):
             self.gated_ids[cond.condid]['right'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
 
     def map_density(self):
+        """
+        Use linear interpolation and colormap normalization to establish color scale (normalized to global density),
+        for each surface.
+        Returns:
+
+        """
         min_density = maxint
         max_density = 0
 
@@ -105,6 +155,12 @@ class PlotDensity(object):
         self.cmap_normalization = self.normalization(min_density, max_density)
 
     def generate_plots(self):
+        """
+        Creates scatter plots for each surface. Surfaces are composed of 1000 points each to mimic
+        a gradient mapped on a line.
+        Returns:
+
+        """
         scatter_plots = []
         points = 1000
         # TODO: Assuming um scale for now. Need to generalize.
@@ -144,30 +200,3 @@ class PlotDensity(object):
                     scatter_plots.append(plot)
 
         ColorbarBase(self.ax_colorbar, cmap=self.cmap, norm=self.cmap_normalization)
-
-    """
-    Generates plots and a colorbar from lost particle data collected from Warp's scraper object.
-    Plots and the colorbar are automatically created on the axes specified.
-    It is the user's responsibility to make sure axes are suitably configured.
-
-    Args:
-        ax: matplotlib axis for overlaying scraper geometry
-        ax_color: matplotlib axis for the colorbar
-        scraper: Warp scraper object with lost particle statistics
-        xplost: top.xplost array
-        zplost: top.zplost array
-        dx: x cell size (or desired discretization size in x)
-        dz: z cell size (or desired discretization size in x)
-        xmmin: Lower bound x-position of the simulation domain (w3d.xmmin in warp)
-        xmmax: Upper bound x-position of the simulation domain (w3d.xmmax in warp)
-        xmmin: Lower bound z-position of the simulation domain (w3d.zmmin in warp)
-        xmmax: Upper bound z-position of the simulation domain (w3d.zmmax in warp)
-    Returns:
-        dictionary of gated data
-    """
-
-
-
-
-
-
