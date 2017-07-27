@@ -1,13 +1,17 @@
 from matplotlib.colors import Normalize
-from matplotlib.colors import SymLogNorm
 from matplotlib.colorbar import ColorbarBase
 from sys import maxint
 from scipy.interpolate import interp1d
 from warp.field_solvers.generateconductors import ZPlane
-import matplotlib as mpl
 import numpy as np
 import matplotlib.cm as cm
 
+
+
+class PlotDensity(object):
+
+    def __init__(self, ax, top, w3d):
+        self.ax = ax
 
 def plot_impact_density(ax, ax_color, scraper, xplost, zplost, dx, dz, xmmin, xmmax, zmmin, zmmax):
     """
