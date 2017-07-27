@@ -7,6 +7,7 @@ from warp import field_solvers
 from warp import w3d
 
 # TODO: Would be nice to have 'run_once' in a central repository location
+# TODO: Formalize grid lines plotting option
 
 
 def run_once(f):
@@ -104,10 +105,11 @@ class PlotConductors(object):
         self.variable_voltage_color = True  # If true use color that varies with voltage, else fixed color for +/-
 
     def __call__(self, solver):
-
+        self.solver = solver
         self.conductor_coordinates(solver)
         self.create_axes()
         self.conductor_collection()
+        plt.grid()
 
     @run_once
     def conductor_coordinates(self, solver):
@@ -130,9 +132,9 @@ class PlotConductors(object):
                         if conductor.voltage is not None:
                             self.conductors.append(self.set_rectangle_patch(conductor))
                             self.voltages.append(conductor.voltage)
-                        else:
-                            self.dielectrics.append(self.set_rectangle_patch(conductor))
-                            # TODO: Will add permittivity when it becomes available
+                        elif conductor.permittivity is not None:
+                            self.dielectrics.append(self.set_rectangle_patch(conductor, dielectric=True))
+                            self.voltages.append(None)
 
     def conductor_collection(self):
         # TODO: Once dielectrics register with solver add in loop to append them to dielectric array
@@ -142,13 +144,21 @@ class PlotConductors(object):
         if self.variable_voltage_color:
             # Min/maxes for linear mapping of voltage to colormap
             negative_min = min(self.voltages)
-            negative_max = max([i for i in self.voltages if i < 0.])
-            positive_min = min([i for i in self.voltages if i > 0.])
+            try:
+                negative_max = max([i for i in self.voltages if i < 0.])
+            except ValueError:
+                negative_max = 0.
+            try:
+                positive_min = min([i for i in self.voltages if i > 0.])
+            except ValueError:
+                positive_min = 0.
             positive_max = max(self.voltages)
 
             # Perform mapping
             for voltage in self.voltages:
-                if voltage < 0.:
+                if not voltage:
+                    self.patch_colors.append('g')
+                elif voltage < 0.:
                     try:
                         color = int(-115. / abs(negative_max - negative_min) * voltage + 140.)
                     except ZeroDivisionError:
@@ -165,7 +175,9 @@ class PlotConductors(object):
         else:
             # Just use same color for all + or - voltages
             for voltage in self.voltages:
-                if voltage < 0.:
+                if not voltage:
+                    continue
+                elif voltage < 0.:
                     self.patch_colors.append(self.map(240))
                 elif voltage > 0.:
                     self.patch_colors.append(self.map(15))
@@ -234,6 +246,10 @@ class PlotConductors(object):
         gs = GridSpec(1, 2, width_ratios=[20, 1])
         ax1 = fig.add_subplot(gs[0, 0])
         ax2 = fig.add_subplot(gs[0, 1])
+
+        ax1.set_xticks(self.solver.zmesh * 1e9)
+        ax1.set_yticks(self.solver.xmesh * 1e9)
+        ax1.grid()
 
         ax2.axis('off')
 
