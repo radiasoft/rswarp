@@ -7,32 +7,22 @@ import numpy as np
 import matplotlib.cm as cm
 
 # TODO: Add attributes:
-#   scale
 #   scatter points for surfaces?
 
+
 class PlotDensity(object):
-    """
-    Handles plotting of density of scraped particles on conducting objects.
-    Can evaluate density on each surface of a Box or ZPlane separately and produce shaded density plots.
-    To run automatically call an initialized PlotDensity object.
 
-    Warning: Only Box and ZPlane are supported at this time. Other conductor shapes will not be evaluated correctly.
-            Only for 2D XZ simulations at this time.
+    """Plots density of scraped particles on conducting objects.
 
-    Useful plotting attributes:
-        ax: Matplotilb axes object for density plots
-        ax_colorbar: Matplotlib axes object for colorbar
-        scraper: Warp ParticleScraper object
-        zplost: Array of z-positions of lost particles. Defaults to top.zplost.
-        xplost: Array of x-positions of lost particles. Defaults to top.xplost.
-        dz, dx: z and x widths used to gate on particles collected by conductor side.
-            Defaults to w3d.dz and w3d.dx
-        cmap: matplotlib.cm colormap. Defaults to coolwarm.
-        normalization: matplotlib.colors normalization function. Defaults to Normalize (linear normalization).
     """
 
     def __init__(self, ax, ax_colorbar, scraper, top, w3d):
         """
+        Can evaluate density on each surface of a Box or ZPlane separately and produce shaded density plots.
+        To run automatically: call an initialized PlotDensity object.
+
+        Warning: Only Box and ZPlane are supported at this time. Other conductor shapes will not be evaluated correctly.
+                Only for 2D XZ simulations at this time.
 
         Args:
             ax: Matplotlib axes object for surface density plots.
@@ -40,7 +30,20 @@ class PlotDensity(object):
             scraper: Warp ParticleScraper object. Only used to acquire conductor positions and dimensions.
             top: Warp top object.
             w3d: Warp w3d object.
+
+        Useful attributes:
+            ax: Matplotilb axes object for density plots
+            ax_colorbar: Matplotlib axes object for colorbar
+            scraper: Warp ParticleScraper object
+            zplost: Array of z-positions of lost particles. Defaults to top.zplost.
+            xplost: Array of x-positions of lost particles. Defaults to top.xplost.
+            dz, dx: z and x widths used to gate on particles collected by conductor side.
+                Defaults to w3d.dz and w3d.dx
+            scale: Set scale of x and z units. Defaults to 1e6 (units of microns).
+            cmap: matplotlib.cm colormap. Defaults to coolwarm.
+            normalization: matplotlib.colors normalization function. Defaults to Normalize (linear normalization).
         """
+
         self.ax = ax
         self.ax_colorbar = ax_colorbar
         self.scraper = scraper
@@ -52,6 +55,7 @@ class PlotDensity(object):
         self.xplost = self.top.xplost
         self.dx = w3d.dx
         self.dz = w3d.dz
+        self.scale = 1e6
 
         self.cmap = cm.coolwarm
         self.normalization = Normalize
@@ -175,8 +179,8 @@ class PlotDensity(object):
                         color_mapping = self.cmap(self.cmap_normalization(interp(np.linspace(0, size - 1, points))))
                     except:  # TODO: Need to find proper exception for zero particle case
                         color_mapping = 'k'
-                    plot = self.ax.scatter(np.linspace(zmin, zmax, points) * 1e6,
-                                           [(xmin + self.dx / 2.) * 1e6] * points,
+                    plot = self.ax.scatter(np.linspace(zmin, zmax, points) * self.scale,
+                                           [(xmin + self.dx / 2.) * self.scale] * points,
                                            c=color_mapping,
                                            s=1,
                                            linewidths=1,
@@ -190,8 +194,8 @@ class PlotDensity(object):
                         color_mapping = self.cmap(self.cmap_normalization(interp(np.linspace(0, size - 1, points))))
                     except:
                         color_mapping = 'k'
-                    plot = self.ax.scatter([(zmin + self.dz / 2.) * 1e6] * points,
-                                           np.linspace(xmin, xmax, points) * 1e6,
+                    plot = self.ax.scatter([(zmin + self.dz / 2.) * self.scale] * points,
+                                           np.linspace(xmin, xmax, points) * self.scale,
                                            c=color_mapping,
                                            s=1,
                                            linewidths=1,
