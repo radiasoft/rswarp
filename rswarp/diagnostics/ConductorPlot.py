@@ -159,6 +159,7 @@ class PlotConductors(object):
             # Assign patches for dielectrics to the plot axes
             self.dielectric_patches = PatchCollection(self.dielectrics)
             self.dielectric_patches.set_color(self.dielectric_patch_colors)
+            self.dielectric_patches.set_hatch('//')
             self.plot_axes.add_collection(self.dielectric_patches)
 
             # Setup the legend and set data for legend axes
@@ -179,8 +180,7 @@ class PlotConductors(object):
             self.legend_axes.add_artist(diel_legend)
 
     def set_collection_colors(self, color_collection, color_values, map):
-        # self.voltage -> color_values
-        # self.conductor_patch_colors -> color_collection
+
         if self.variable_voltage_color:
             # Min/maxes for linear mapping of voltage to colormap
             negative_min = min(color_values)
@@ -198,7 +198,8 @@ class PlotConductors(object):
             for voltage in color_values:
                 if voltage < 0.:
                     try:
-                        color = int(-115. / abs(negative_max - negative_min) * voltage + 140.)
+                        color = int(-115. / abs(negative_max - negative_min) * voltage - 115. /
+                                    abs(negative_max - negative_min) * negative_max + 115.)
                         print voltage, color
                     except ZeroDivisionError:
                         color = 240
@@ -305,9 +306,9 @@ class PlotConductors(object):
 
         for permittivity, color in zip(self.permittivities, self.dielectric_patch_colors):
             if permittivity not in permittivity_sort:
-                legend_artist = patches.Patch(color=color, label=permittivity)
+                legend_artist = patches.Patch(color=color, label=permittivity, hatch='//')
                 self.dielectric_legend_handles.append(legend_artist)
-                permittivity_sort.append(voltage)
+                permittivity_sort.append(permittivity)
 
         self.conductor_legend_handles = [j for (i, j) in sorted(zip(voltage_sort, self.conductor_legend_handles))]
         self.dielectric_legend_handles = [j for (i, j) in sorted(zip(permittivity_sort,
