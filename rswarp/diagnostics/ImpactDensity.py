@@ -18,6 +18,8 @@ class PlotDensity(object):
 
     def __init__(self, ax, ax_colorbar, scraper, top, w3d):
         """
+        Plots density of scraped particles on conducting objects.
+
         Can evaluate density on each surface of a Box or ZPlane separately and produce shaded density plots.
         To run automatically: call an initialized PlotDensity object.
 
@@ -183,7 +185,7 @@ class PlotDensity(object):
                                            [(xmin + self.dx / 2.) * self.scale] * points,
                                            c=color_mapping,
                                            s=1,
-                                           linewidths=1,
+                                           linewidths=0,
                                            # marker='|',
                                            zorder=50)
                     scatter_plots.append(plot)
@@ -198,7 +200,7 @@ class PlotDensity(object):
                                            np.linspace(xmin, xmax, points) * self.scale,
                                            c=color_mapping,
                                            s=1,
-                                           linewidths=1,
+                                           linewidths=0,
                                            # marker='_',
                                            zorder=50)
                     scatter_plots.append(plot)
