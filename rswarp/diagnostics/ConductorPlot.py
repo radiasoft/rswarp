@@ -91,9 +91,13 @@ class PlotConductors(object):
         self.conductors = []
         self.voltages = []
         self.dielectrics = []
-        self.patches = None
-        self.patch_colors = []
-        self.legend_handles = []
+        self.permittivities = []
+        self.conductor_patches = None
+        self.dielectric_patches = None
+        self.conductor_patch_colors = []
+        self.dielectric_patch_colors = []
+        self.conductor_legend_handles = []
+        self.dielectric_legend_handles = []
         self.legend_fontsize = 5
         self.legend_anchor = (2.25, 1.0)
 
@@ -129,73 +133,95 @@ class PlotConductors(object):
                 # Perform check to make sure this is a conductor the code knows how to handle
                 for obj_type in self.conductor_types:
                     if isinstance(conductor, getattr(field_solvers.generateconductors, obj_type)):
-                        if conductor.voltage is not None:
+                        if conductor.permittivity is None:
                             self.conductors.append(self.set_rectangle_patch(conductor))
                             self.voltages.append(conductor.voltage)
-                        elif conductor.permittivity is not None:
+                        if conductor.permittivity is not None:
                             self.dielectrics.append(self.set_rectangle_patch(conductor, dielectric=True))
-                            self.voltages.append(None)
+                            self.permittivities.append(conductor.permittivity)
 
     def conductor_collection(self):
         # TODO: Once dielectrics register with solver add in loop to append them to dielectric array
         if not self.plot_axes:
             self.create_axes()
 
+        if len(self.voltages) > 0:
+            self.set_collection_colors(self.conductor_patch_colors, self.voltages, self.map)
+
+            # Assign patches for conductors to the plot axes
+            self.conductor_patches = PatchCollection(self.conductors)
+            self.conductor_patches.set_color(self.conductor_patch_colors)
+            self.plot_axes.add_collection(self.conductor_patches)
+
+        if len(self.permittivities) > 0:
+            self.set_collection_colors(self.dielectric_patch_colors, self.permittivities, plt.cm.viridis)
+
+            # Assign patches for dielectrics to the plot axes
+            self.dielectric_patches = PatchCollection(self.dielectrics)
+            self.dielectric_patches.set_color(self.dielectric_patch_colors)
+            self.plot_axes.add_collection(self.dielectric_patches)
+
+            # Setup the legend and set data for legend axes
+            self.create_legend()
+        if len(self.voltages) > 0:
+            cond_legend = self.legend_axes.legend(handles=self.conductor_legend_handles,
+                                    bbox_to_anchor=self.legend_anchor,
+                                    borderaxespad=0.,
+                                    fontsize=self.legend_fontsize,
+                                    title='Voltage (V)')
+            self.legend_axes.add_artist(cond_legend)
+        if len(self.permittivities) > 0:
+            diel_legend = self.legend_axes.legend(handles=self.dielectric_legend_handles,
+                                    bbox_to_anchor=(self.legend_anchor[0], self.legend_anchor[1] - 0.2),
+                                    borderaxespad=0.,
+                                    fontsize=self.legend_fontsize,
+                                    title='Permittivity')
+            self.legend_axes.add_artist(diel_legend)
+
+    def set_collection_colors(self, color_collection, color_values, map):
+        # self.voltage -> color_values
+        # self.conductor_patch_colors -> color_collection
         if self.variable_voltage_color:
             # Min/maxes for linear mapping of voltage to colormap
-            negative_min = min(self.voltages)
+            negative_min = min(color_values)
             try:
-                negative_max = max([i for i in self.voltages if i < 0.])
+                negative_max = max([i for i in color_values if i < 0.])
             except ValueError:
                 negative_max = 0.
             try:
-                positive_min = min([i for i in self.voltages if i > 0.])
+                positive_min = min([i for i in color_values if i > 0.])
             except ValueError:
                 positive_min = 0.
-            positive_max = max(self.voltages)
+            positive_max = max(color_values)
 
             # Perform mapping
-            for voltage in self.voltages:
-                if not voltage:
-                    self.patch_colors.append('g')
-                elif voltage < 0.:
+            for voltage in color_values:
+                if voltage < 0.:
                     try:
                         color = int(-115. / abs(negative_max - negative_min) * voltage + 140.)
+                        print voltage, color
                     except ZeroDivisionError:
                         color = 240
-                    self.patch_colors.append(self.map(color))
+                    color_collection.append(map(color))
                 elif voltage > 0.:
                     try:
-                        color = int(-115. / (positive_max - positive_min) * voltage + 115.)
+                        color = int(-113. / (positive_max - positive_min) * voltage + 113. /
+                                    (positive_max - positive_min) * positive_max + 2)
+                        print voltage, color
                     except ZeroDivisionError:
                         color = 15
-                    self.patch_colors.append(self.map(color))
+                    color_collection.append(map(color))
                 elif voltage == 0.:
-                        self.patch_colors.append('grey')
+                    color_collection.append('grey')
         else:
             # Just use same color for all + or - voltages
-            for voltage in self.voltages:
-                if not voltage:
-                    continue
-                elif voltage < 0.:
-                    self.patch_colors.append(self.map(240))
+            for voltage in color_values:
+                if voltage < 0.:
+                    color_collection.append(map(240))
                 elif voltage > 0.:
-                    self.patch_colors.append(self.map(15))
+                    color_collection.append(map(15))
                 elif voltage == 0.:
-                    self.patch_colors.append('grey')
-
-        # Assign patches for conductors to the plot axes
-        self.patches = PatchCollection(self.conductors + self.dielectrics)
-        self.patches.set_color(self.patch_colors)
-        self.plot_axes.add_collection(self.patches)
-
-        # Setup the legend and set data for legend axes
-        self.create_legend()
-        self.legend_axes.legend(handles=self.legend_handles,
-                                bbox_to_anchor=self.legend_anchor,
-                                borderaxespad=0.,
-                                fontsize=self.legend_fontsize,
-                                title='Voltage (V)')
+                    color_collection.append('grey')
 
     def set_rectangle_patch(self, conductor, dielectric=False):
         """
@@ -222,11 +248,11 @@ class PlotConductors(object):
             p = patches.Rectangle(
                 (xcorner * self.scale, ycorner * self.scale),
                 xlength * self.scale,
-                ylength * self.scale,
-                fill=False,
-                lw=3,
-                color='k',
-                hatch='/')
+                ylength * self.scale)
+                # fill=False,
+                # lw=3,
+                # color='k',
+                # hatch='/')
         else:
             p = patches.Rectangle(
                 (xcorner * self.scale, ycorner * self.scale),
@@ -242,7 +268,7 @@ class PlotConductors(object):
             None
         """
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(12, 5))
         gs = GridSpec(1, 2, width_ratios=[20, 1])
         ax1 = fig.add_subplot(gs[0, 0])
         ax2 = fig.add_subplot(gs[0, 1])
@@ -269,13 +295,23 @@ class PlotConductors(object):
     @run_once
     def create_legend(self):
         voltage_sort = []
-        for voltage, color in zip(self.voltages, self.patch_colors):
+        permittivity_sort = []
+
+        for voltage, color in zip(self.voltages, self.conductor_patch_colors):
             if voltage not in voltage_sort:
                 legend_artist = patches.Patch(color=color, label=voltage)
-                self.legend_handles.append(legend_artist)
+                self.conductor_legend_handles.append(legend_artist)
                 voltage_sort.append(voltage)
 
-        self.legend_handles = [j for (i, j) in sorted(zip(voltage_sort, self.legend_handles))]
+        for permittivity, color in zip(self.permittivities, self.dielectric_patch_colors):
+            if permittivity not in permittivity_sort:
+                legend_artist = patches.Patch(color=color, label=permittivity)
+                self.dielectric_legend_handles.append(legend_artist)
+                permittivity_sort.append(voltage)
+
+        self.conductor_legend_handles = [j for (i, j) in sorted(zip(voltage_sort, self.conductor_legend_handles))]
+        self.dielectric_legend_handles = [j for (i, j) in sorted(zip(permittivity_sort,
+                                                                     self.dielectric_legend_handles))]
 
     def set_legend_properties(self, fontsize=5, anchor=(2.25, 1.0)):
         """
