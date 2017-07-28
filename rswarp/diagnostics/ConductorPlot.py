@@ -173,13 +173,15 @@ class PlotConductors(object):
             self.legend_axes.add_artist(cond_legend)
         if len(self.permittivities) > 0:
             diel_legend = self.legend_axes.legend(handles=self.dielectric_legend_handles,
-                                    bbox_to_anchor=(self.legend_anchor[0], self.legend_anchor[1] - 0.2),
+                                    bbox_to_anchor=(self.legend_anchor[0] + 0.05, self.legend_anchor[1] - 0.2),
                                     borderaxespad=0.,
                                     fontsize=self.legend_fontsize,
-                                    title='Permittivity')
+                                    title='   Relative\nPermittivity')
             self.legend_axes.add_artist(diel_legend)
 
     def set_collection_colors(self, color_collection, color_values, map):
+        # Wanted color scaling to always be red for negative and blue for positive (assuming bl-r colormap)
+        # Created custom linear scaling to using halves of color map for +/- consistently, even if only one sign present
 
         if self.variable_voltage_color:
             # Min/maxes for linear mapping of voltage to colormap
@@ -200,7 +202,6 @@ class PlotConductors(object):
                     try:
                         color = int(-115. / abs(negative_max - negative_min) * voltage - 115. /
                                     abs(negative_max - negative_min) * negative_max + 115.)
-                        print voltage, color
                     except ZeroDivisionError:
                         color = 240
                     color_collection.append(map(color))
@@ -208,7 +209,6 @@ class PlotConductors(object):
                     try:
                         color = int(-113. / (positive_max - positive_min) * voltage + 113. /
                                     (positive_max - positive_min) * positive_max + 2)
-                        print voltage, color
                     except ZeroDivisionError:
                         color = 15
                     color_collection.append(map(color))
