@@ -53,11 +53,13 @@ class PlotDensity(object):
         self.w3d = w3d
 
         self.gated_ids = {}
-        self.zplost = self.top.zplost
-        self.xplost = self.top.xplost
         self.dx = w3d.dx
         self.dz = w3d.dz
         self.scale = 1e6
+        #categorize the number lost to avoid padded values at end of array
+        self.numlost = top.npslost[0]
+        self.zplost = self.top.zplost[:self.numlost]
+        self.xplost = self.top.xplost[:self.numlost]
 
         self.cmap = cm.coolwarm
         self.normalization = Normalize
