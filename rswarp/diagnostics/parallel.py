@@ -3,7 +3,22 @@ import numpy as np
 Utilities for parallel Warp operation.
 """
 
+
 def save_lost_particles(top, comm_world, fsave=None):
+    """
+    Function for saving lost (scraped) particles coordinate data. Only useful for when Warp is operating in parallel.
+    Data is saved in (x,y,z) columns in numpy.save binary file format.
+    Due to Warp's dynamic array system data may contain empty coordinates as float 0's.
+
+    Args:
+        top: top object from Warp
+        comm_world: comm_world object used by Warp
+        fsave: path for save file.
+            If not given defauts to 'lost_particles_step_$(step_number).npy' in the local directory.
+
+    Returns:
+
+    """
     if not fsave:
         fsave = 'lost_particles_step_{}.npy'.format(top.it)
 
