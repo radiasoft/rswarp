@@ -56,7 +56,7 @@ class PlotDensity(object):
         self.dx = w3d.dx
         self.dz = w3d.dz
         self.scale = 1e6
-        #categorize the number lost to avoid padded values at end of array
+        # categorize the number lost to avoid padded values at end of array
         self.numlost = top.npslost[0]
         self.zplost = self.top.zplost[:self.numlost]
         self.xplost = self.top.xplost[:self.numlost]
