@@ -1,5 +1,6 @@
 import os
 import pysftp
+import paramiko
 from time import sleep
 
 batch_header = """
@@ -36,8 +37,6 @@ batch_instructions = {
 remote_transfer_settings = {
     'server': 'cori.nersc.gov',
     'username': 'hallcc',
-    'private_key_path': '/Users/chall/.ssh/id_rsa',
-    'private_key_phrase': 'blocktime',
     'project_directory': '/global/cscratch1/sd/hallcc/',
     'get_directory': 'new_test1/',
     'local_directory': 'new_dir/'
@@ -71,13 +70,32 @@ def create_runfiles(population, filename=None, batch_instructions=batch_instruct
         f1.write(run_tail)
 
 
-def retrieve_fitness(server, username, private_key_path, private_key_phrase,
-                     project_directory, get_directory, local_directory):
+def retrieve_fitness(server, username,
+                     project_directory, local_directory):
+    """
+    Retrieve all files from given folder. uses Paramiko's `load_system_host_keys` to validate ssh/sftp connection.
+    Will attempt to download all files in `project_directory` folder.
+    Args:
+        server: Name of remote serve for ssh connection.
+        username: Username for connection to remote server.
+        project_directory: Path to folder to download files from.
+        local_directory: Path on local machine to download files to.
+
+    Returns:
+        0
+    """
     try:
-        with pysftp.Connection(server, username=username,
-                               private_key=private_key_path, private_key_pass=private_key_phrase) as sftp:
-            with sftp.cd(project_directory):
-                sftp.get_d(get_directory, local_directory)
+        with paramiko.SSHClient() as client:
+            client.load_system_host_keys()
+            client.connect(hostname=server, username=username)
+            sftp_client = client.open_sftp()
+            sftp_client.chdir(project_directory)
+            for fil in sftp_client.listdir():
+                try:
+                    sftp_client.get(fil, os.path.join(local_directory, fil))
+                except IOError, e:
+                    print "File retrieval failed with:\n {}".format(e)
+                    pass
             saved_e = 0
     except IOError, e:
         print "Retrieval Failure"
@@ -86,17 +104,32 @@ def retrieve_fitness(server, username, private_key_path, private_key_phrase,
     return saved_e
 
 
-def upload_batch_file(server, username, private_key_path, private_key_phrase,
-                      project_directory, upload_dir, upload_file):
+def upload_batch_file(server, username,
+                      project_directory, upload_file, upload_directory=None, start_job=True):
     try:
-        with pysftp.Connection(server, username=username,
-                               private_key=private_key_path, private_key_pass=private_key_phrase) as sftp:
-            with sftp.cd(project_directory):
-                if not sftp.isdir(upload_dir):
-                    sftp.mkdir(upload_dir)
-                with sftp.cd(upload_dir):
-                    sftp.put(upload_file)
-            saved_e = 0
+        with paramiko.SSHClient() as client:
+            client.load_system_host_keys()
+            client.connect(hostname=server, username=username)
+            sftp_client = client.open_sftp()
+            sftp_client.chdir(project_directory)
+
+            # Make new directory to upload file to, if required
+            # Move to new directory
+            if upload_directory and (upload_directory not in sftp_client.listdir):
+                sftp_client.mkdir(upload_directory)
+                sftp_client.chdir(upload_directory)
+
+            sftp_client.put(upload_file, os.path.split(upload_file)[-1])
+
+            if start_job:
+                stdin, stdout, sterr = client.exec_command('sbatch {}').format(upload_file)
+
+                if sterr:
+                    return sterr.read()
+                elif stdout:
+                    # return JobID
+                    status = stdout.read().split()
+                    return status[-1]
     except IOError, e:
         print "Retrieval Failure"
         saved_e = e
@@ -104,6 +137,29 @@ def upload_batch_file(server, username, private_key_path, private_key_phrase,
     return saved_e
 
 
+def start_job(server, username, path, filename):
+    try:
+        with paramiko.SSHClient() as client:
+            client.load_system_host_keys()
+            client.connect(hostname=server, username=username)
+            client.exec_command('cd {}'.format(path))
+            stdin, stdout, sterr = client.exec_command('sbatch {}').format(filename)
+
+            if sterr:
+                return sterr.read()
+            elif stdout:
+                # return JobID
+                status = stdout.read().split()
+                return status[-1]
+
+    except IOError, e:
+        print "Connection Failure"
+        return e
+
+def return_job_status(jobid):
+
+
+    pass
 def manage_retrieval(remote_transfer_settings):
     # If local_directory exists remove all txt files that might hold old data, else make the directory
     if os.path.isdir(remote_transfer_settings['local_directory']):
@@ -131,7 +187,10 @@ def manage_retrieval(remote_transfer_settings):
         print "Retrieval Completed:", status == 0
         print status, type(status), status[0], status[1]
 
-        retrieval_completed = True
+        if retrieval_completed:
+            return 0
+        else:
+            return 1
 
 
 def evalEfficiency(filename, population, generation):
