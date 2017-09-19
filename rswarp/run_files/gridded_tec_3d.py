@@ -36,7 +36,6 @@ m = m_e  # electron mass
 
 
 def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height, id,
-         save_directory,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_flag=False):
     # record inputs
     run_attributes = deepcopy(locals())
