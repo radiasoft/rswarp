@@ -36,6 +36,7 @@ m = m_e  # electron mass
 
 
 def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height, id,
+         injection_settings={'type': 1, 'temperature':1273.15},
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_flag=False):
     # record inputs
     run_attributes = deepcopy(locals())
@@ -46,9 +47,10 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     if particle_diagnostic_switch or field_diagnostic_switch:
         # Directory paths
-        diagDir = 'diags/xyzsolver/hdf5/'
-        field_base_path = 'diags/fields/'
-        diagFDir = {'magnetic': 'diags/fields/magnetic', 'electric': 'diags/fields/electric'}
+        diagDir = 'diags_id{}/xyzsolver/hdf5/'.format(id)
+        field_base_path = 'diags_id{}/fields/'.format(id)
+        diagFDir = {'magnetic': 'diags_id{}/fields/magnetic'.format(id),
+                    'electric': 'diags_id{}/fields/electric'.format(id)}
 
         # Cleanup command if directories already exist
         if comm_world.rank == 0:
@@ -109,10 +111,10 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     #############################
 
     # INJECTION SPECIFICATION
-    USER_INJECT = 1
+    USER_INJECT = injection_settings['type']
 
     # Cathode and anode settings
-    CATHODE_TEMP = 1273.15
+    CATHODE_TEMP = injection_settings['temperature']
     CATHODE_PHI = 2.0  # work function in eV
     ANODE_WF = 0.1  # Can be used if vacuum level is being set
     ACCEL_VOLTS = volts_on_grid  # ACCEL_VOLTS used for velocity and CL calculations
@@ -157,32 +159,39 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         beam.b0 = CHANNEL_WIDTH
         beam.ap0 = .0e0
         beam.bp0 = .0e0
+
         w3d.l_inj_exact = True
+
+        # Initial velocity settings (5% of c)
         vrms = np.sqrt(1 - 1 / (0.05 / 511e3 + 1) ** 2) * 3e8
         top.vzinject = vrms
-        # top.vthperp = vrms
-        # top.vthz = vrms
-    if USER_INJECT == 2:
-        # Thermionic injection
 
-        # Set injection flag
-        top.inject = 6  # 1 means constant; 2 means space-charge limited injection;# 6 means user-specified
+    if USER_INJECT == 2:
+        # True Thermionic injection
+        top.inject = 1
+        top.npinject = PTCL_PER_STEP
+
+        beam_current = 4. / 9. * eps0 * sqrt(2. * echarge / beam.mass) \
+                       * ACCEL_VOLTS ** 1.5 / PLATE_SPACING ** 2 * cathode_area
+
+        beam.ibeam = beam_current * CURRENT_MODIFIER
+
+        beam.a0 = CHANNEL_WIDTH
+        beam.b0 = CHANNEL_WIDTH
+        beam.ap0 = .0e0
+        beam.bp0 = .0e0
+
+        w3d.l_inj_exact = True
+
+        # Specify thermal properties
+        beam.vthz = np.sqrt(CATHODE_TEMP * kb_J / beam.mass)
+        beam.vthperp = np.sqrt(CATHODE_TEMP * kb_J / beam.mass)
+        top.lhalfmaxwellinject = 1  # inject z velocities as half Maxwellian
 
         beam_current = sources.j_rd(CATHODE_TEMP, CATHODE_PHI) * cathode_area  # steady state current in Amps
         beam.ibeam = beam_current * CURRENT_MODIFIER
         beam.a0 = SOURCE_RADIUS_1
         beam.b0 = SOURCE_RADIUS_2
-
-        max_current = 4. / 9. * eps0 * sqrt(2. * echarge / beam.mass) \
-                      * ACCEL_VOLTS ** 1.5 / grid_height ** 2 * cathode_area
-
-        print  "CL Max Current: {}\nRD Current: {}".format(max_current, beam_current)
-        myInjector = injectors.injectorUserDefined(beam, CATHODE_TEMP, CHANNEL_WIDTH, Z_PART_MIN, PTCL_PER_STEP)
-        installuserinjection(myInjector.inject_thermionic)
-
-        # These must be set for user injection
-        top.ainject = 1.0
-        top.binject = 1.0
 
     derivqty()
 
@@ -360,14 +369,14 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     ######################
 
     if comm_world.rank == 0:
-        with open('output_stats_{}.txt'.format(id), 'w') as f1:
+        with open('output_stats_id{}.txt'.format(id), 'w') as f1:
             for ts in times:
                 f1.write('{}\n'.format(ts))
             f1.write('\n')
             f1.write('{} {} {} {}\n'.format(collector_fraction_0, accumulated_0[0], accumulated_0[1], accumulated_0[2]))
             f1.write('{} {} {} {}\n'.format(collector_fraction_1, accumulated_1[0], accumulated_1[1], accumulated_1[2]))
 
-        filename = 'effdiag_' + str(id)
+        filename = 'efficiency_id{}.h5'.format(str(id))
         with h5.File(filename, 'w') as h5file:
             for key in run_attributes:
                 h5file.attrs[key] = run_attributes[key]
