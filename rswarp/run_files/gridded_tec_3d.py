@@ -354,7 +354,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
         # START TEMP
 
-        for cond in solverE.conductordatalist:
+        for cond in solverE.conductordatalist[0]:
             print "SOLVER COND DATA"
             print cond.condid
             print cond.lostparticles_data.shape
