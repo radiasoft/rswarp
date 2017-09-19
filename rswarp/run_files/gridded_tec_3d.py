@@ -144,6 +144,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     PTCL_PER_STEP = 300
     CURRENT_MODIFIER = 0.5  # Factor to reduce current by
 
+    top.seedranf(245340539453)
     if USER_INJECT == 1:
         # Constant current density - beam transverse velocity fixed to zero, very small longitduinal velocity
 
