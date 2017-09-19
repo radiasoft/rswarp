@@ -284,6 +284,9 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         return np.array([np.sum(scraper_record[1][:, 1]), np.sum(scraper_record[2][:, 1]),
                          np.sum(scraper_record[3][:, 1])])
 
+    ##########################
+    # SOLVER SETTINGS/GENERATE
+    ##########################
 
     # prevent gist from starting upon setup
     top.lprntpara = false
@@ -302,7 +305,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     # Determine an appropriate time step based upon estimated final velocity
     vzfinal = sqrt(2. * abs(volts_on_grid) * np.abs(beam.charge) / beam.mass) + beam_beta * c
-    dt = dz / vzfinal  # 5e-15
+    dt = dz / vzfinal
     top.dt = dt
 
     solverE.mgmaxiters = init_iters
@@ -348,6 +351,23 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         step(1000)
 
         counts_2 = get_lost_counts()
+
+        # START TEMP
+
+        for cond in solverE.conductordatalist:
+            print "SOLVER COND DATA"
+            print cond.condid
+            print cond.lostparticles_data.shape
+            print cond.lostparticles_data[:, 0].shape
+            print np.sum(np.round(-1. * cond.lostparticles_data[:, 1] / beam.sw / e))
+        for cond in scraper.conductors:
+            print "SCRAPER COND DATA"
+            print cond.condid
+            print cond.lostparticles_data.shape
+            print cond.lostparticles_data[:, 0].shape
+            print np.sum(np.round(-1. * cond.lostparticles_data[:, 1] / beam.sw / e))
+
+        # END TEMP
 
         # Record i-1 and i+1 intervals
         accumulated_0 = counts_1 - counts_0
