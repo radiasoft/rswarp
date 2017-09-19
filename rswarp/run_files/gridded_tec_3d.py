@@ -36,7 +36,7 @@ m = m_e  # electron mass
 
 
 def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height, id,
-         injection_settings={'type': 1, 'temperature':1273.15},
+         injection_type=1, cathode_temperature=1273.15,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_flag=False):
     # record inputs
     run_attributes = deepcopy(locals())
@@ -111,10 +111,10 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     #############################
 
     # INJECTION SPECIFICATION
-    USER_INJECT = injection_settings['type']
+    USER_INJECT = injection_type
 
     # Cathode and anode settings
-    CATHODE_TEMP = injection_settings['temperature']
+    CATHODE_TEMP = cathode_temperature
     CATHODE_PHI = 2.0  # work function in eV
     ANODE_WF = 0.1  # Can be used if vacuum level is being set
     ACCEL_VOLTS = volts_on_grid  # ACCEL_VOLTS used for velocity and CL calculations
