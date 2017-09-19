@@ -20,6 +20,7 @@ import sys
 sys.path.append('/global/homes/h/hallcc/github/rswarp')
 
 from copy import deepcopy
+from random import randint
 from rswarp.cathode import sources
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from rswarp.diagnostics import FieldDiagnostic
@@ -37,9 +38,14 @@ m = m_e  # electron mass
 
 def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height, id,
          injection_type=1, cathode_temperature=1273.15,
+         random_seed=True,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_flag=False):
     # record inputs
     run_attributes = deepcopy(locals())
+
+    # set new random seed
+    if random_seed:
+        top.seedranf(randint(1, 1e9))
 
     # Control for printing in parallel
     if comm_world.size != 1:
@@ -144,7 +150,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     PTCL_PER_STEP = 300
     CURRENT_MODIFIER = 0.5  # Factor to reduce current by
 
-    top.seedranf(245340539453)
+
     if USER_INJECT == 1:
         # Constant current density - beam transverse velocity fixed to zero, very small longitduinal velocity
 
