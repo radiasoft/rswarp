@@ -115,7 +115,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     CATHODE_TEMP = 1273.15
     CATHODE_PHI = 2.0  # work function in eV
     ANODE_WF = 0.1  # Can be used if vacuum level is being set
-    GRID_BIAS = volts_on_grid  # voltage applied to any grid of electrodes
+    ACCEL_VOLTS = volts_on_grid  # ACCEL_VOLTS used for velocity and CL calculations
 
     # Emitted species
     beam = Species(type=Electron, name='beam')
@@ -149,7 +149,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         top.inject = 1  # 1 means constant; 2 means space-charge limited injection;# 6 means user-specified
         top.npinject = PTCL_PER_STEP
         beam_current = 4. / 9. * eps0 * sqrt(2. * echarge / beam.mass) \
-                       * GRID_BIAS ** 1.5 / PLATE_SPACING ** 2 * cathode_area
+                       * ACCEL_VOLTS ** 1.5 / PLATE_SPACING ** 2 * cathode_area
 
         beam.ibeam = beam_current * CURRENT_MODIFIER
 
@@ -174,7 +174,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         beam.b0 = SOURCE_RADIUS_2
 
         max_current = 4. / 9. * eps0 * sqrt(2. * echarge / beam.mass) \
-                      * GRID_BIAS ** 1.5 / grid_height ** 2 * cathode_area
+                      * ACCEL_VOLTS ** 1.5 / grid_height ** 2 * cathode_area
 
         print  "CL Max Current: {}\nRD Current: {}".format(max_current, beam_current)
         myInjector = injectors.injectorUserDefined(beam, CATHODE_TEMP, CHANNEL_WIDTH, Z_PART_MIN, PTCL_PER_STEP)
@@ -261,6 +261,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         scraper_record = analyze_scraped_particles(top, beam, solverE)
 
         for key in scraper_dictionary:
+            print 'Step: {}'.format(top.it)
             print 'analyze says {} scraped:'.format(scraper_dictionary[key]), \
                 np.sum(scraper_record[key][:, 1])
 
@@ -299,7 +300,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # CONTROL SEQUENCE
     ##################
 
-    times = []  # Write out 1000 step time increments to file
+    times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
 
     # Run for 1000 steps initially
@@ -323,7 +324,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     while (tol > target) and (clock < time_limit):
         if lost_diagnostic_flag:
-            save_lost_particles(top, comm_world)
+            lost_particle_file = 'lost_particles_id{}_step{}.npy'.format(id, top.it)
+            save_lost_particles(top, comm_world, fsave=lost_particle_file)
 
         time1 = time.time()
 
@@ -365,7 +367,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
             f1.write('{} {} {} {}\n'.format(collector_fraction_0, accumulated_0[0], accumulated_0[1], accumulated_0[2]))
             f1.write('{} {} {} {}\n'.format(collector_fraction_1, accumulated_1[0], accumulated_1[1], accumulated_1[2]))
 
-        filename = 'effdiag_' + id
+        filename = 'effdiag_' + str(id)
         with h5.File(filename, 'w') as h5file:
             for key in run_attributes:
                 h5file.attrs[key] = run_attributes[key]
