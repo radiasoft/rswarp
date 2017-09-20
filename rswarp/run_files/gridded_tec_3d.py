@@ -228,8 +228,10 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # Create source conductors
     source = ZPlane(zcent=w3d.zmmin, zsign=-1., voltage=0., condid=2)
     # Create ground plate
-    plate = ZPlane(voltage=0., zcent=zplate, condid=3)
-
+    if install_grid:
+        plate = ZPlane(voltage=0., zcent=zplate, condid=3)
+    else:
+        plate = ZPlane(voltage=volts_on_grid, zcent=zplate, condid=3)
     #####
     # Grid dimensions used in testing
     # strut_width = 3e-9
@@ -326,9 +328,10 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     # Run for 1000 steps initially
     time1 = time.time()
-
-    counts_0 = np.array([0., 0., 0.])
-
+    if install_grid:
+        counts_0 = np.array([0., 0., 0.])
+    else:
+        counts_0 = np.array([0., 0.])
     step(1000)
 
     counts_1 = get_lost_counts()
