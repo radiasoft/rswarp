@@ -38,7 +38,7 @@ m = m_e  # electron mass
 
 def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height, id,
          injection_type=1, cathode_temperature=1273.15,
-         random_seed=True,
+         random_seed=True, install_grid=True,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_flag=False):
     # record inputs
     run_attributes = deepcopy(locals())
@@ -215,7 +215,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # CONDUCTOR INSTALLATION
     ########################
 
-    install_grid = True
+    # install_grid = True
 
     accel_grid, gl = create_grid(x_struts, y_struts, volts_on_grid,
                                  grid_height, strut_width, strut_height,
@@ -280,10 +280,12 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
             print 'Step: {}'.format(top.it)
             print 'analyze says {} scraped:'.format(scraper_dictionary[key]), \
                 np.sum(scraper_record[key][:, 1])
-
-        return np.array([np.sum(scraper_record[1][:, 1]), np.sum(scraper_record[2][:, 1]),
-                         np.sum(scraper_record[3][:, 1])])
-
+        if install_grid:
+            return np.array([np.sum(scraper_record[1][:, 1]), np.sum(scraper_record[2][:, 1]),
+                             np.sum(scraper_record[3][:, 1])])
+        else:
+            return np.array([np.sum(scraper_record[2][:, 1]),
+                             np.sum(scraper_record[3][:, 1])])
     ##########################
     # SOLVER SETTINGS/GENERATE
     ##########################
