@@ -215,12 +215,11 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # CONDUCTOR INSTALLATION
     ########################
 
-    # install_grid = True
-
-    accel_grid, gl = create_grid(x_struts, y_struts, volts_on_grid,
-                                 grid_height, strut_width, strut_height,
-                                 CHANNEL_WIDTH)
-    accel_grid.voltage = volts_on_grid
+    if install_grid:
+        accel_grid, gl = create_grid(x_struts, y_struts, volts_on_grid,
+                                     grid_height, strut_width, strut_height,
+                                     CHANNEL_WIDTH)
+        accel_grid.voltage = volts_on_grid
 
     # --- Anode Location
     zplate = Z_MAX
@@ -239,7 +238,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # grid_height = zplate / 2.
     # volts_on_grid = 5.
 
-    print "Initial Grid id:", accel_grid.condid, source.condid, plate.condid
+    # print "Initial Grid id:", accel_grid.condid, source.condid, plate.condid
 
     if install_grid:
         installconductor(accel_grid)
