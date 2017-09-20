@@ -287,8 +287,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
             return np.array([np.sum(scraper_record[1][:, 1]), np.sum(scraper_record[2][:, 1]),
                              np.sum(scraper_record[3][:, 1])])
         else:
-            return np.array([np.sum(scraper_record[2][:, 1]),
-                             np.sum(scraper_record[3][:, 1])])
+            return np.array([np.sum(scraper_record[1][:, 1]),
+                             np.sum(scraper_record[2][:, 1])])
     ##########################
     # SOLVER SETTINGS/GENERATE
     ##########################
