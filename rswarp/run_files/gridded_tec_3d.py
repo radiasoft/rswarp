@@ -312,7 +312,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     vzfinal = sqrt(2. * abs(volts_on_grid) * np.abs(beam.charge) / beam.mass) + beam_beta * c
     dt = dz / vzfinal
     print "TIME STEP:", dt
-    top.dt = 1e-15
+    top.dt = dt
 
     solverE.mgmaxiters = init_iters
     solverE.mgtol = init_tol
@@ -339,7 +339,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     counts_1 = get_lost_counts()
 
     # START TEMP
-
+    print w3d.dz, np.max(getvz())
     for cond in solverE.conductordatalist:
         print "SOLVER COND DATA"
         print cond[0].condid, beam.sw, e
