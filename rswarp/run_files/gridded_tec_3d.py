@@ -356,13 +356,15 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
         for cond in solverE.conductordatalist:
             print "SOLVER COND DATA"
-            print cond[0].condid
+            print cond[0].condid, beam.sw, e
             print cond[0].lostparticles_data[()][:, 0].shape
+            print np.sum(cond.lostparticles_data[()][:, 1])
             print np.sum(np.round(-1. * cond[0].lostparticles_data[()][:, 1] / beam.sw / e))
         for cond in scraper.conductors:
             print "SCRAPER COND DATA"
-            print cond.condid
+            print cond.condid, beam.sw, e
             print cond.lostparticles_data[()][:, 0].shape
+            print np.sum(cond.lostparticles_data[()][:, 1])
             print np.sum(np.round(-1. * cond.lostparticles_data[()][:, 1] / beam.sw / e))
 
         # END TEMP
