@@ -148,8 +148,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     beam_beta = sources.compute_cutoff_beta(CATHODE_TEMP, frac=0.99)
 
     PTCL_PER_STEP = 300
-    CURRENT_MODIFIER = 0.5  # Factor to reduce current by
-
+    CURRENT_MODIFIER = 0.5  # Factor to multiply CL current by when setting beam current
 
     if USER_INJECT == 1:
         # Constant current density - beam transverse velocity fixed to zero, very small longitduinal velocity
@@ -225,12 +224,15 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     zplate = Z_MAX
 
     # Create source conductors
-    source = ZPlane(zcent=w3d.zmmin, zsign=-1., voltage=0., condid=2)
+    if install_grid:
+        source = ZPlane(zcent=w3d.zmmin, zsign=-1., voltage=0., condid=2)
+    else:
+        source = ZPlane(zcent=w3d.zmmin, zsign=-1., voltage=0.)
     # Create ground plate
     if install_grid:
         plate = ZPlane(voltage=0., zcent=zplate, condid=3)
     else:
-        plate = ZPlane(voltage=volts_on_grid, zcent=zplate, condid=3)
+        plate = ZPlane(voltage=volts_on_grid, zcent=zplate)
     #####
     # Grid dimensions used in testing
     # strut_width = 3e-9
@@ -244,7 +246,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         installconductor(accel_grid)
         installconductor(source, dfill=largepos)
         installconductor(plate, dfill=largepos)
-        scraper = ParticleScraper([source, plate, accel_grid],
+        scraper = ParticleScraper([accel_grid, source, plate],
                                   lcollectlpdata=True,
                                   lsaveintercept=True)
         scraper_dictionary = {1: 'grid', 2: 'source', 3: 'collector'}
