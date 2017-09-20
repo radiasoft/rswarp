@@ -29,7 +29,7 @@ from rswarp.diagnostics.parallel import save_lost_particles
 from rswarp.diagnostics.ConductorDiagnostics import analyze_scraped_particles
 
 # Constants imports
-from scipy.constants import m_e, c, k
+from scipy.constants import e, m_e, c, k
 
 kb_eV = 8.6173324e-5  # Bolztmann constant in eV/K
 kb_J = k  # Boltzmann constant in J/K
