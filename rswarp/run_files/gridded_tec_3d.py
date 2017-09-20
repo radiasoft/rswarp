@@ -254,7 +254,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         installconductor(source, dfill=largepos)
         installconductor(plate, dfill=largepos)
         scraper = ParticleScraper([source, plate])
-        scraper_dictionary = {2: 'source', 3: 'collector'}
+        scraper_dictionary = {1: 'source', 2: 'collector'}
 
     #############
     # DIAGNOSTICS
