@@ -395,14 +395,14 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         accumulated_0 = counts_1 - counts_0
         accumulated_1 = counts_2 - counts_1
 
-        if counts_2[2] < 1000:
+        if counts_2[-1] < 1000:
             # Insufficient statistics to start counting, keep tol at default
             collector_fraction_0 = -1.
             collector_fraction_1 = -1.
         else:
-            collector_fraction_0 = accumulated_0[2] / np.sum(accumulated_0,
+            collector_fraction_0 = accumulated_0[-1] / np.sum(accumulated_0,
                                                              dtype=float)  # Fraction of particles incident on collector
-            collector_fraction_1 = accumulated_1[2] / np.sum(accumulated_1,
+            collector_fraction_1 = accumulated_1[-1] / np.sum(accumulated_1,
                                                              dtype=float)  # Fraction of particles incident on collector
             tol = abs(collector_fraction_1 - collector_fraction_0) / collector_fraction_1
 
