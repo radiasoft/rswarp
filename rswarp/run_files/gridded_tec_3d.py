@@ -377,7 +377,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         counts_2 = get_lost_counts()
 
         # START TEMP
-
+        print w3d.dz, np.max(getvz())
         for cond in solverE.conductordatalist:
             print "SOLVER COND DATA"
             print cond[0].condid, beam.sw, e
