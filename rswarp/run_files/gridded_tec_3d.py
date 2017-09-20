@@ -311,7 +311,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # Determine an appropriate time step based upon estimated final velocity
     vzfinal = sqrt(2. * abs(volts_on_grid) * np.abs(beam.charge) / beam.mass) + beam_beta * c
     dt = dz / vzfinal
-    top.dt = dt
+    print "TIME STEP:", dt
+    top.dt = 1e-15
 
     solverE.mgmaxiters = init_iters
     solverE.mgtol = init_tol
