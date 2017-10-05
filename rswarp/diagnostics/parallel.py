@@ -34,7 +34,7 @@ def save_lost_particles(top, comm_world, fsave=None):
         status = 1
     except:
         status = 0
-        "{} failed try".format(comm_world.rank)
+        "Rank {} does not hold lost particle arrays".format(comm_world.rank)
 
     # Send each status to head
     all_status = comm_world.gather(status, root=0)

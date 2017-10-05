@@ -6,7 +6,7 @@ from __future__ import division
 import matplotlib
 matplotlib.use('PS')
 
-# set warpoptions.ignoreUnknownArgs = True before main import to allow command line arguments
+# set `warpoptions.ignoreUnknownArgs = True` before main import to allow command line arguments Warp does not recognize
 import warpoptions
 warpoptions.ignoreUnknownArgs = True
 
