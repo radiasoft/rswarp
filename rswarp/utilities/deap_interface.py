@@ -2,7 +2,7 @@ import os
 import h5py as h5
 import numpy as np
 import paramiko
-from time import sleep
+from time import sleep, ctime
 
 batch_header = """#!/bin/bash -l
 #SBATCH -p {queue} 
@@ -66,7 +66,7 @@ class JobRunner(object):
         # Set when job started by `self.project_directory`
         self.project_directory = None
 
-        #Directory containing any output from simulation
+        # Directory containing any output from simulation
         self.output_directory = None
 
         # SLURM ID for current job being executed
@@ -143,17 +143,19 @@ class JobRunner(object):
         self.refresh_ssh_client()
 
         path, job_name = os.path.split(job)
-        print path
+        print 'Starting batch file: {} in directory {}'.format(job_name, path)
 
-        if path:
-            stdin, stdout, stderr = self.client.exec_command('ls')
-            out = stdout.read()
-            err = stderr.read()
-            if err:
-                print 'fail'
-                return err
-            else:
-                print "Moved to {}".format(path)
+        # Check for path existance
+        stdin, stdout, stderr = self.client.exec_command('ls {}'.format(path))
+        out = stdout.read()
+        err = stderr.read()
+        if err:
+            print 'Could not find directory: {}'.format(path)
+            print err, out
+            return err
+        else:
+            print "Contents of job directory:", out
+            assert job_name in out, "Cannot find {}\n Run will not start".format(job_name)
 
         stdin, stdout, stderr = self.client.exec_command('cd {}; sbatch {}'.format(path, job_name))
 
@@ -171,12 +173,14 @@ class JobRunner(object):
             self.project_directory = path
             return status[-1]
 
-    def check_job_status(self):
+    def check_job_status(self, output_directory=None):
         if not self.jobid:
             print "No job known"
             return -1
+        if output_directory:
+            self.output_directory = output_directory
 
-        check_file = os.path.join(self.project_directory, 'COMPLETE')
+        check_file = os.path.join(self.output_directory, 'COMPLETE')
 
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
@@ -193,7 +197,7 @@ class JobRunner(object):
             print "FOUND COMPLETE"
             if out_file == '0':
                 # Complete
-                "Job {} complete".format(self.jobid)
+                "{}: Job {} complete".format(ctime(), self.jobid)
                 return 0
             else:
                 # Fatal error
@@ -201,19 +205,21 @@ class JobRunner(object):
                 return -1
         elif err_file and out_job:
             # Job not complete but still active
-            print "Job active but not complete"
+            print "{}: Job active but not complete".format(ctime())
             return 1
         elif err_file and err_job:
             # Fatal error
-            print "Error on status and file"
+            print "{}: Error on status and file".format(ctime())
             return -1
 
-    def evaluate_fitness(self, timer):
+    def monitor_job(self, timer, remote_output_directory, local_directory):
+        self.output_directory = remote_output_directory
+
         sleep(10 * 60)
         timer -= 10 * 60
         status = self.check_job_status()
         if status == 0:
-            self.retrieve_fitness()
+            self.retrieve_fitness(local_directory)
             return 0
         elif status == -1:
             return -1
@@ -224,7 +230,7 @@ class JobRunner(object):
 
             status = self.check_job_status()
             if status == 0:
-                self.retrieve_fitness()
+                self.retrieve_fitness(local_directory)
                 return 0
             elif status == -1:
                 return -1
@@ -233,44 +239,35 @@ class JobRunner(object):
 
         return -1
 
+    def retrieve_fitness(self, local_directory):
 
-    # def retrieve_fitness(self, server, username,
-    #                      project_directory, local_directory):
-    #     """
-    #     Retrieve all files from given folder. uses Paramiko's `load_system_host_keys` to validate ssh/sftp connection.
-    #     Will attempt to download all files in `project_directory` folder.
-    #     Args:
-    #         server: Name of remote serve for ssh connection.
-    #         username: Username for connection to remote server.
-    #         project_directory: Path to folder to download files from.
-    #         local_directory: Path on local machine to download files to.
-    #
-    #     Returns:
-    #         0
-    #     """
-    #     try:
-    #         with paramiko.SSHClient() as client:
-    #             client.load_system_host_keys()
-    #             client.connect(hostname=server, username=username)
-    #             sftp_client = client.open_sftp()
-    #             sftp_client.chdir(project_directory)
-    #             for fil in sftp_client.listdir():
-    #                 try:
-    #                     sftp_client.get(fil, os.path.join(local_directory, fil))
-    #                 except IOError, e:
-    #                     print "File retrieval failed with:\n {}".format(e)
-    #                     pass
-    #             saved_e = 0
-    #     except IOError, e:
-    #         print "Retrieval Failure"
-    #         saved_e = e
-    #
-    #     return saved_e
+        # Make sure we have an SSH connection
+        self.refresh_ssh_client()
 
-def create_runfiles(population, filename=None, batch_instructions=batch_instructions,
+        # Use existing client to run SFTP connection
+        sftp_client = self.establish_sftp_client(self.client)
+
+        # Make new directory to upload file to, if required
+        # Move to new directory
+        try:
+            sftp_client.chdir(self.output_directory)
+        except IOError as e:
+            print("Failed to create directory")
+            return e
+
+        for fil in sftp_client.listdir():
+            try:
+                sftp_client.get(fil, os.path.join(local_directory, fil))
+            except IOError as e:
+                print "File retrieval failed with:\n {}".format(e)
+                pass
+
+        sftp_client.close()
+        print "SFTP Connection Closed"
+
+
+def create_runfiles(population, filename, batch_instructions=batch_instructions,
                     run_header=batch_header, run_command=batch_srun, run_tail=batch_tail):
-    if not filename:
-        filename = 'PLACEHOLDER.txt'
     run_strings = []
     for i, ind in enumerate(population):
         parameter_string = ''
@@ -286,131 +283,7 @@ def create_runfiles(population, filename=None, batch_instructions=batch_instruct
         f1.write(run_tail)
 
 
-def retrieve_fitness(server, username,
-                     project_directory, local_directory):
-    """
-    Retrieve all files from given folder. uses Paramiko's `load_system_host_keys` to validate ssh/sftp connection.
-    Will attempt to download all files in `project_directory` folder.
-    Args:
-        server: Name of remote serve for ssh connection.
-        username: Username for connection to remote server.
-        project_directory: Path to folder to download files from.
-        local_directory: Path on local machine to download files to.
-
-    Returns:
-        0
-    """
-    try:
-        with paramiko.SSHClient() as client:
-            client.load_system_host_keys()
-            client.connect(hostname=server, username=username)
-            sftp_client = client.open_sftp()
-            sftp_client.chdir(project_directory)
-            for fil in sftp_client.listdir():
-                try:
-                    sftp_client.get(fil, os.path.join(local_directory, fil))
-                except IOError, e:
-                    print "File retrieval failed with:\n {}".format(e)
-                    pass
-            saved_e = 0
-    except IOError, e:
-        print "Retrieval Failure"
-        saved_e = e
-
-    return saved_e
-
-
-def upload_batch_file(server, username,
-                      project_directory, upload_file, upload_directory=None, start_job=True):
-    try:
-        with paramiko.SSHClient() as client:
-            client.load_system_host_keys()
-            client.connect(hostname=server, username=username)
-            sftp_client = client.open_sftp()
-            sftp_client.chdir(project_directory)
-
-            # Make new directory to upload file to, if required
-            # Move to new directory
-            if upload_directory and (upload_directory not in sftp_client.listdir):
-                sftp_client.mkdir(upload_directory)
-                sftp_client.chdir(upload_directory)
-
-            sftp_client.put(upload_file, os.path.split(upload_file)[-1])
-
-            if start_job:
-                stdin, stdout, sterr = client.exec_command('sbatch {}').format(upload_file)
-
-                if sterr:
-                    return sterr.read()
-                elif stdout:
-                    # return JobID
-                    status = stdout.read().split()
-                    return status[-1]
-    except IOError, e:
-        print "Retrieval Failure"
-        saved_e = e
-
-    return saved_e
-
-
-def start_job(server, username, path, filename):
-    try:
-        with paramiko.SSHClient() as client:
-            client.load_system_host_keys()
-            client.connect(hostname=server, username=username)
-            client.exec_command('cd {}'.format(path))
-            stdin, stdout, sterr = client.exec_command('sbatch {}').format(filename)
-
-            if sterr:
-                return sterr.read()
-            elif stdout:
-                # return JobID
-                status = stdout.read().split()
-                return status[-1]
-
-    except IOError, e:
-        print "Connection Failure"
-        return e
-
-
-def manage_retrieval(remote_transfer_settings):
-    # If local_directory exists remove all txt files that might hold old data, else make the directory
-    if os.path.isdir(remote_transfer_settings['local_directory']):
-        for fil in os.listdir(remote_transfer_settings['local_directory']):
-            if fil.endswith('.txt'):
-                os.remove(os.path.join(remote_transfer_settings['local_directory'], fil))
-    else:
-        os.mkdir(remote_transfer_settings['local_directory'])
-
-    # Loop attempts to check on and retrieve output data from NERSC
-    retrieval_completed = False
-    while not retrieval_completed:
-        # TODO: Change sleep value to 3000 in final version
-        sleep(5)
-        status = retrieve_fitness(**remote_transfer_settings)
-
-        if status == 0:
-            retrieval_completed = True
-        elif isinstance(status, IOError):
-            assert status[1] == 'No such file', "Unknown IOError on retrieval"
-
-        else:
-            raise Exception('Unkown error on retrieval: {}'.format(status))
-
-        print "Retrieval Completed:", status == 0
-        print status, type(status), status[0], status[1]
-
-        if retrieval_completed:
-            return 0
-        else:
-            return 1
-
-
-def evalEfficiency(filename, population, generation):
-    manage_retrieval(**remote_transfer_settings)
-
-
-def save_data(filename, population, generation, labels=None):
+def save_generation(filename, population, generation, labels=None):
     label_format = 'str'
     if not labels:
         labels = [i for i in range(len(population))]
@@ -430,3 +303,10 @@ def save_data(filename, population, generation, labels=None):
     data_set = pop_group.create_dataset('fitness', fitness_data)
 
     data_file.close()
+
+
+def evaluate_fitness(JobRunner, remote_directory, local_directory, population, generation, time=120 * 60):
+    # Create run_files separately
+    # Start job separately
+
+    JobRunner.monitor_job(time, remote_output_directory=remote_directory, local_directory=local_directory)
