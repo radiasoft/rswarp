@@ -7,7 +7,7 @@ Authors: Nathan Cook and Chris Hall
 
 from __future__ import division
 import numpy as np
-from scipy.special import erfinv
+from scipy.special import erf,erfinv
 import injectors
 
 
@@ -127,6 +127,34 @@ def compute_cutoff_beta(T, frac=0.99):
     multiplier = erfinv(frac)  # the multiplier on sigma accounting for frac of the distribution
 
     return multiplier*sigma/c 
+    
+
+def compute_crossing_fraction(cathode_temp, phi, zmesh):
+    """
+    Returns the % of particles expected to cross the gap
+    
+    Arguments:
+        cathode_temp    (float) : cathode temperature in K
+        phi             (scipy) : Interpolation (scipy.interpolate.interpolate.interp1d) of Phi from initial solve
+        zmesh          (ndArray) : 1D array with positions of the z-coordinates of the grid
+        
+    Returns:
+        e_frac          (float) : fraction of beam that overcomes the peak potential barrier phi
+    """ 
+    
+    # Conditions at cathode edge
+    var_xy = kb_J*cathode_temp/m  # Define the variance of the distribution in the x,y planes
+    var_z = 2*kb_J*cathode_temp/m  # Variance in z plane is twice that in the horizontal
+    
+    #Phi is in eV
+    vz_phi = np.sqrt(2.*e*np.max(phi(zmesh))/m_e) 
+    
+    #cumulative distribution function for a Maxwellian
+    CDF_Maxwell = lambda v, a: erf(v/(np.sqrt(2)*a)) - np.sqrt(2./np.pi)*v*np.exp(-1.*v**2/(2.*a**2))/a
+    
+    e_frac = CDF_Maxwell(vz_phi,np.sqrt(var_z)) #fraction with velocity below vz_phi
+    
+    return (1.-e_frac)*100. #Multiply by 100 to get % value
 
 
 def compute_expected_time(beam, cathode_temp,Ez, zmin, zmax, dt):
@@ -162,6 +190,9 @@ def compute_expected_time(beam, cathode_temp,Ez, zmin, zmax, dt):
         z_curr = z_curr + v_curr*dt
         # Update t to get traversal time
         t_curr = t_curr + dt
+        
+        assert z_curr > 0, \
+            'Expected crossing time could not be calculated. Particle with expected velocity {:.3e} fails to cross specified geometry'.format(v0)
         
     return t_curr
 
