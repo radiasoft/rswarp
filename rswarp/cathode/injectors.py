@@ -44,6 +44,7 @@ class injectorUserDefined(object):
         self.channel_width = channel_width
         self.z_part_min = z_part_min
         self.ptcl_per_step = ptcl_per_step
+        #self.top = top
         
     def inject_thermionic(self):
         '''Define particle coordinates for thermionic injection. Note that this does not specify current, just macroparticle coordinates'''
@@ -67,11 +68,19 @@ class injectorUserDefined(object):
         self.beam.addparticles(x=ptclArray[:,0],y=ptclArray[:,2],z=ptclArray[:,4],
         vx=ptclArray[:,1],vy=ptclArray[:,3],vz=ptclArray[:,5])
         
+    def inject_thermionic_egun(self):
+        '''
+        Define particle coordinates for thermionic injection. Note that this does not specify current, just macroparticle coordinates.
+        The "egun" mode modifies the injector call to adjust certain top quantities after a single particle addition.
         
-        
-        
-        
-        
-        
-        
-        
+        '''
+        v_coords = sources.get_MB_velocities(self.ptcl_per_step,self.cathode_temp)
+        x_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
+        y_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
+        z_vals = np.zeros(self.ptcl_per_step) + self.z_part_min #Add a minimum z coordinate to prevent absorption
+        ptclArray = np.asarray([x_vals,v_coords[:,0],y_vals,v_coords[:,1],z_vals,v_coords[:,2]]).T
+        #print "Ready to 'addparticles'"
+        self.beam.addparticles(x=ptclArray[:,0],y=ptclArray[:,2],z=ptclArray[:,4],
+        vx=ptclArray[:,1],vy=ptclArray[:,3],vz=ptclArray[:,5], lallindomain=True)        
+        #print "Added particles"
+        #self.top.inject = 100
