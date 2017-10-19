@@ -195,7 +195,7 @@ class JobRunner(object):
 
         if out_file:
             print "FOUND COMPLETE"
-            if out_file == '0':
+            if '0' in out_file:
                 # Complete
                 "{}: Job {} complete".format(ctime(), self.jobid)
                 return 0
@@ -239,8 +239,7 @@ class JobRunner(object):
 
         return -1
 
-    def retrieve_fitness(self, local_directory):
-
+    def retrieve_fitness(self, local_directory, match_string=None):
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
 
@@ -256,10 +255,21 @@ class JobRunner(object):
             return e
 
         for fil in sftp_client.listdir():
+            # If a match_string is given only retrieve files containing match_string
+            if match_string:
+                if match_string in fil:
+                    pass
+                else:
+                    continue
+            else:
+                pass
+
+            # Retrieve the next file
             try:
                 sftp_client.get(fil, os.path.join(local_directory, fil))
             except IOError as e:
-                print "File retrieval failed with:\n {}".format(e)
+                print "File retrieval failed for: {}".format(fil)
+                print "Error returned:\n {}".format(e)
                 pass
 
         sftp_client.close()
@@ -310,3 +320,5 @@ def evaluate_fitness(JobRunner, remote_directory, local_directory, population, g
     # Start job separately
 
     JobRunner.monitor_job(time, remote_output_directory=remote_directory, local_directory=local_directory)
+
+    # TODO: Evaluation is yet to be added
