@@ -253,7 +253,9 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     else:
         installconductor(source, dfill=largepos)
         installconductor(plate, dfill=largepos)
-        scraper = ParticleScraper([source, plate])
+        scraper = ParticleScraper([source, plate],
+                                  lcollectlpdata=True,
+                                  lsaveintercept=True)
         scraper_dictionary = {1: 'source', 2: 'collector'}
 
     #############
@@ -363,7 +365,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     tol = 1e9  # Large initial error for check
     target = 0.1  # Final tolerance we are trying to reach
-    time_limit = 1.5 * 60 * 60  # 1.5 hour time limit
+    time_limit = 50 * 60  # 50 min time limit
 
     while (tol > target) and (clock < time_limit):
         if lost_diagnostic_flag:
