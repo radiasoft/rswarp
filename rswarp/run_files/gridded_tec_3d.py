@@ -53,7 +53,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     if particle_diagnostic_switch or field_diagnostic_switch:
         # Directory paths
-        diagDir = 'diags_id{}/xyzsolver/hdf5/'.format(id)
+        diagDir = 'diags_id{}/hdf5/'.format(id)
         field_base_path = 'diags_id{}/fields/'.format(id)
         diagFDir = {'magnetic': 'diags_id{}/fields/magnetic'.format(id),
                     'electric': 'diags_id{}/fields/electric'.format(id)}
