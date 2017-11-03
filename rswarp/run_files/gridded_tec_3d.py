@@ -362,7 +362,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     clock += times[-1]
 
     # Start run cycle
-
+    # TODO: We probably want a better metric to measure convergence. One that will allow checking more frequently than
+    # TODO:      every thousand steps.
     tol = 1e9  # Large initial error for check
     target = 0.1  # Final tolerance we are trying to reach
     time_limit = 50 * 60  # 50 min time limit
@@ -399,7 +400,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         accumulated_0 = counts_1 - counts_0
         accumulated_1 = counts_2 - counts_1
 
-        if counts_2[-1] < 1000:
+        if counts_2[-1] < 1000:  # TODO: The 1000 floor is completely arbitrary and probably kind of low
             # Insufficient statistics to start counting, keep tol at default
             collector_fraction_0 = -1.
             collector_fraction_1 = -1.
