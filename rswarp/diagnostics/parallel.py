@@ -14,7 +14,7 @@ def save_lost_particles(top, comm_world, fsave=None):
         top: top object from Warp
         comm_world: comm_world object used by Warp
         fsave: path for save file.
-            If not given defauts to 'lost_particles_step_$(step_number).npy' in the local directory.
+            If not given defaults to 'lost_particles_step_$(step_number).npy' in the local directory.
 
     Returns:
 

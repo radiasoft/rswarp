@@ -212,14 +212,14 @@ class JobRunner(object):
             print "{}: Error on status and file".format(ctime())
             return -1
 
-    def monitor_job(self, timer, remote_output_directory, local_directory):
+    def monitor_job(self, timer, remote_output_directory, local_directory, match_string=None):
         self.output_directory = remote_output_directory
 
         sleep(10 * 60)
         timer -= 10 * 60
         status = self.check_job_status()
         if status == 0:
-            self.retrieve_fitness(local_directory)
+            self.retrieve_fitness(local_directory, match_string=match_string)
             return 0
         elif status == -1:
             return -1
@@ -230,7 +230,7 @@ class JobRunner(object):
 
             status = self.check_job_status()
             if status == 0:
-                self.retrieve_fitness(local_directory)
+                self.retrieve_fitness(local_directory, match_string=match_string)
                 return 0
             elif status == -1:
                 return -1
@@ -240,14 +240,23 @@ class JobRunner(object):
         return -1
 
     def retrieve_fitness(self, local_directory, match_string=None):
+        # TODO: stop grabbing folders
+
+        if os.path.isdir(local_directory):
+            pass
+        else:
+            try:
+                os.makedirs(local_directory)
+            except OSError as e:
+                raise e
+
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
 
         # Use existing client to run SFTP connection
         sftp_client = self.establish_sftp_client(self.client)
 
-        # Make new directory to upload file to, if required
-        # Move to new directory
+        # Move to output directory
         try:
             sftp_client.chdir(self.output_directory)
         except IOError as e:
@@ -294,6 +303,7 @@ def create_runfiles(population, filename, batch_instructions=batch_instructions,
 
 
 def save_generation(filename, population, generation, labels=None):
+    # TODO: Put in catch for if generation exists
     label_format = 'str'
     if not labels:
         labels = [i for i in range(len(population))]
@@ -313,12 +323,3 @@ def save_generation(filename, population, generation, labels=None):
     data_set = pop_group.create_dataset('fitness', fitness_data)
 
     data_file.close()
-
-
-def evaluate_fitness(JobRunner, remote_directory, local_directory, population, generation, time=120 * 60):
-    # Create run_files separately
-    # Start job separately
-
-    JobRunner.monitor_job(time, remote_output_directory=remote_directory, local_directory=local_directory)
-
-    # TODO: Evaluation is yet to be added
