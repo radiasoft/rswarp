@@ -5,19 +5,29 @@ from ipywidgets import widgets, interactive
 from collections import OrderedDict
 from IPython.display import display
 
+# TODO: Right now you need to provide a live FieldSolver object. Might want option to give bounds and cell numbers.
+
 
 class FieldLineout():
+    """
+    Class can be used in IPython notebooks to create an interactive plot of field/potential lineouts of 2D simulations.
+    To use: Instantiate an instance of FieldLineout and then call that instance.
+    """
+
     def __init__(self, solver, field_data, potential_data):
+        """
+        Initialize instance of the interactive plotter
+        Args:
+            solver: Instance of a Warp FieldSolver object
+            field_data: Array of 3D field data (vector component, nx, nz).
+            potential_data: Array of field data (nx, nz).
+        """
         self.solver = solver
         self.field_data = field_data
         self.potential_data = potential_data
 
     def __call__(self):
-        """
-        Position field
-        x, z dropdown
-        Ex, Ez, V dropdown
-        """
+
         init = 'x'
         self.position_options = {'x': self.solver.xmesh, 'z': self.solver.zmesh}
         self.position_formatter = widgets.Dropdown(options=self.position_options[init],
@@ -34,10 +44,11 @@ class FieldLineout():
         x_axis_options['z'] = 1
         x_axis_formatter = widgets.Dropdown(options=x_axis_options, description='Lineout Axis')
 
-        p1 = interactive(self.plot_lineout, x=x_axis_formatter, position=self.position_formatter, y=z_axis_formatter)
+        p1 = interactive(self._plot_lineout, x=x_axis_formatter, position=self.position_formatter, y=z_axis_formatter)
         display(p1)
 
-    def plot_lineout(self, x, position, y):
+    def _plot_lineout(self, x, position, y):
+
         self.x = x
         self.position = float(position)
         self.y = y
