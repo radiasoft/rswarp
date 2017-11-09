@@ -33,13 +33,35 @@ from scipy.constants import e, m_e, c, k
 
 kb_eV = 8.6173324e-5  # Bolztmann constant in eV/K
 kb_J = k  # Boltzmann constant in J/K
-m = m_e  # electron mass
+m = m_e  # electron mass in kg
 
 
 def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height, id,
          injection_type=1, cathode_temperature=1273.15,
          random_seed=True, install_grid=True,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_flag=False):
+    """
+    Run a simulation of a gridded TEC.
+    Args:
+        x_struts: Number of struts that intercept the x-axis.
+        y_struts: Number of struts that intercept the y-axis
+        volts_on_grid: Voltage to place on the grid in Volts.
+        grid_height: Distance from the emitter to the grid in meters.
+        strut_width: Transverse extent of the struts in meters.
+        strut_height: Longitudinal extent of the struts in meters.
+        id: Run id. Mainly used for parallel optimization.
+        injection_type: 1: For constant current emission with only thermal velocity spread in z.
+                        2: For true thermionic emission. Velocity spread along all axes.
+        cathode_temperature: Temperature of emitter. Current density is governed by Richardson-Dushman.
+        random_seed: True/False. If True, will force a random seed to be used for emission positions.
+        install_grid: True/False. If False the grid will not be installed. Results in simple parallel plate setup.
+                                  If False then voltage_on_grid specifies the voltage on the collector.
+        particle_diagnostic_switch: True/False. Use openPMD compliant .h5 particle diagnostics.
+        field_diagnostic_switch: True/False. Use rswarp electrostatic .h5 field diagnostics (Maybe openPMD compliant?).
+        lost_diagnostic_flag: True/False. Enable collection of lost particle coordinates
+                        with rswarp.diagnostics.parallel.save_lost_particles.
+
+    """
     # record inputs
     run_attributes = deepcopy(locals())
 
@@ -354,7 +376,6 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         print cond.lostparticles_data[()][:, 0].shape
         print np.sum(cond.lostparticles_data[()][:, 1])
         print np.sum(np.round(-1. * cond.lostparticles_data[()][:, 1] / beam.sw / e))
-
     # END TEMP
 
     time2 = time.time()
@@ -393,7 +414,6 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
             print cond.lostparticles_data[()][:, 0].shape
             print np.sum(cond.lostparticles_data[()][:, 1])
             print np.sum(np.round(-1. * cond.lostparticles_data[()][:, 1] / beam.sw / e))
-
         # END TEMP
 
         # Record i-1 and i+1 intervals
