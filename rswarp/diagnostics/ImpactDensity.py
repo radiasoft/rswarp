@@ -58,6 +58,8 @@ class PlotDensity(object):
         self.scale = 1e6
         # categorize the number lost to avoid padded values at end of array
         self.numlost = top.npslost[0]
+        assert self.numlost > 1, "No particles lost in simulation. Nothing to plot."
+
         self.zplost = self.top.zplost[:self.numlost]
         self.xplost = self.top.xplost[:self.numlost]
 
