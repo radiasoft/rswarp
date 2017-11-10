@@ -2,4 +2,4 @@
 
 # Batch script to emualte NERSC workflow
 
-mpiexec -n 4 python run_warp.py 4 8 17.7265855605 1.07243108547e-07 1.97828380067e-09 1.7538111785e-08 1 'run_0' -p 1 1 4
+mpiexec -n 4 python run_warp.py 4 8 17.7265855605 1.07243108547e-07 1.97828380067e-09 1.7538111785e-08 1 -p 1 1 4
