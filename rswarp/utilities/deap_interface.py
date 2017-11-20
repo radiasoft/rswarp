@@ -302,16 +302,29 @@ def create_runfiles(population, filename, batch_instructions=batch_instructions,
         f1.write(run_tail)
 
 
-def save_generation(filename, population, generation, labels=None):
-    # TODO: Put in catch for if generation exists
+def save_generation(filename, population, generation, labels=None, overwrite_generation=False):
+
+    # If attributes are not labled then label with an id number
     label_format = 'str'
     if not labels:
         labels = [i for i in range(len(population))]
         label_format = 'int'
 
     data_file = h5.File(filename, mode='a')
+
     data_file.attrs['generations'] = generation
-    pop_group = data_file.create_group('/generation{}'.format(generation))
+
+    # Check for existing generation and remove if overwrite_generation
+    try:
+        pop_group = data_file.create_group('/generation{}'.format(generation))
+    except ValueError:
+        if not overwrite_generation:
+            raise ValueError("Generation exists. Enable `overwrite_generation` flag to replace.")
+        else:
+            pop_group = data_file['/generation{}'.format(generation)]
+            for dset in pop_group.keys():
+                pop_group.__delitem__(dset)
+
     for lb, ind in zip(labels, zip(*population)):
         if label_format == 'int':
             label = 'parameter{}'.format(lb)
@@ -320,6 +333,6 @@ def save_generation(filename, population, generation, labels=None):
         data_set = pop_group.create_dataset(label, data=ind)
 
     fitness_data = np.array([ind.fitness.getValues() for ind in population])
-    data_set = pop_group.create_dataset('fitness', fitness_data)
+    data_set = pop_group.create_dataset('fitness', data=fitness_data)
 
     data_file.close()
