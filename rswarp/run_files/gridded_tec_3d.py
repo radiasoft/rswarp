@@ -39,7 +39,7 @@ m = m_e  # electron mass in kg
 def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height, id,
          injection_type=1, cathode_temperature=1273.15,
          random_seed=True, install_grid=True,
-         particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_flag=False):
+         particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
     """
     Run a simulation of a gridded TEC.
     Args:
@@ -58,7 +58,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
                                   If False then voltage_on_grid specifies the voltage on the collector.
         particle_diagnostic_switch: True/False. Use openPMD compliant .h5 particle diagnostics.
         field_diagnostic_switch: True/False. Use rswarp electrostatic .h5 field diagnostics (Maybe openPMD compliant?).
-        lost_diagnostic_flag: True/False. Enable collection of lost particle coordinates
+        lost_diagnostic_switch: True/False. Enable collection of lost particle coordinates
                         with rswarp.diagnostics.parallel.save_lost_particles.
 
     """
@@ -390,7 +390,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     time_limit = 50 * 60  # 50 min time limit
 
     while (tol > target) and (clock < time_limit):
-        if lost_diagnostic_flag:
+        if lost_diagnostic_switch:
             lost_particle_file = 'lost_particles_id{}_step{}.npy'.format(id, top.it)
             save_lost_particles(top, comm_world, fsave=lost_particle_file)
 
