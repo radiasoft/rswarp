@@ -483,3 +483,7 @@ def create_grid(nx, ny, volts,
         grid += strut
 
     return grid, grid_list
+
+def calculate_current(x):
+
+    return x
