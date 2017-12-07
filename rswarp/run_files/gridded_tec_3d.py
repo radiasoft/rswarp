@@ -267,6 +267,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     #############
     # DIAGNOSTICS
     #############
+    zcrossing_position = grid_height / 2.
 
     # Particle/Field diagnostic options
     if particle_diagnostic_switch:
@@ -341,7 +342,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         counts_0 = np.array([0., 0., 0.])
     else:
         counts_0 = np.array([0., 0.])
-    step(1000)
+    for _ in range(1000):
+        step(1)
 
     counts_1 = get_lost_counts()
 
@@ -364,7 +366,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
         time1 = time.time()
 
-        step(1000)
+        for _ in range(1000):
+            step(1)
 
         counts_2 = get_lost_counts()
 
