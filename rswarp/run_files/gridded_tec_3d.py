@@ -1,11 +1,6 @@
-# From grid_field_testing.py
-
 from __future__ import division
 
-# Set matplotlib backend for saving plots (if requested)
-import matplotlib
-matplotlib.use('PS')
-
+# TODO: Check the correct value for beam.a0. Width or half width?
 # set `warpoptions.ignoreUnknownArgs = True` before main import to allow command line arguments Warp does not recognize
 import warpoptions
 warpoptions.ignoreUnknownArgs = True
@@ -36,9 +31,10 @@ kb_J = k  # Boltzmann constant in J/K
 m = m_e  # electron mass in kg
 
 
-def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height, id,
-         injection_type=1, cathode_temperature=1273.15,
-         random_seed=True, install_grid=True,
+def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height,
+         T_em, phi_em, T_coll, phi_coll, R_ew, gap_distance,
+         run_id,
+         injection_type=2, random_seed=True, install_grid=True,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
     """
     Run a simulation of a gridded TEC.
@@ -49,7 +45,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         grid_height: Distance from the emitter to the grid in meters.
         strut_width: Transverse extent of the struts in meters.
         strut_height: Longitudinal extent of the struts in meters.
-        id: Run id. Mainly used for parallel optimization.
+        run_id: Run ID. Mainly used for parallel optimization.
         injection_type: 1: For constant current emission with only thermal velocity spread in z.
                         2: For true thermionic emission. Velocity spread along all axes.
         cathode_temperature: Temperature of emitter. Current density is governed by Richardson-Dushman.
@@ -75,10 +71,10 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     if particle_diagnostic_switch or field_diagnostic_switch:
         # Directory paths
-        diagDir = 'diags_id{}/hdf5/'.format(id)
-        field_base_path = 'diags_id{}/fields/'.format(id)
-        diagFDir = {'magnetic': 'diags_id{}/fields/magnetic'.format(id),
-                    'electric': 'diags_id{}/fields/electric'.format(id)}
+        diagDir = 'diags_id{}/hdf5/'.format(run_id)
+        field_base_path = 'diags_id{}/fields/'.format(run_id)
+        diagFDir = {'magnetic': 'diags_id{}/fields/magnetic'.format(run_id),
+                    'electric': 'diags_id{}/fields/electric'.format(run_id)}
 
         # Cleanup command if directories already exist
         if comm_world.rank == 0:
@@ -88,7 +84,6 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # DOMAIN/GEOMETRY/MESH
     ######################
 
-    PLATE_SPACING = 1e-6  # plate spacing
     CHANNEL_WIDTH = 100e-9  # width of simulation box
 
     # Dimensions
@@ -96,15 +91,15 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     X_MIN = -X_MAX
     Y_MAX = +CHANNEL_WIDTH / 2.
     Y_MIN = -Y_MAX
-    Z_MAX = PLATE_SPACING
+    Z_MAX = gap_distance
     Z_MIN = 0.
 
     # Grid parameters
     NUM_X = 100
     NUM_Y = 100
-    NUM_Z = 1000
+    NUM_Z = int(gap_distance / 1e-9)
 
-    # z step size
+    # z mesh spacing
     dz = (Z_MAX - Z_MIN) / NUM_Z
 
     # Solver Geometry and Boundaries
@@ -138,13 +133,10 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # PARTICLE INJECTION SETTINGS
     #############################
 
-    # INJECTION SPECIFICATION
-    USER_INJECT = injection_type
-
     # Cathode and anode settings
-    CATHODE_TEMP = cathode_temperature
-    CATHODE_PHI = 2.0  # work function in eV
-    ANODE_WF = 0.1  # Can be used if vacuum level is being set
+    EMITTER_TEMP = T_em
+    EMITTER_PHI = phi_em # work function in eV
+    COLLECTOR_PHI = phi_coll  # Can be used if vacuum level is being set
     ACCEL_VOLTS = volts_on_grid  # ACCEL_VOLTS used for velocity and CL calculations
 
     # Emitted species
@@ -167,19 +159,19 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     top.linj_rectangle = (w3d.solvergeom == w3d.XZgeom or w3d.solvergeom == w3d.XYZgeom)
 
     # Returns velocity beam_beta (in units of beta) for which frac of emitted particles have v < beam_beta * c
-    beam_beta = sources.compute_cutoff_beta(CATHODE_TEMP, frac=0.99)
+    beam_beta = sources.compute_cutoff_beta(EMITTER_TEMP, frac=0.99)
 
     PTCL_PER_STEP = 300
-    CURRENT_MODIFIER = 0.5  # Factor to multiply CL current by when setting beam current
 
-    if USER_INJECT == 1:
+    if injection_type == 1:
+        CURRENT_MODIFIER = 0.5  # Factor to multiply CL current by when setting beam current
         # Constant current density - beam transverse velocity fixed to zero, very small longitduinal velocity
 
         # Set injection flag
         top.inject = 1  # 1 means constant; 2 means space-charge limited injection;# 6 means user-specified
         top.npinject = PTCL_PER_STEP
         beam_current = 4. / 9. * eps0 * sqrt(2. * echarge / beam.mass) \
-                       * ACCEL_VOLTS ** 1.5 / PLATE_SPACING ** 2 * cathode_area
+                       * ACCEL_VOLTS ** 1.5 / gap_distance ** 2 * cathode_area
 
         beam.ibeam = beam_current * CURRENT_MODIFIER
 
@@ -194,32 +186,24 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         vrms = np.sqrt(1 - 1 / (0.05 / 511e3 + 1) ** 2) * 3e8
         top.vzinject = vrms
 
-    if USER_INJECT == 2:
+    if injection_type == 2:
         # True Thermionic injection
         top.inject = 1
         top.npinject = PTCL_PER_STEP
 
-        beam_current = 4. / 9. * eps0 * sqrt(2. * echarge / beam.mass) \
-                       * ACCEL_VOLTS ** 1.5 / PLATE_SPACING ** 2 * cathode_area
-
-        beam.ibeam = beam_current * CURRENT_MODIFIER
-
-        beam.a0 = CHANNEL_WIDTH
-        beam.b0 = CHANNEL_WIDTH
-        beam.ap0 = .0e0
-        beam.bp0 = .0e0
-
         w3d.l_inj_exact = True
 
         # Specify thermal properties
-        beam.vthz = np.sqrt(CATHODE_TEMP * kb_J / beam.mass)
-        beam.vthperp = np.sqrt(CATHODE_TEMP * kb_J / beam.mass)
+        beam.vthz = np.sqrt(EMITTER_TEMP * kb_J / beam.mass)
+        beam.vthperp = np.sqrt(EMITTER_TEMP * kb_J / beam.mass)
         top.lhalfmaxwellinject = 1  # inject z velocities as half Maxwellian
 
-        beam_current = sources.j_rd(CATHODE_TEMP, CATHODE_PHI) * cathode_area  # steady state current in Amps
-        beam.ibeam = beam_current * CURRENT_MODIFIER
+        beam_current = sources.j_rd(EMITTER_TEMP, EMITTER_PHI) * cathode_area  # steady state current in Amps
+        beam.ibeam = beam_current
         beam.a0 = SOURCE_RADIUS_1
         beam.b0 = SOURCE_RADIUS_2
+        beam.ap0 = .0e0
+        beam.bp0 = .0e0
 
     derivqty()
 
@@ -335,7 +319,6 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # Determine an appropriate time step based upon estimated final velocity
     vzfinal = sqrt(2. * abs(volts_on_grid) * np.abs(beam.charge) / beam.mass) + beam_beta * c
     dt = dz / vzfinal
-    print "TIME STEP:", dt
     top.dt = dt
 
     solverE.mgmaxiters = init_iters
@@ -362,21 +345,6 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     counts_1 = get_lost_counts()
 
-    # START TEMP
-    print w3d.dz, np.max(getvz())
-    for cond in solverE.conductordatalist:
-        print "SOLVER COND DATA"
-        print cond[0].condid, beam.sw, e
-        print cond[0].lostparticles_data[()][:, 0].shape
-        print np.sum(cond[0].lostparticles_data[()][:, 1])
-        print np.sum(np.round(-1. * cond[0].lostparticles_data[()][:, 1] / beam.sw / e))
-    for cond in scraper.conductors:
-        print "SCRAPER COND DATA"
-        print cond.condid, beam.sw, e
-        print cond.lostparticles_data[()][:, 0].shape
-        print np.sum(cond.lostparticles_data[()][:, 1])
-        print np.sum(np.round(-1. * cond.lostparticles_data[()][:, 1] / beam.sw / e))
-    # END TEMP
 
     time2 = time.time()
     times.append(time2 - time1)
@@ -391,7 +359,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     while (tol > target) and (clock < time_limit):
         if lost_diagnostic_switch:
-            lost_particle_file = 'lost_particles_id{}_step{}.npy'.format(id, top.it)
+            lost_particle_file = 'lost_particles_id{}_step{}.npy'.format(run_id, top.it)
             save_lost_particles(top, comm_world, fsave=lost_particle_file)
 
         time1 = time.time()
@@ -399,22 +367,6 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         step(1000)
 
         counts_2 = get_lost_counts()
-
-        # START TEMP
-        print w3d.dz, np.max(getvz())
-        for cond in solverE.conductordatalist:
-            print "SOLVER COND DATA"
-            print cond[0].condid, beam.sw, e
-            print cond[0].lostparticles_data[()][:, 0].shape
-            print np.sum(cond[0].lostparticles_data[()][:, 1])
-            print np.sum(np.round(-1. * cond[0].lostparticles_data[()][:, 1] / beam.sw / e))
-        for cond in scraper.conductors:
-            print "SCRAPER COND DATA"
-            print cond.condid, beam.sw, e
-            print cond.lostparticles_data[()][:, 0].shape
-            print np.sum(cond.lostparticles_data[()][:, 1])
-            print np.sum(np.round(-1. * cond.lostparticles_data[()][:, 1] / beam.sw / e))
-        # END TEMP
 
         # Record i-1 and i+1 intervals
         accumulated_0 = counts_1 - counts_0
@@ -443,14 +395,14 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     ######################
 
     if comm_world.rank == 0:
-        with open('output_stats_id{}.txt'.format(id), 'w') as f1:
+        with open('output_stats_id{}.txt'.format(run_id), 'w') as f1:
             for ts in times:
                 f1.write('{}\n'.format(ts))
             f1.write('\n')
             f1.write('{} {} {} {}\n'.format(collector_fraction_0, accumulated_0[0], accumulated_0[1], accumulated_0[2]))
             f1.write('{} {} {} {}\n'.format(collector_fraction_1, accumulated_1[0], accumulated_1[1], accumulated_1[2]))
 
-        filename = 'efficiency_id{}.h5'.format(str(id))
+        filename = 'efficiency_id{}.h5'.format(str(run_id))
         with h5.File(filename, 'w') as h5file:
             for key in run_attributes:
                 h5file.attrs[key] = run_attributes[key]
@@ -483,7 +435,3 @@ def create_grid(nx, ny, volts,
         grid += strut
 
     return grid, grid_list
-
-def calculate_current(x):
-
-    return x
