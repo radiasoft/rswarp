@@ -1,6 +1,7 @@
 from __future__ import division
 
 # TODO: Check the correct value for beam.a0. Width or half width?
+# TODO: Change grid position to be set as fraction of gap_distance
 # set `warpoptions.ignoreUnknownArgs = True` before main import to allow command line arguments Warp does not recognize
 import warpoptions
 warpoptions.ignoreUnknownArgs = True
@@ -34,7 +35,7 @@ m = m_e  # electron mass in kg
 def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height,
          T_em, phi_em, T_coll, phi_coll, R_ew, gap_distance,
          run_id,
-         injection_type=2, random_seed=True, install_grid=True,
+         injection_type=2, random_seed=True, install_grid=True, max_wall_time=0.,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
     """
     Run a simulation of a gridded TEC.
@@ -46,7 +47,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         strut_width: Transverse extent of the struts in meters.
         strut_height: Longitudinal extent of the struts in meters.
         run_id: Run ID. Mainly used for parallel optimization.
-        injection_type: 1: For constant current emission with only thermal velocity spread in z.
+        injection_type: 1: For constant current emission with only thermal velocity spread in z and CL limited emission.
                         2: For true thermionic emission. Velocity spread along all axes.
         cathode_temperature: Temperature of emitter. Current density is governed by Richardson-Dushman.
         random_seed: True/False. If True, will force a random seed to be used for emission positions.
@@ -140,7 +141,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     ACCEL_VOLTS = volts_on_grid  # ACCEL_VOLTS used for velocity and CL calculations
 
     # Emitted species
-    beam = Species(type=Electron, name='beam')
+    background_beam = Species(type=Electron, name='background')
+    measurement_beam = Species(type=Electron, name='measurement')
 
     # Emitter area and position
     SOURCE_RADIUS_1 = 0.5 * CHANNEL_WIDTH  # a0 parameter - X plane
@@ -170,15 +172,15 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         # Set injection flag
         top.inject = 1  # 1 means constant; 2 means space-charge limited injection;# 6 means user-specified
         top.npinject = PTCL_PER_STEP
-        beam_current = 4. / 9. * eps0 * sqrt(2. * echarge / beam.mass) \
+        beam_current = 4. / 9. * eps0 * sqrt(2. * echarge / background_beam.mass) \
                        * ACCEL_VOLTS ** 1.5 / gap_distance ** 2 * cathode_area
 
-        beam.ibeam = beam_current * CURRENT_MODIFIER
+        background_beam.ibeam = beam_current * CURRENT_MODIFIER
 
-        beam.a0 = CHANNEL_WIDTH
-        beam.b0 = CHANNEL_WIDTH
-        beam.ap0 = .0e0
-        beam.bp0 = .0e0
+        background_beam.a0 = CHANNEL_WIDTH
+        background_beam.b0 = CHANNEL_WIDTH
+        background_beam.ap0 = .0e0
+        background_beam.bp0 = .0e0
 
         w3d.l_inj_exact = True
 
@@ -189,21 +191,28 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     if injection_type == 2:
         # True Thermionic injection
         top.inject = 1
-        top.npinject = PTCL_PER_STEP
+
+        # Set both beams to same npinject to keep weights the same
+        background_beam.npinject = PTCL_PER_STEP
+        measurement_beam.npinject = PTCL_PER_STEP
+
+        # Use rnpinject to set number of macroparticles emitted
+        background_beam.rnpinject = PTCL_PER_STEP
+        measurement_beam.rnpinject = 0  # measurement beam is off at start
 
         w3d.l_inj_exact = True
 
         # Specify thermal properties
-        beam.vthz = np.sqrt(EMITTER_TEMP * kb_J / beam.mass)
-        beam.vthperp = np.sqrt(EMITTER_TEMP * kb_J / beam.mass)
+        background_beam.vthz = measurement_beam.vthz = np.sqrt(EMITTER_TEMP * kb_J / background_beam.mass)
+        background_beam.vthperp = measurement_beam.vthperp = np.sqrt(EMITTER_TEMP * kb_J / background_beam.mass)
         top.lhalfmaxwellinject = 1  # inject z velocities as half Maxwellian
 
         beam_current = sources.j_rd(EMITTER_TEMP, EMITTER_PHI) * cathode_area  # steady state current in Amps
-        beam.ibeam = beam_current
-        beam.a0 = SOURCE_RADIUS_1
-        beam.b0 = SOURCE_RADIUS_2
-        beam.ap0 = .0e0
-        beam.bp0 = .0e0
+        background_beam.ibeam = measurement_beam.ibeam = beam_current
+        background_beam.a0 = measurement_beam.a0 = SOURCE_RADIUS_1
+        background_beam.b0 = measurement_beam.b0 = SOURCE_RADIUS_2
+        background_beam.ap0 = measurement_beam.ap0 = .0e0
+        background_beam.bp0 = measurement_beam.bp0 = .0e0
 
     derivqty()
 
@@ -267,7 +276,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     #############
     # DIAGNOSTICS
     #############
-    zcrossing_position = grid_height / 2.
+    zcrossing_position = grid_height
 
     # Particle/Field diagnostic options
     if particle_diagnostic_switch:
@@ -286,7 +295,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         installafterstep(efield_diagnostic_0.write)
 
     def get_lost_counts():
-        scraper_record = analyze_scraped_particles(top, beam, solverE)
+        scraper_record = analyze_scraped_particles(top, background_beam, solverE)
 
         for key in scraper_dictionary:
             print 'Step: {}'.format(top.it)
@@ -318,7 +327,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # Time Step
 
     # Determine an appropriate time step based upon estimated final velocity
-    vzfinal = sqrt(2. * abs(volts_on_grid) * np.abs(beam.charge) / beam.mass) + beam_beta * c
+    vz_accel = sqrt(2. * abs(volts_on_grid) * np.abs(background_beam.charge) / background_beam.mass)
+    vzfinal = vz_accel + beam_beta * c
     dt = dz / vzfinal
     top.dt = dt
 
@@ -332,32 +342,29 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     ##################
     # CONTROL SEQUENCE
     ##################
+    # Run until steady state is achieved (flat current profile at collector) (measurement species turned on)
+    # Record data for effiency calculation
+    # Switch off measurement species and wait for simulation to clear (background species is switched on)
 
+    startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
+    crossing_measurements = 8  # Number of crossing times to record for
+    steps_per_crossing = gap_distance / vzfinal
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
 
-    # Run for 1000 steps initially
-    time1 = time.time()
-    if install_grid:
-        counts_0 = np.array([0., 0., 0.])
-    else:
-        counts_0 = np.array([0., 0.])
-    for _ in range(1000):
-        step(1)
-
-    counts_1 = get_lost_counts()
-
-
-    time2 = time.time()
-    times.append(time2 - time1)
+    # Run initial block of steps
+    record_time(step(startup_time), times)
     clock += times[-1]
 
+    print(" Steady State Reached.\n Starting efficiency "
+          "recording for {} crossing times.\n This is {} steps".format(crossing_measurements,
+                                                                       steps_per_crossing * crossing_measurements))
+
     # Start run cycle
-    # TODO: We probably want a better metric to measure convergence. One that will allow checking more frequently than
-    # TODO:      every thousand steps.
+
     tol = 1e9  # Large initial error for check
     target = 0.1  # Final tolerance we are trying to reach
-    time_limit = 50 * 60  # 50 min time limit
+    time_limit = max_wall_time  # Time limit if on a queued system
 
     while (tol > target) and (clock < time_limit):
         if lost_diagnostic_switch:
@@ -366,8 +373,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
         time1 = time.time()
 
-        for _ in range(1000):
-            step(1)
+        step(1000)
 
         counts_2 = get_lost_counts()
 
@@ -438,3 +444,10 @@ def create_grid(nx, ny, volts,
         grid += strut
 
     return grid, grid_list
+
+
+def record_time(func, time_list):
+    t1 = time.time()
+    func
+    t2 = time.time()
+    time_list.append(t2 - t1)
