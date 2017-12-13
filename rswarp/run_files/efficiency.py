@@ -1,5 +1,5 @@
 from scipy.constants import e, m_e, k, h, physical_constants
-from numpy import pi, exp
+import numpy as np
 k_ev = physical_constants['Boltzmann constant in eV/K'][0]
 sigma_sb = physical_constants['Stefan-Boltzmann constant'][0]
 L = 2.44e-8  # Lorentz number in units of W*Ohms/K**2
@@ -13,23 +13,31 @@ L = 2.44e-8  # Lorentz number in units of W*Ohms/K**2
 # alpha and rho are an average for common materials
 
 
-tec_parameters_template = {
-    'A_em': [0, 'Emitter area (cm**2)'],
-    'R_ew': [0, 'Emitter wiring resistance (Ohms)'],
-    'R_em': [0, 'Emitter resistance (Ohms)'],
-    'J_em': [0, 'Emitter current density (A/cm**2)'],
-    'phi_em': [0, 'Emitter work function (eV)'],
-    'T_em': [0, 'Emitter temperature (K)'],
-    'R_cw':  [0, 'Collector wiring resistance (Ohms)'],
-    'J_coll': [0, 'Collector current density (A/cm**2)'],  # Will set analytically based on collector temp
-    'phi_coll': [0, 'Collector work function (eV)'],
-    'T_coll': [0, 'Collector temperature (K)'],
-    'emiss_eff': [0, 'Emissivity ()'],
-    'T_env': [0, 'Ambient temperature (K)'],
+tec_parameters = {
+    'A_em': [False, 'Emitter area (cm**2)'],
+    'R_ew': [False, 'Emitter wiring resistance (Ohms)'],
+    'P_em': [False, 'Emitter electron power (W/cm**2)'],
+    'J_em': [False, 'Emitter current density (A/cm**2)'],
+    'phi_em': [False, 'Emitter work function (eV)'],
+    'T_em': [False, 'Emitter temperature (K)'],
+    'R_cw': [False, 'Collector wiring resistance (Ohms)'],
+    'J_coll': [False, 'Collector current density (A/cm**2)'],  # Will set analytically based on collector temp
+    'phi_coll': [False, 'Collector work function (eV)'],
+    'T_coll': [False, 'Collector temperature (K)'],
+    'x_struts': [False, 'Number of struts that intersect the x-axis'],
+    'y_struts': [False, 'Number of struts that intersect the y-axis'],
+    'V_grid': [False, 'Bias on grid relative to the emitter (V)'],
+    'J_grid': [False, 'Grid current density (A/cm**2)'],
+    'grid_height': [False, 'Position of the grid relative to emitter, normalized by collector position'],
+    'strut_width': [False, 'Size of the strut parallel to intersecting axis (m)'],
+    'strut_height': [False, 'Size of the strut along the z-axis'],
+    'emiss_eff': [0.1, 'Emissivity ()'],
+    'T_env': [300., 'Ambient temperature (K)'],
     'L_wire': [1.0, 'Wire length for emitter/collector (m)'],
     'rho': [4.792857143e-8, 'Resistivity (Ohms/m)'],
     'alpha': [0.0044, 'Temperature coefficient of resistance (1/K)'],
-    'occlusion': [0, 'Fractional occlusion of collector by grid']
+    'occlusion': [False, 'Fractional occlusion of collector by grid'],
+    'run_time': [False, 'Simulation run time (s)']
 }
 
 
@@ -44,12 +52,12 @@ def rd_current(phi, T):
         Current density in J/cm**2
     """
 
-    A = 4 * pi * m_e * k ** 2 * e / h ** 3
+    A = 4 * np.pi * m_e * k ** 2 * e / h ** 3
 
-    return A * T ** 2 * exp(-phi / (k_ev * T)) * 0.01**2
+    return A * T ** 2 * np.exp(-phi / (k_ev * T)) * 0.01**2
 
 
-def calculate_resistance(T, A, L_wire, rho, alpha, **kwargs):
+def calculate_resistance(T, L_wire, rho, alpha, A_em, T_ref=300., **kwargs):
     """
     Temperature dependent resistance model.
     Area will be the area of the collector/emitter. Provides reasonable scaling since the wire gauge will vary
@@ -66,9 +74,8 @@ def calculate_resistance(T, A, L_wire, rho, alpha, **kwargs):
         Resistance (Ohms)
     """
 
-    L_wire, rho, alpha = L_wire[0], rho[0], alpha[0]
+    L_wire, rho, alpha, A = L_wire[0], rho[0], alpha[0], A_em[0]
 
-    T_ref = 300.0  # Reference temperature for rho
     delta_T = T - T_ref
 
     R0 = rho * L_wire / (A / 10000. / 2.)
@@ -77,33 +84,63 @@ def calculate_resistance(T, A, L_wire, rho, alpha, **kwargs):
     return R1
 
 
-def calculate_occlusion(nx, ny, w, L):
+def calculate_occlusion(x_struts, y_struts, strut_width, A_em, **kwargs):
     """
     Calculate the fractional area of the collector occluded by the grid.
+    Assumes square domain.
     Args:
-        nx: Struts along x
-        ny: Struts along y
-        w: Strut width
-        L: Strut length
+        x_struts: Struts along x
+        y_struts: Struts along y
+        strut_width: Strut width (m)
+        A_em: Emitter area (cm**2)
 
     Returns:
         Fractional occlusion
     """
+    nx = x_struts[0]
+    ny = y_struts[0]
+    w = strut_width[0] * 1e2
+    L = np.sqrt(A_em[0])
+
     fractional_occlusion = ((nx + ny) * L * w - (nx * ny) * w ** 2) / L ** 2
 
     return fractional_occlusion
 
 
-def efficiency(A_em, R_ew, R_em, J_em, phi_em, T_em,
+def calculate_power_flux(velocity, weight, phi, run_time, A_em, **kwargs):
+    """
+    Calculate total power from array of particle velocities.
+    Will return 'real' power computed based on macroparticle weight.
+    Args:
+        velocity: Array of particle velocities in m/s [N, 3, periods]
+        weight: Macroparticle weight
+        phi: Work function of the emitter in eV
+        run_time: Time over which velocities were collected
+        A_em: Emitter area in cm**2
+        **kwargs: Catch unused arguments
+
+    Returns:
+        Power in W/cm**2
+    """
+    v_sqr = velocity[:, 0, :]**2 + velocity[:, 1, :]**2 + velocity[:, 2, :]**2
+    ke = 0.5 * m_e * np.sum(v_sqr)
+    N = v_sqr[:, 0, :].size
+    E_tot = ke + phi * e * N
+
+    return E_tot * weight * N / run_time / A_em**2
+
+
+def calculate_efficiency(A_em, R_ew, P_em, J_em, phi_em, T_em,
                R_cw, J_coll, phi_coll, T_coll,
-               emiss_eff, T_env, occlusion, **kwargs):
+               emiss_eff, T_env, J_grid, V_grid,
+               occlusion, run_time, **kwargs):
     """
     Calculate the TEC efficieny.
+    All power terms should be calculated to give W/cm**2
     Based on S. Meir et al. J. Renewable Sustainable Energy 2013.
     Args:
         A_em: Emitter area (cm**2)
         R_ew: Emitter wiring resistance (Ohms)
-        R_em: Emitter resistance (Ohms)
         J_em: Emitter current density (A/cm**2)
         phi_em: Emitter work function (eV)
         T_em: Emitter temperature (K)
@@ -120,30 +157,32 @@ def efficiency(A_em, R_ew, R_em, J_em, phi_em, T_em,
         Efficiency ()
     """
 
-    A_em, R_ew, R_em, J_em, phi_em, T_em, \
+    A_em, R_ew, P_em, J_em, phi_em, T_em, \
     R_cw, J_coll, phi_coll, T_coll, \
-    emiss_eff, T_env, occlusion = A_em[0], R_ew[0], R_em[0], J_em[0], phi_em[0], T_em[0], \
+    emiss_eff, T_env, J_grid, V_grid, occlusion, run_time = A_em[0], R_ew[0], P_em[0], J_em[0], phi_em[0], T_em[0], \
                R_cw[0], J_coll[0], phi_coll[0], T_coll[0], \
-               emiss_eff[0], T_env[0], occlusion[0]
-
+               emiss_eff[0], T_env[0], J_grid[0], V_grid[0], occlusion[0], run_time[0]
 
     t = 1. - occlusion
-    J_coll = rd_current(phi_coll, T_em)  # TODO: Decide where to set variables with dependencies like J_coll
+    J_coll = rd_current(phi_coll, T_em)
     J_load = J_em - J_coll
 
     # P_ew
-    P_ew = 0.5 * (L / (A_em * R_em) * (T_em - T_env) ** 2 - J_load ** 2 * A_em * R_ew)
+    P_ew = 0.5 * (L / (A_em * R_ew) * (T_em - T_env) ** 2 - J_load ** 2 * A_em * R_ew)
 
     # P_r
     P_r = emiss_eff * sigma_sb * (T_em ** 4 - t * T_coll ** 4)
 
-    # P_ec
-    P_ec = J_em / e * (phi_em + 2 * k_ev * T_em) - J_coll / e * (phi_em + 2 * k_ev * T_coll)
+    # P_ec (electron cooling power)
+    P_ec = P_em - t * J_coll / e * (phi_em + 2 * k_ev * T_coll)
 
     # P_load
     V_load = (phi_em - phi_coll) / e - J_load * A_em * (R_ew + R_cw)
     P_load = J_load * V_load
 
-    eta = P_load / (P_ec + P_r + P_ew)
+    # P_gate
+    P_gate = J_grid * V_grid
+
+    eta = (P_load - P_gate) / (P_ec + P_r + P_ew)
 
     return eta
