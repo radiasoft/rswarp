@@ -375,7 +375,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     crossing_wall_time = times[-1] * steps_per_crossing / ss_check_interval  # Estimate wall time for one crossing
     for sint in range(crossing_measurements):
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
-        if (clock - max_wall_time) < crossing_wall_time:
+        if (max_wall_time - clock) < crossing_wall_time:
             early_abort = True
             break
 
@@ -397,7 +397,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     while measurement_beam.npsim[0] > 0:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
-        if (clock - max_wall_time) < crossing_wall_time * steps_per_crossing / ss_check_interval:
+        if (max_wall_time - clock) < crossing_wall_time * steps_per_crossing / ss_check_interval:
             early_abort = True
             break
 
@@ -440,9 +440,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
             h5file.attrs['complete'] = early_abort
             for key in run_attributes:
                 h5file.attrs[key] = run_attributes[key]
-            for key in measured_current:
-                print key,  measured_current[key]
-                h5file.attrs[key] = measured_current[key]
+            for key, value in scraper_dictionary.iteritems():
+                h5file.attrs[key] = measured_current[value]
 
 
 def create_grid(nx, ny, volts,
