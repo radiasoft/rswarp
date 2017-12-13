@@ -346,7 +346,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     clock += times[-1]
 
     # Start checking for Steady State Operation
-    tol = 0.01
+    tol = 0.05
     steady_state = 0
     while steady_state != 1:
         record_time(step(ss_check_interval), times)
@@ -354,7 +354,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         steady_state, avg, stdev = stead_state_check(background_beam, solverE,
                                                      scraper_dictionary['collector'], ss_check_interval, tol=tol)
         print(" For {} steps: Avg particles/step={}, Stdev particles/step={}, tol={}".format(ss_check_interval,
-                                                                                       avg, std, tol))
+                                                                                             avg, stdev, tol))
 
     # Start Steady State Operation
     print(" Steady State Reached.\n Starting efficiency "
