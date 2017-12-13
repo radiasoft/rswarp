@@ -17,8 +17,10 @@ sys.path.append('/global/homes/h/hallcc/github/rswarp')
 
 from copy import deepcopy
 from random import randint
+from scipy.signal import lfilter
 from rswarp.cathode import sources
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
+from warp.particles.extpart import ZCrossingParticles
 from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.file_utils import cleanupPrevious
 from rswarp.diagnostics.parallel import save_lost_particles
@@ -141,8 +143,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     ACCEL_VOLTS = volts_on_grid  # ACCEL_VOLTS used for velocity and CL calculations
 
     # Emitted species
-    background_beam = Species(type=Electron, name='background')
-    measurement_beam = Species(type=Electron, name='measurement')
+    background_beam = Species(type=Electron, name='background', js=0)
+    measurement_beam = Species(type=Electron, name='measurement', js=1)
 
     # Emitter area and position
     SOURCE_RADIUS_1 = 0.5 * CHANNEL_WIDTH  # a0 parameter - X plane
@@ -276,7 +278,6 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     #############
     # DIAGNOSTICS
     #############
-    zcrossing_position = grid_height
 
     # Particle/Field diagnostic options
     if particle_diagnostic_switch:
@@ -348,76 +349,103 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
     crossing_measurements = 8  # Number of crossing times to record for
-    steps_per_crossing = gap_distance / vzfinal
+    steps_per_crossing = gap_distance / vzfinal / dt
+    ss_check_interval = steps_per_crossing / 5.
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
 
     # Run initial block of steps
-    record_time(step(startup_time), times)
+    record_time(stept(startup_time), times)
     clock += times[-1]
 
+    # Start checking for Steady State Operation
+    tol = 0.01
+    steady_state = 0
+    while steady_state != 1:
+        record_time(step(ss_check_interval), times)
+        clock += times[-1]
+        steady_state, avg, stdev = stead_state_check(background_beam, solverE,
+                                                     scraper_dictionary['collector'], ss_check_interval, tol=tol)
+        print(" For {} steps: Avg particles/step={}, Stdev particles/step={}, tol={}".format(ss_check_interval,
+                                                                                       avg, std, tol))
+
+    # Start Steady State Operation
     print(" Steady State Reached.\n Starting efficiency "
           "recording for {} crossing times.\n This is {} steps".format(crossing_measurements,
                                                                        steps_per_crossing * crossing_measurements))
 
-    # Start run cycle
+    # Switch to measurement beam species
+    measurement_beam.rnpinject = PTCL_PER_STEP
+    background_beam.rnpinject = 0
 
-    tol = 1e9  # Large initial error for check
-    target = 0.1  # Final tolerance we are trying to reach
-    time_limit = max_wall_time  # Time limit if on a queued system
+    # Install Zcrossing Diagnostic
+    # TODO: make change to grid_height fractional
+    ZCross = ZCrossingParticles(zz=grid_height * gap_distance / 20., laccumulate=1)
+    emitter_flux = []
 
-    while (tol > target) and (clock < time_limit):
-        if lost_diagnostic_switch:
-            lost_particle_file = 'lost_particles_id{}_step{}.npy'.format(run_id, top.it)
-            save_lost_particles(top, comm_world, fsave=lost_particle_file)
+    crossing_wall_time = times[-1] * steps_per_crossing / ss_check_interval  # Estimate wall time for one crossing
+    for sint in range(crossing_measurements):
+        # Kill the loop and proceed to writeout if we don't have time to complete the loop
+        if (clock - max_wall_time) < crossing_wall_time:
+            early_abort = True
+            break
 
-        time1 = time.time()
-
-        step(1000)
-
-        counts_2 = get_lost_counts()
-
-        # Record i-1 and i+1 intervals
-        accumulated_0 = counts_1 - counts_0
-        accumulated_1 = counts_2 - counts_1
-
-        if counts_2[-1] < 1000:  # TODO: The 1000 floor is completely arbitrary and probably kind of low
-            # Insufficient statistics to start counting, keep tol at default
-            collector_fraction_0 = -1.
-            collector_fraction_1 = -1.
-        else:
-            collector_fraction_0 = accumulated_0[-1] / np.sum(accumulated_0,
-                                                             dtype=float)  # Fraction of particles incident on collector
-            collector_fraction_1 = accumulated_1[-1] / np.sum(accumulated_1,
-                                                             dtype=float)  # Fraction of particles incident on collector
-            tol = abs(collector_fraction_1 - collector_fraction_0) / collector_fraction_1
-
-        # Re-index values, counts_2 redefined at start of next loop
-        counts_0, counts_1 = counts_1, counts_2
-
-        time2 = time.time()
-        times.append(time2 - time1)
+        record_time(step(steps_per_crossing), times)
         clock += times[-1]
 
+        emitter_flux.append([ZCross.getvx(js=measurement_beam.js),
+                             ZCross.getvy(js=measurement_beam.js),
+                             ZCross.getvz(js=measurement_beam.js)])
+        ZCross.clear()  # Clear ZcrossingParticles memory
+
+        print("Measurement: {} of {} intervals completed. Previous interval: {} s".format(sint + 1,
+                                                                                          crossing_measurements,
+                                                                                          times[-1]))
+
+    # Run wind-down until measurement particles have cleared
+    measurement_beam.rnpinject = 0
+    background_beam.rnpinject = PTCL_PER_STEP
+
+    while measurement_beam.npsim[0] > 0:
+        # Kill the loop and proceed to writeout if we don't have time to complete the loop
+        if (clock - max_wall_time) < crossing_wall_time * steps_per_crossing / ss_check_interval:
+            early_abort = True
+            break
+
+        record_time(step(ss_check_interval), times)
+        clock += times[-1]
+
+        if ZCross.getvx(js=measurement_beam.js).shape[0] > 0:
+            emitter_flux.append([ZCross.getvx(js=measurement_beam.js),
+                                 ZCross.getvy(js=measurement_beam.js),
+                                 ZCross.getvz(js=measurement_beam.js)])
+            ZCross.clear()  # Clear ZcrossingParticles memory
+
+        print(" Wind-down: Taking {} steps, On Step: {}, {} Particles Left".format(ss_check_interval, top.it,
+                                                                                   measurement_beam.npsim[0]))
     ######################
     # FINAL RUN STATISTICS
     ######################
+
+    # Filter for measurement_species
+    surface_currents = analyze_scraped_particles(top, measurement_beam, solverE)
+    measured_current = {}
+    for key in surface_currents:
+        # We can abuse the fact that js=0 for background species to filter it from the sum
+        measured_current[key] = np.sum(surface_currents[key][:, 1] * surface_currents[key][:, 3])
 
     if comm_world.rank == 0:
         with open('output_stats_id{}.txt'.format(run_id), 'w') as f1:
             for ts in times:
                 f1.write('{}\n'.format(ts))
             f1.write('\n')
-            f1.write('{} {} {} {}\n'.format(collector_fraction_0, accumulated_0[0], accumulated_0[1], accumulated_0[2]))
-            f1.write('{} {} {} {}\n'.format(collector_fraction_1, accumulated_1[0], accumulated_1[1], accumulated_1[2]))
 
         filename = 'efficiency_id{}.h5'.format(str(run_id))
         with h5.File(filename, 'w') as h5file:
             for key in run_attributes:
                 h5file.attrs[key] = run_attributes[key]
-            h5file.attrs['grid'] = counts_2[0]
-            h5file.attrs['source'] = counts_2[1]
-            h5file.attrs['collector'] = counts_2[2]
+            for key in measured_current:
+                h5file.attrs[key] = measured_current[key]
 
 
 def create_grid(nx, ny, volts,
@@ -451,3 +479,17 @@ def record_time(func, time_list):
     func
     t2 = time.time()
     time_list.append(t2 - t1)
+
+
+def stead_state_check(particles, solver, sid, interval, tol=0.01, n=185, a=1):
+    b = [1.0 / n] * n
+    collector_current = analyze_scraped_particles(top, particles, solver)[sid]
+    y = lfilter(b, a, collector_current[-interval:, 1])  # Assumes that charge is being deposited ~every step
+    avg = np.average(y)
+    stdev = np.std(y)
+    if stdev / avg < tol:
+        ss = 1
+    else:
+        ss = 0
+
+    return ss, avg, stdev
