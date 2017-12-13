@@ -13,7 +13,7 @@ def analyze_scraped_particles(top, particles, solver):
         solver: Electrostatic solver object.
 
     Returns:
-        [step, particles deposited on step]
+        [step, particles deposited on step, timestep, species index]
     """
     cond_ids = []
     cond_objs = []
