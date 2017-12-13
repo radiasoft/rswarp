@@ -1,6 +1,6 @@
 from __future__ import division
 
-# TODO: Change grid position to be set as fraction of gap_distance
+# TODO: cycle times for comparison against wall clock are still not calculated correctly
 # set `warpoptions.ignoreUnknownArgs = True` before main import to allow command line arguments Warp does not recognize
 import warpoptions
 warpoptions.ignoreUnknownArgs = True
@@ -18,6 +18,7 @@ from copy import deepcopy
 from random import randint
 from scipy.signal import lfilter
 from rswarp.cathode import sources
+from rswarp.run_files import efficiency
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from warp.particles.extpart import ZCrossingParticles
 from rswarp.diagnostics import FieldDiagnostic
@@ -60,8 +61,12 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                         with rswarp.diagnostics.parallel.save_lost_particles.
 
     """
-    # record inputs
+    # record inputs and set parameters
     run_attributes = deepcopy(locals())
+
+    for key in run_attributes:
+        if key in efficiency.tec_parameters:
+            efficiency.tec_parameters[key] = run_attributes[key]
 
     # set new random seed
     if random_seed:
@@ -410,34 +415,55 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         clock += times[-1]
 
         if ZCross.getvx(js=measurement_beam.js).shape[0] > 0:
-            emitter_flux.append([ZCross.getvx(js=measurement_beam.js),
-                                 ZCross.getvy(js=measurement_beam.js),
-                                 ZCross.getvz(js=measurement_beam.js)])
+            emitter_flux.append(np.array([ZCross.getvx(js=measurement_beam.js),
+                                ZCross.getvy(js=measurement_beam.js),
+                                ZCross.getvz(js=measurement_beam.js)]))
             ZCross.clear()  # Clear ZcrossingParticles memory
 
+        print np.vstack(emitter_flux).shape
         print(" Wind-down: Taking {} steps, On Step: {}, {} Particles Left".format(ss_check_interval, top.it,
                                                                                    measurement_beam.npsim[0]))
     ######################
     # CALCULATE EFFICIENCY
     ######################
-    emitter_flux = np.array(emitter_flux)
-    print "velocity array shape:", emitter_flux.shape
+    emitter_flux = np.vstack(emitter_flux)
+
+    # Find integrated charge on each conductor
+    surface_charge = analyze_scraped_particles(top, measurement_beam, solverE)
+    measured_charge = {}
+
+    for key in surface_charge:
+        # We can abuse the fact that js=0 for background species to filter it from the sum
+        measured_charge[key] = np.sum(surface_charge[key][:, 1] * surface_charge[key][:, 3])
+
+    # Set externally derived parameters
+    efficiency.tec_parameters['occlusion'] = efficiency.calculate_occlusion(**efficiency.tec_parameters)
+    efficiency.tec_parameters['R_ew'] = efficiency.calculate_resistance(efficiency.tec_parameters['T_em'],
+                                                                        **efficiency.tec_parameters)
+    efficiency.tec_parameters['R_cw'] = efficiency.calculate_resistance(efficiency.tec_parameters['T_coll'],
+                                                                        **efficiency.tec_parameters)
+    # Set derived parameters from simulation
+    efficiency.tec_parameters['run_time'] = crossing_measurements * steps_per_crossing
+    efficiency.tec_parameters['J_em'] = (emitter_flux.shape - measured_charge['emitter']) * measurement_beam.sw / \
+                                        efficiency.tec_parameters['run_time'] / efficiency.tec_parameters['A_em']
+    efficiency.tec_parameters['J_grid'] = measured_charge['grid'] * measurement_beam.sw / \
+                                        efficiency.tec_parameters['run_time'] / efficiency.tec_parameters['A_em']
+    efficiency.tec_parameters['J_coll'] = measured_charge['grid'] * measurement_beam.sw / \
+                                        efficiency.tec_parameters['run_time'] / efficiency.tec_parameters['A_em']
+    efficiency.tec_parameters['P_em'] = efficiency.calculate_power_flux(emitter_flux, measurement_beam.sw,
+                                                                        efficiency.tec_parameters['phi_em'],
+                                                                        **efficiency.tec_parameters)
+
+    # Efficiency calculation
+    print "Efficiency", efficiency.calculate_efficiency(**efficiency.tec_parameters)
     ######################
     # FINAL RUN STATISTICS
     ######################
 
-    # Filter for measurement_species
-    surface_currents = analyze_scraped_particles(top, measurement_beam, solverE)
-    measured_current = {}
-
     import pickle
 
-    for key in surface_currents:
-        # We can abuse the fact that js=0 for background species to filter it from the sum
-        measured_current[key] = np.sum(surface_currents[key][:, 1] * surface_currents[key][:, 3])
-
     if comm_world.rank == 0:
-        pickle.dump(surface_currents, open("test_current_data.p", "wb"))
+        pickle.dump(surface_charge, open("test_current_data.p", "wb"))
         with open('output_stats_id{}.txt'.format(run_id), 'w') as f1:
             for ts in times:
                 f1.write('{}\n'.format(ts))
@@ -451,7 +477,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
             for key in run_attributes:
                 h5file.attrs[key] = run_attributes[key]
             for key, value in scraper_dictionary.iteritems():
-                h5file.attrs[key] = measured_current[value]
+                h5file.attrs[key] = measured_charge[value]
 
 
 def create_grid(nx, ny, volts,
