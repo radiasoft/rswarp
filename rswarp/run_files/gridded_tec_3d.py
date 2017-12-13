@@ -346,7 +346,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     record_time(stept, times, startup_time)
     clock += times[-1]
 
-    print("Completed Initialization on Step {}".format(top.it))
+    print("Completed Initialization on Step {}\n Initialization run time: {}".format(top.it, times[-1]))
 
     # Start checking for Steady State Operation
     tol = 0.05
@@ -374,6 +374,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     emitter_flux = []
 
     crossing_wall_time = times[-1] * steps_per_crossing / ss_check_interval  # Estimate wall time for one crossing
+    print('crossing_wall_time estimate: {}, for {} steps'.format(crossing_wall_time, steps_per_crossing))
+    print('wind-down loop time estimate: {}, for {} steps'.format(crossing_wall_time * steps_per_crossing / ss_check_interval, ss_check_interval))
     for sint in range(crossing_measurements):
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
         if (max_wall_time - clock) < crossing_wall_time:
@@ -475,7 +477,6 @@ def record_time(func, time_list, *args, **kwargs):
     t1 = time.time()
     func(*args, **kwargs)
     t2 = time.time()
-    print 'times', t2, t1, t2 - t1
     time_list.append(t2 - t1)
 
 
