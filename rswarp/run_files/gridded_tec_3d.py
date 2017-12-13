@@ -211,8 +211,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
         beam_current = sources.j_rd(EMITTER_TEMP, EMITTER_PHI) * cathode_area  # steady state current in Amps
         background_beam.ibeam = measurement_beam.ibeam = beam_current
-        background_beam.a0 = measurement_beam.a0 = SOURCE_RADIUS_1
-        background_beam.b0 = measurement_beam.b0 = SOURCE_RADIUS_2
+        background_beam.a0 = measurement_beam.a0 = CHANNEL_WIDTH
+        background_beam.b0 = measurement_beam.b0 = CHANNEL_WIDTH
         background_beam.ap0 = measurement_beam.ap0 = .0e0
         background_beam.bp0 = measurement_beam.bp0 = .0e0
 
@@ -266,14 +266,14 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         scraper = ParticleScraper([accel_grid, source, plate],
                                   lcollectlpdata=True,
                                   lsaveintercept=True)
-        scraper_dictionary = {1: 'grid', 2: 'source', 3: 'collector'}
+        scraper_dictionary = {'grid': 1, 'source': 2, 'collector': 3}
     else:
         installconductor(source, dfill=largepos)
         installconductor(plate, dfill=largepos)
         scraper = ParticleScraper([source, plate],
                                   lcollectlpdata=True,
                                   lsaveintercept=True)
-        scraper_dictionary = {1: 'source', 2: 'collector'}
+        scraper_dictionary = {'source': 1, 'collector': 2}
 
     #############
     # DIAGNOSTICS
@@ -295,19 +295,6 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
                                                                   period=fieldperiod)
         installafterstep(efield_diagnostic_0.write)
 
-    def get_lost_counts():
-        scraper_record = analyze_scraped_particles(top, background_beam, solverE)
-
-        for key in scraper_dictionary:
-            print 'Step: {}'.format(top.it)
-            print 'analyze says {} scraped:'.format(scraper_dictionary[key]), \
-                np.sum(scraper_record[key][:, 1])
-        if install_grid:
-            return np.array([np.sum(scraper_record[1][:, 1]), np.sum(scraper_record[2][:, 1]),
-                             np.sum(scraper_record[3][:, 1])])
-        else:
-            return np.array([np.sum(scraper_record[1][:, 1]),
-                             np.sum(scraper_record[2][:, 1])])
     ##########################
     # SOLVER SETTINGS/GENERATE
     ##########################
