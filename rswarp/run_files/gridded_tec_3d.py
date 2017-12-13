@@ -398,9 +398,12 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     measurement_beam.rnpinject = 0
     background_beam.rnpinject = PTCL_PER_STEP
 
-    while measurement_beam.npsim[0] > 0:
+    initial_population = measurement_beam.npsim[0]
+    measurement_tol = 0.02
+
+    while measurement_beam.npsim[0] / initial_population > measurement_tol:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
-        if (max_wall_time - clock) < crossing_wall_time * steps_per_crossing / ss_check_interval:
+        if (max_wall_time - clock) < crossing_wall_time * ss_check_interval / steps_per_crossing :
             early_abort = True
             break
 
