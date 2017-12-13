@@ -345,6 +345,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     record_time(stept(startup_time), times)
     clock += times[-1]
 
+    print("Completed Initialization on Step {}".format(top.it))
+
     # Start checking for Steady State Operation
     tol = 0.05
     steady_state = 0
@@ -474,7 +476,7 @@ def record_time(func, time_list):
 def stead_state_check(particles, solver, sid, interval, tol=0.01, n=185, a=1):
     b = [1.0 / n] * n
     collector_current = analyze_scraped_particles(top, particles, solver)[sid]
-    y = lfilter(b, a, collector_current[-interval:, 1])  # Assumes that charge is being deposited ~every step
+    y = lfilter(b, a, collector_current[:, 1])[-interval:]  # Assumes that charge is being deposited ~every step
     avg = np.average(y)
     stdev = np.std(y)
     if stdev / avg < tol:
