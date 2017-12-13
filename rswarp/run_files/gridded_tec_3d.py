@@ -143,8 +143,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     ACCEL_VOLTS = volts_on_grid  # ACCEL_VOLTS used for velocity and CL calculations
 
     # Emitted species
-    background_beam = Species(type=Electron, name='background', js=0)
-    measurement_beam = Species(type=Electron, name='measurement', js=1)
+    background_beam = Species(type=Electron, name='background')
+    measurement_beam = Species(type=Electron, name='measurement')
 
     # Emitter area and position
     SOURCE_RADIUS_1 = 0.5 * CHANNEL_WIDTH  # a0 parameter - X plane
