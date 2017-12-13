@@ -1,6 +1,5 @@
 from __future__ import division
 
-# TODO: Check the correct value for beam.a0. Width or half width?
 # TODO: Change grid position to be set as fraction of gap_distance
 # set `warpoptions.ignoreUnknownArgs = True` before main import to allow command line arguments Warp does not recognize
 import warpoptions
@@ -34,7 +33,7 @@ kb_J = k  # Boltzmann constant in J/K
 m = m_e  # electron mass in kg
 
 
-def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_height,
+def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
          T_em, phi_em, T_coll, phi_coll, R_ew, gap_distance,
          run_id,
          injection_type=2, random_seed=True, install_grid=True, max_wall_time=0.,
@@ -44,8 +43,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     Args:
         x_struts: Number of struts that intercept the x-axis.
         y_struts: Number of struts that intercept the y-axis
-        volts_on_grid: Voltage to place on the grid in Volts.
-        grid_height: Distance from the emitter to the grid in meters.
+        V_grid: Voltage to place on the grid in Volts.
+        grid_height: Distance from the emitter to the grid normalized by gap_distance, unitless.
         strut_width: Transverse extent of the struts in meters.
         strut_height: Longitudinal extent of the struts in meters.
         run_id: Run ID. Mainly used for parallel optimization.
@@ -140,7 +139,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     EMITTER_TEMP = T_em
     EMITTER_PHI = phi_em # work function in eV
     COLLECTOR_PHI = phi_coll  # Can be used if vacuum level is being set
-    ACCEL_VOLTS = volts_on_grid  # ACCEL_VOLTS used for velocity and CL calculations
+    ACCEL_VOLTS = V_grid  # ACCEL_VOLTS used for velocity and CL calculations
 
     # Emitted species
     background_beam = Species(type=Electron, name='background')
@@ -232,10 +231,10 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     ########################
 
     if install_grid:
-        accel_grid, gl = create_grid(x_struts, y_struts, volts_on_grid,
-                                     grid_height, strut_width, strut_height,
+        accel_grid, gl = create_grid(x_struts, y_struts, V_grid,
+                                     grid_height * gap_distance, strut_width, strut_height,
                                      CHANNEL_WIDTH)
-        accel_grid.voltage = volts_on_grid
+        accel_grid.voltage = V_grid
 
     # --- Anode Location
     zplate = Z_MAX
@@ -249,7 +248,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     if install_grid:
         plate = ZPlane(voltage=0., zcent=zplate, condid=3)
     else:
-        plate = ZPlane(voltage=volts_on_grid, zcent=zplate)
+        plate = ZPlane(voltage=V_grid, zcent=zplate)
     #####
     # Grid dimensions used in testing
     # strut_width = 3e-9
@@ -315,7 +314,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # Time Step
 
     # Determine an appropriate time step based upon estimated final velocity
-    vz_accel = sqrt(2. * abs(volts_on_grid) * np.abs(background_beam.charge) / background_beam.mass)
+    vz_accel = sqrt(2. * abs(V_grid) * np.abs(background_beam.charge) / background_beam.mass)
     vzfinal = vz_accel + beam_beta * c
     dt = dz / vzfinal
     top.dt = dt
@@ -418,6 +417,11 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
         print(" Wind-down: Taking {} steps, On Step: {}, {} Particles Left".format(ss_check_interval, top.it,
                                                                                    measurement_beam.npsim[0]))
+    ######################
+    # CALCULATE EFFICIENCY
+    ######################
+    emitter_flux = np.array(emitter_flux)
+    print "velocity array shape:", emitter_flux.shape
     ######################
     # FINAL RUN STATISTICS
     ######################
