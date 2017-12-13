@@ -337,7 +337,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
     crossing_measurements = 8  # Number of crossing times to record for
     steps_per_crossing = gap_distance / vzfinal / dt
-    ss_check_interval = steps_per_crossing / 5.
+    ss_check_interval = int(steps_per_crossing / 5.)
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
 
@@ -425,10 +425,13 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
         with open('output_stats_id{}.txt'.format(run_id), 'w') as f1:
             for ts in times:
                 f1.write('{}\n'.format(ts))
+            if early_abort:
+                f1.write('ABORTED')
             f1.write('\n')
 
         filename = 'efficiency_id{}.h5'.format(str(run_id))
         with h5.File(filename, 'w') as h5file:
+            h5file.attrs['complete'] = early_abort
             for key in run_attributes:
                 h5file.attrs[key] = run_attributes[key]
             for key in measured_current:
