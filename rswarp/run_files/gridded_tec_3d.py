@@ -334,6 +334,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # Record data for effiency calculation
     # Switch off measurement species and wait for simulation to clear (background species is switched on)
 
+    early_abort = False  # If true will flag output data to notify
     startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
     crossing_measurements = 8  # Number of crossing times to record for
     steps_per_crossing = gap_distance / vzfinal / dt
@@ -342,7 +343,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
 
     # Run initial block of steps
-    record_time(stept(startup_time), times)
+    record_time(stept, times, startup_time)
     clock += times[-1]
 
     print("Completed Initialization on Step {}".format(top.it))
@@ -351,7 +352,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     tol = 0.05
     steady_state = 0
     while steady_state != 1:
-        record_time(step(ss_check_interval), times)
+        record_time(step, times, ss_check_interval)
         clock += times[-1]
         steady_state, avg, stdev = stead_state_check(background_beam, solverE,
                                                      scraper_dictionary['collector'], ss_check_interval, tol=tol)
@@ -360,8 +361,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
     # Start Steady State Operation
     print(" Steady State Reached.\n Starting efficiency "
-          "recording for {} crossing times.\n This is {} steps".format(crossing_measurements,
-                                                                       steps_per_crossing * crossing_measurements))
+          "recording for {} crossing times.\n This will be {} steps".format(crossing_measurements,
+                                                                            steps_per_crossing * crossing_measurements))
 
     # Switch to measurement beam species
     measurement_beam.rnpinject = PTCL_PER_STEP
@@ -379,7 +380,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
             early_abort = True
             break
 
-        record_time(step(steps_per_crossing), times)
+        record_time(step, times, steps_per_crossing)
         clock += times[-1]
 
         emitter_flux.append([ZCross.getvx(js=measurement_beam.js),
@@ -401,7 +402,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
             early_abort = True
             break
 
-        record_time(step(ss_check_interval), times)
+        record_time(step, times, ss_check_interval)
         clock += times[-1]
 
         if ZCross.getvx(js=measurement_beam.js).shape[0] > 0:
@@ -470,9 +471,9 @@ def create_grid(nx, ny, volts,
     return grid, grid_list
 
 
-def record_time(func, time_list):
+def record_time(func, time_list, *args, **kwargs):
     t1 = time.time()
-    func
+    func(*args, **kwargs)
     t2 = time.time()
     print 'times', t2, t1, t2 - t1
     time_list.append(t2 - t1)
