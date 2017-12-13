@@ -419,11 +419,15 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
     # Filter for measurement_species
     surface_currents = analyze_scraped_particles(top, measurement_beam, solverE)
     measured_current = {}
+
+    import pickle
+
     for key in surface_currents:
         # We can abuse the fact that js=0 for background species to filter it from the sum
         measured_current[key] = np.sum(surface_currents[key][:, 1] * surface_currents[key][:, 3])
 
     if comm_world.rank == 0:
+        pickle.dump(surface_currents, open("test_current_data.p", "wb"))
         with open('output_stats_id{}.txt'.format(run_id), 'w') as f1:
             for ts in times:
                 f1.write('{}\n'.format(ts))
@@ -437,6 +441,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
             for key in run_attributes:
                 h5file.attrs[key] = run_attributes[key]
             for key in measured_current:
+                print key,  measured_current[key]
                 h5file.attrs[key] = measured_current[key]
 
 
