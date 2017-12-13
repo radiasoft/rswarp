@@ -179,8 +179,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
         background_beam.ibeam = beam_current * CURRENT_MODIFIER
 
-        background_beam.a0 = CHANNEL_WIDTH
-        background_beam.b0 = CHANNEL_WIDTH
+        background_beam.a0 = SOURCE_RADIUS_1
+        background_beam.b0 = SOURCE_RADIUS_1
         background_beam.ap0 = .0e0
         background_beam.bp0 = .0e0
 
@@ -211,8 +211,8 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
 
         beam_current = sources.j_rd(EMITTER_TEMP, EMITTER_PHI) * cathode_area  # steady state current in Amps
         background_beam.ibeam = measurement_beam.ibeam = beam_current
-        background_beam.a0 = measurement_beam.a0 = CHANNEL_WIDTH
-        background_beam.b0 = measurement_beam.b0 = CHANNEL_WIDTH
+        background_beam.a0 = measurement_beam.a0 = SOURCE_RADIUS_1
+        background_beam.b0 = measurement_beam.b0 = SOURCE_RADIUS_1
         background_beam.ap0 = measurement_beam.ap0 = .0e0
         background_beam.bp0 = measurement_beam.bp0 = .0e0
 
@@ -387,7 +387,7 @@ def main(x_struts, y_struts, volts_on_grid, grid_height, strut_width, strut_heig
                              ZCross.getvz(js=measurement_beam.js)])
         ZCross.clear()  # Clear ZcrossingParticles memory
 
-        print("Measurement: {} of {} intervals completed. Previous interval: {} s".format(sint + 1,
+        print("Measurement: {} of {} intervals completed. Interval run time: {} s".format(sint + 1,
                                                                                           crossing_measurements,
                                                                                           times[-1]))
 
@@ -474,6 +474,7 @@ def record_time(func, time_list):
     t1 = time.time()
     func
     t2 = time.time()
+    print 'times', t2, t1, t2 - t1
     time_list.append(t2 - t1)
 
 
