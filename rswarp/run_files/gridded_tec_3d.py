@@ -338,7 +338,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Run until steady state is achieved (flat current profile at collector) (measurement species turned on)
     # Record data for effiency calculation
     # Switch off measurement species and wait for simulation to clear (background species is switched on)
-    # TODO: Changing parameters to speed up simulation run for testing
+    # TODO: Changing parameters to speed up simulation run for testing: steps_per_crossing divided by 5
     early_abort = False  # If true will flag output data to notify
     startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
     crossing_measurements = 8  # Number of crossing times to record for
@@ -390,11 +390,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         record_time(step, times, steps_per_crossing)
         clock += times[-1]
 
-        emitter_flux.append([ZCross.getvx(js=measurement_beam.js),
+        emitter_flux.append(np.array([ZCross.getvx(js=measurement_beam.js),
                              ZCross.getvy(js=measurement_beam.js),
-                             ZCross.getvz(js=measurement_beam.js)])
+                             ZCross.getvz(js=measurement_beam.js)]).transpose())
         ZCross.clear()  # Clear ZcrossingParticles memory
-
+        for i in emitter_flux: print i.shape
         print("Measurement: {} of {} intervals completed. Interval run time: {} s".format(sint + 1,
                                                                                           crossing_measurements,
                                                                                           times[-1]))
