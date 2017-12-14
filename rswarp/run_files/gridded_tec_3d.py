@@ -1,6 +1,7 @@
 from __future__ import division
 
 # TODO: cycle times for comparison against wall clock are still not calculated correctly
+# TODO: decide on handling for tails. are we hurting the effiency estimation?
 # set `warpoptions.ignoreUnknownArgs = True` before main import to allow command line arguments Warp does not recognize
 import warpoptions
 warpoptions.ignoreUnknownArgs = True
@@ -417,7 +418,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         if ZCross.getvx(js=measurement_beam.js).shape[0] > 0:
             emitter_flux.append(np.array([ZCross.getvx(js=measurement_beam.js),
                                 ZCross.getvy(js=measurement_beam.js),
-                                ZCross.getvz(js=measurement_beam.js)]))
+                                ZCross.getvz(js=measurement_beam.js)]).transpose())
             ZCross.clear()  # Clear ZcrossingParticles memory
 
         print np.vstack(emitter_flux).shape
@@ -447,7 +448,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     efficiency.tec_parameters['J_em'] = (emitter_flux.shape - measured_charge['emitter']) * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'] / efficiency.tec_parameters['A_em']
     efficiency.tec_parameters['J_grid'] = measured_charge['grid'] * measurement_beam.sw / \
-                                        efficiency.tec_parameters['run_time'] / efficiency.tec_parameters['A_em']
+                                        efficiency.tec_parameters['run_time'] / \
+                                          (efficiency.tec_parameters['occlusion'] * efficiency.tec_parameters['A_em'])
     efficiency.tec_parameters['J_coll'] = measured_charge['grid'] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'] / efficiency.tec_parameters['A_em']
     efficiency.tec_parameters['P_em'] = efficiency.calculate_power_flux(emitter_flux, measurement_beam.sw,
