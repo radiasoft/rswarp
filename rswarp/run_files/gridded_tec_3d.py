@@ -445,12 +445,12 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                                                         **efficiency.tec_parameters)
     # Set derived parameters from simulation
     efficiency.tec_parameters['run_time'] = crossing_measurements * steps_per_crossing
-    efficiency.tec_parameters['J_em'] = (emitter_flux.shape[0] - measured_charge['emitter']) * measurement_beam.sw / \
+    efficiency.tec_parameters['J_em'] = (emitter_flux.shape[0] - measured_charge['source']) * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
     efficiency.tec_parameters['J_grid'] = measured_charge['grid'] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / \
                                         (efficiency.tec_parameters['occlusion'][0] * efficiency.tec_parameters['A_em'][0])
-    efficiency.tec_parameters['J_coll'] = measured_charge['grid'] * measurement_beam.sw / \
+    efficiency.tec_parameters['J_coll'] = measured_charge['collector'] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
     efficiency.tec_parameters['P_em'] = efficiency.calculate_power_flux(emitter_flux, measurement_beam.sw,
                                                                         efficiency.tec_parameters['phi_em'][0],
