@@ -338,11 +338,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Run until steady state is achieved (flat current profile at collector) (measurement species turned on)
     # Record data for effiency calculation
     # Switch off measurement species and wait for simulation to clear (background species is switched on)
-
+    # TODO: Changing parameters to speed up simulation run for testing
     early_abort = False  # If true will flag output data to notify
     startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
     crossing_measurements = 8  # Number of crossing times to record for
-    steps_per_crossing = gap_distance / vzfinal / dt
+    steps_per_crossing = gap_distance / vzfinal / dt / 5.
     ss_check_interval = int(steps_per_crossing / 5.)
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
