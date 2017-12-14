@@ -215,6 +215,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         top.lhalfmaxwellinject = 1  # inject z velocities as half Maxwellian
 
         beam_current = sources.j_rd(EMITTER_TEMP, EMITTER_PHI) * cathode_area  # steady state current in Amps
+        print('beam current expected: {}, current density {}'.format(beam_current, beam_current / cathode_area))
         background_beam.ibeam = measurement_beam.ibeam = beam_current
         background_beam.a0 = measurement_beam.a0 = SOURCE_RADIUS_1
         background_beam.b0 = measurement_beam.b0 = SOURCE_RADIUS_1
@@ -222,7 +223,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         background_beam.bp0 = measurement_beam.bp0 = .0e0
 
     derivqty()
-
+    print('weight {}'.format(background_beam.sw))
     ##############
     # FIELD SOLVER
     ##############
@@ -338,11 +339,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Run until steady state is achieved (flat current profile at collector) (measurement species turned on)
     # Record data for effiency calculation
     # Switch off measurement species and wait for simulation to clear (background species is switched on)
-    # TODO: Changing parameters to speed up simulation run for testing: steps_per_crossing divided by 5, very high tol
+
     early_abort = False  # If true will flag output data to notify
     startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
     crossing_measurements = 8  # Number of crossing times to record for
-    steps_per_crossing = gap_distance / vzfinal / dt / 5.
+    steps_per_crossing = gap_distance / vzfinal / dt
     ss_check_interval = int(steps_per_crossing / 5.)
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
@@ -404,7 +405,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     background_beam.rnpinject = PTCL_PER_STEP
 
     initial_population = measurement_beam.npsim[0]
-    measurement_tol = 0.5
+    measurement_tol = 0.02
 
     while measurement_beam.npsim[0] / initial_population > measurement_tol:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
