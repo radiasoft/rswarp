@@ -57,14 +57,14 @@ def rd_current(phi, T):
     return A * T ** 2 * np.exp(-phi / (k_ev * T)) * 0.01**2
 
 
-def calculate_resistance(T, L_wire, rho, alpha, A_em, T_ref=300., **kwargs):
+def calculate_resistance(T, L_wire, rho, alpha, T_ref=300., **kwargs):
     """
     Temperature dependent resistance model.
     Area will be the area of the collector/emitter. Provides reasonable scaling since the wire gauge will vary
     depending on current which in turn is a function of unit area of the system.
     Args:
         T: Temperature of wire (K)
-        A: Area (cm**2)
+        A: Area (cm**2) [Fixed at 1 cm**2 for now]
         L_wire: Length of wire (m)
         rho: Resistivity (Ohms/m)
         alpha: Reference resistance coefficient
@@ -74,7 +74,7 @@ def calculate_resistance(T, L_wire, rho, alpha, A_em, T_ref=300., **kwargs):
         Resistance (Ohms)
     """
 
-    L_wire, rho, alpha, A = L_wire[0], rho[0], alpha[0], A_em[0]
+    L_wire, rho, alpha, A = L_wire[0], rho[0], alpha[0], 1.
 
     delta_T = T - T_ref
 
@@ -182,7 +182,7 @@ def calculate_efficiency(A_em, R_ew, P_em, J_em, phi_em, T_em,
     P_load = J_load * V_load
 
     # P_gate
-    P_gate = J_grid * V_grid
+    P_gate = J_grid * A_em * (1. - t) * V_grid
 
     eta = (P_load - P_gate) / (P_ec + P_r + P_ew)
 

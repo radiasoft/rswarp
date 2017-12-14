@@ -420,7 +420,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                 ZCross.getvy(js=measurement_beam.js),
                                 ZCross.getvz(js=measurement_beam.js)]).transpose())
             ZCross.clear()  # Clear ZcrossingParticles memory
-
+        print "Backwards particles: {}".format(np.where(emitter_flux[-1][:, 2] < 0.)[0].shape)
         print(" Wind-down: Taking {} steps, On Step: {}, {} Particles Left".format(ss_check_interval, top.it,
                                                                                    measurement_beam.npsim[0]))
     ######################
@@ -444,7 +444,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     efficiency.tec_parameters['R_cw'][0] = efficiency.calculate_resistance(efficiency.tec_parameters['T_coll'][0],
                                                                         **efficiency.tec_parameters)
     # Set derived parameters from simulation
-    efficiency.tec_parameters['run_time'][0] = crossing_measurements * steps_per_crossing
+    efficiency.tec_parameters['run_time'][0] = crossing_measurements * steps_per_crossing * dt
     efficiency.tec_parameters['J_em'][0] = (emitter_flux.shape[0] - measured_charge[scraper_dictionary['source']]) \
                                         * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
