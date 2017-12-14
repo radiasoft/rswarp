@@ -67,7 +67,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     for key in run_attributes:
         if key in efficiency.tec_parameters:
-            efficiency.tec_parameters[key] = run_attributes[key]
+            efficiency.tec_parameters[key][0] = run_attributes[key]
 
     # set new random seed
     if random_seed:
@@ -465,6 +465,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     if comm_world.rank == 0:
         pickle.dump(surface_charge, open("test_current_data.p", "wb"))
+        pickle.dump(efficiency.tec_parameters, open("test_parameter_data.p", "wb"))
         with open('output_stats_id{}.txt'.format(run_id), 'w') as f1:
             for ts in times:
                 f1.write('{}\n'.format(ts))
