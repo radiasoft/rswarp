@@ -338,7 +338,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Run until steady state is achieved (flat current profile at collector) (measurement species turned on)
     # Record data for effiency calculation
     # Switch off measurement species and wait for simulation to clear (background species is switched on)
-    # TODO: Changing parameters to speed up simulation run for testing: steps_per_crossing divided by 5
+    # TODO: Changing parameters to speed up simulation run for testing: steps_per_crossing divided by 5, very high tol
     early_abort = False  # If true will flag output data to notify
     startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
     crossing_measurements = 8  # Number of crossing times to record for
@@ -394,7 +394,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                              ZCross.getvy(js=measurement_beam.js),
                              ZCross.getvz(js=measurement_beam.js)]).transpose())
         ZCross.clear()  # Clear ZcrossingParticles memory
-        for i in emitter_flux: print i.shape
+
         print("Measurement: {} of {} intervals completed. Interval run time: {} s".format(sint + 1,
                                                                                           crossing_measurements,
                                                                                           times[-1]))
@@ -404,7 +404,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     background_beam.rnpinject = PTCL_PER_STEP
 
     initial_population = measurement_beam.npsim[0]
-    measurement_tol = 0.02
+    measurement_tol = 0.5
 
     while measurement_beam.npsim[0] / initial_population > measurement_tol:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
@@ -421,7 +421,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                 ZCross.getvz(js=measurement_beam.js)]).transpose())
             ZCross.clear()  # Clear ZcrossingParticles memory
 
-        print np.vstack(emitter_flux).shape
         print(" Wind-down: Taking {} steps, On Step: {}, {} Particles Left".format(ss_check_interval, top.it,
                                                                                    measurement_beam.npsim[0]))
     ######################
