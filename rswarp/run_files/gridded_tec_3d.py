@@ -86,7 +86,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
         # Cleanup command if directories already exist
         if comm_world.rank == 0:
-            cleanupPrevious(diagDir,diagFDir)
+            cleanupPrevious(diagDir, diagFDir)
 
     ######################
     # DOMAIN/GEOMETRY/MESH
@@ -437,6 +437,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         measured_charge[key] = np.sum(surface_charge[key][:, 1] * surface_charge[key][:, 3])
 
     # Set externally derived parameters
+    efficiency.tec_parameters['A_em'][0] = cathode_area * 1e4
     efficiency.tec_parameters['occlusion'] = efficiency.calculate_occlusion(**efficiency.tec_parameters)
     efficiency.tec_parameters['R_ew'] = efficiency.calculate_resistance(efficiency.tec_parameters['T_em'][0],
                                                                         **efficiency.tec_parameters)
@@ -457,6 +458,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Efficiency calculation
     print "Efficiency", efficiency.calculate_efficiency(**efficiency.tec_parameters)
+
     ######################
     # FINAL RUN STATISTICS
     ######################
