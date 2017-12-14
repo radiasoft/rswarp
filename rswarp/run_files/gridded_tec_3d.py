@@ -323,7 +323,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     vz_accel = sqrt(2. * abs(V_grid) * np.abs(background_beam.charge) / background_beam.mass)
     vzfinal = vz_accel + beam_beta * c
     dt = dz / vzfinal
-    top.dt = dt
+    top.dt = 1e-14 #dt
 
     solverE.mgmaxiters = init_iters
     solverE.mgtol = init_tol
