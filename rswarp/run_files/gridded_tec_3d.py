@@ -323,7 +323,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     vz_accel = sqrt(2. * abs(V_grid) * np.abs(background_beam.charge) / background_beam.mass)
     vzfinal = vz_accel + beam_beta * c
     dt = dz / vzfinal
-    top.dt = 1e-14 #dt
+    top.dt = dt
 
     solverE.mgmaxiters = init_iters
     solverE.mgtol = init_tol
@@ -438,23 +438,23 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Set externally derived parameters
     efficiency.tec_parameters['A_em'][0] = cathode_area * 1e4
-    efficiency.tec_parameters['occlusion'] = efficiency.calculate_occlusion(**efficiency.tec_parameters)
-    efficiency.tec_parameters['R_ew'] = efficiency.calculate_resistance(efficiency.tec_parameters['T_em'][0],
+    efficiency.tec_parameters['occlusion'][0] = efficiency.calculate_occlusion(**efficiency.tec_parameters)
+    efficiency.tec_parameters['R_ew'][0] = efficiency.calculate_resistance(efficiency.tec_parameters['T_em'][0],
                                                                         **efficiency.tec_parameters)
-    efficiency.tec_parameters['R_cw'] = efficiency.calculate_resistance(efficiency.tec_parameters['T_coll'][0],
+    efficiency.tec_parameters['R_cw'][0] = efficiency.calculate_resistance(efficiency.tec_parameters['T_coll'][0],
                                                                         **efficiency.tec_parameters)
     # Set derived parameters from simulation
-    efficiency.tec_parameters['run_time'] = crossing_measurements * steps_per_crossing
-    efficiency.tec_parameters['J_em'] = (emitter_flux.shape[0] - measured_charge[scraper_dictionary['source']]) \
+    efficiency.tec_parameters['run_time'][0] = crossing_measurements * steps_per_crossing
+    efficiency.tec_parameters['J_em'][0] = (emitter_flux.shape[0] - measured_charge[scraper_dictionary['source']]) \
                                         * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
-    efficiency.tec_parameters['J_grid'] = measured_charge[scraper_dictionary['grid']] * measurement_beam.sw / \
+    efficiency.tec_parameters['J_grid'][0] = measured_charge[scraper_dictionary['grid']] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / \
                                         (efficiency.tec_parameters['occlusion'][0] *
                                          efficiency.tec_parameters['A_em'][0])
-    efficiency.tec_parameters['J_coll'] = measured_charge[scraper_dictionary['collector']] * measurement_beam.sw / \
+    efficiency.tec_parameters['J_coll'][0] = measured_charge[scraper_dictionary['collector']] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
-    efficiency.tec_parameters['P_em'] = efficiency.calculate_power_flux(emitter_flux, measurement_beam.sw,
+    efficiency.tec_parameters['P_em'][0] = efficiency.calculate_power_flux(emitter_flux, measurement_beam.sw,
                                                                         efficiency.tec_parameters['phi_em'][0],
                                                                         **efficiency.tec_parameters)
 
