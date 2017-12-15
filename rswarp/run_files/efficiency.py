@@ -4,6 +4,7 @@ k_ev = physical_constants['Boltzmann constant in eV/K'][0]
 sigma_sb = physical_constants['Stefan-Boltzmann constant'][0]
 L = 2.44e-8  # Lorentz number in units of W*Ohms/K**2
 
+# TODO: Need to account for particles travelling back to the emitter
 # Current in Amps
 # Current density in A/cm**2
 # Temperature in Kelvin
@@ -127,7 +128,7 @@ def calculate_power_flux(velocity, weight, phi, run_time, A_em, **kwargs):
     ke = 0.5 * m_e * np.sum(v_sqr)
     N = v_sqr.size
     E_tot = ke + phi * e * N
-
+    print "Etot: {}".format(E_tot)
     return E_tot * weight * N / run_time / A_em**2
 
 
