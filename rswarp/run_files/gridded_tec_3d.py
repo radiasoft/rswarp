@@ -453,7 +453,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                         efficiency.tec_parameters['run_time'][0] / \
                                         (efficiency.tec_parameters['occlusion'][0] *
                                          efficiency.tec_parameters['A_em'][0])
-    efficiency.tec_parameters['J_coll'][0] = e * measured_charge[scraper_dictionary['collector']] * measurement_beam.sw / \
+    efficiency.tec_parameters['J_ec'][0] = e * measured_charge[scraper_dictionary['collector']] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
     efficiency.tec_parameters['P_em'][0] = efficiency.calculate_power_flux(emitter_flux, measurement_beam.sw,
                                                                         efficiency.tec_parameters['phi_em'][0],

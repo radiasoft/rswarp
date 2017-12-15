@@ -1,7 +1,7 @@
 from scipy.constants import e, m_e, k, h, physical_constants
 import numpy as np
 k_ev = physical_constants['Boltzmann constant in eV/K'][0]
-sigma_sb = physical_constants['Stefan-Boltzmann constant'][0]
+sigma_sb = physical_constants['Stefan-Boltzmann constant'][0] * 1e-4
 L = 2.44e-8  # Lorentz number in units of W*Ohms/K**2
 
 # TODO: Need to account for particles travelling back to the emitter
@@ -25,6 +25,7 @@ tec_parameters = {
     'J_coll': [False, 'Collector current density (A/cm**2)'],  # Will set analytically based on collector temp
     'phi_coll': [False, 'Collector work function (eV)'],
     'T_coll': [False, 'Collector temperature (K)'],
+    'J_ec': [False, 'Current from emitter that reaches collector (A/cm**2)'],
     'x_struts': [False, 'Number of struts that intersect the x-axis'],
     'y_struts': [False, 'Number of struts that intersect the y-axis'],
     'V_grid': [False, 'Bias on grid relative to the emitter (V)'],
@@ -129,11 +130,11 @@ def calculate_power_flux(velocity, weight, phi, run_time, A_em, **kwargs):
     N = v_sqr.size
     E_tot = ke + phi * e * N
     print "Etot: {}".format(E_tot)
-    return E_tot * weight * N / run_time / A_em**2
+    return E_tot * weight / run_time / A_em
 
 
-def calculate_efficiency(A_em, R_ew, P_em, J_em, phi_em, T_em,
-               R_cw, J_coll, phi_coll, T_coll,
+def calculate_efficiency(A_em, R_ew, J_em, P_em, phi_em, T_em,
+               R_cw, J_ec, phi_coll, T_coll,
                emiss_eff, T_env, J_grid, V_grid,
                occlusion, run_time, **kwargs):
     """
@@ -147,7 +148,6 @@ def calculate_efficiency(A_em, R_ew, P_em, J_em, phi_em, T_em,
         phi_em: Emitter work function (eV)
         T_em: Emitter temperature (K)
         R_cw: Collector wiring resistance (Ohms)
-        J_coll: Collector current density (A/cm**2)
         phi_coll: Collector work function (eV)
         T_coll: Collector temperature (K)
         emiss_eff: Emissivity ()
@@ -159,31 +159,32 @@ def calculate_efficiency(A_em, R_ew, P_em, J_em, phi_em, T_em,
         Efficiency ()
     """
 
-    A_em, R_ew, P_em, J_em, phi_em, T_em, \
-    R_cw, J_coll, phi_coll, T_coll, \
-    emiss_eff, T_env, J_grid, V_grid, occlusion, run_time = A_em[0], R_ew[0], P_em[0], J_em[0], phi_em[0], T_em[0], \
-               R_cw[0], J_coll[0], phi_coll[0], T_coll[0], \
+    A_em, R_ew, J_em, P_em, phi_em, T_em, \
+    R_cw, J_ec, phi_coll, T_coll, \
+    emiss_eff, T_env, J_grid, V_grid, occlusion, run_time = A_em[0], R_ew[0], J_em[0], P_em[0], phi_em[0], T_em[0], \
+               R_cw[0], J_ec[0], phi_coll[0], T_coll[0], \
                emiss_eff[0], T_env[0], J_grid[0], V_grid[0], occlusion[0], run_time[0]
 
     t = 1. - occlusion
-    J_coll = rd_current(phi_coll, T_em)
-    J_load = J_em - J_coll
-
+    J_coll = rd_current(phi_coll, T_coll)
+    # Modify J_ec (emitter to collector current) for analytical collector produced current
+    J_ec = J_ec - J_coll
     # P_ew
-    P_ew = 0.5 * (L / (A_em * R_ew) * (T_em - T_env) ** 2 - J_load ** 2 * A_em * R_ew)
+    P_ew = 0.5 * (L / (A_em * R_ew) * (T_em - T_env) ** 2 - (J_em - t * J_coll) ** 2 * A_em * R_ew)
 
     # P_r
     P_r = emiss_eff * sigma_sb * (T_em ** 4 - t * T_coll ** 4)
 
     # P_ec (electron cooling power)
-    P_ec = P_em - t * J_coll / e * (phi_em + 2 * k_ev * T_coll)
+    P_ec = P_em - t * J_coll * (phi_em + 2 * k_ev * T_coll)
 
     # P_load
-    V_load = (phi_em - phi_coll) / e - J_load * A_em * (R_ew + R_cw)
-    P_load = J_load * V_load
+    V_lead = J_ec * R_cw + (J_ec - t * J_coll) * R_ew
+    V_load = (phi_em - phi_coll) - V_lead
+    P_load = J_ec * V_load
 
     # P_gate
-    P_gate = J_grid * A_em * (1. - t) * V_grid
+    P_gate = (J_grid * t + J_coll) * V_grid
 
     eta = (P_load - P_gate) / (P_ec + P_r + P_ew)
 
