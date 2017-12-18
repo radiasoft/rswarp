@@ -133,6 +133,7 @@ class Ionization(ionization.Ionization):
             os.makedirs(self.writeAngleDataDir)
 
     def generate(self, dt=None):
+        self.init_grid()
         if dt is None:
             dt = top.dt
         if self.l_timing:
