@@ -459,18 +459,22 @@ class Ionization(ionization.Ionization):
                         ncoli = ncoli[io] - 1
                         io = arange(nnew)[ncoli > 0]
                         nnew = len(io)
-
-                    if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
-                        for em in self.inter[incident_species]['emitted_species'][it]:
-                            fmt = (int(top.it), incident_species.name, em.name)
-                            start = time.time()
-                            with h5py.File(os.path.join(self.writeAngleDataDir, 'angledata.h5'), 'a') as f:
-                                f['data/{}/{}/{}/incidentvelocities'.format(*fmt)] = incidentvelocities[em]
-                                f['data/{}/{}/{}/originalvelocities'.format(*fmt)] = originalvelocities[em]
-                                f['data/{}/{}/{}/emittedvelocities'.format(*fmt)] = emittedvelocities[em]
-                                f['data/{}/{}/{}/emissionangles'.format(*fmt)] = emissionangles[em]
-                                f['data/{}/{}/{}/recoilangles'.format(*fmt)] = recoilangles[em]
-                            print("Spent {} ms on hdf5 writing".format((time.time() - start)*1000))
+                    try:
+                        rank = comm_world.rank
+                    except NameError:
+                        rank = 0
+                    if rank == 0:
+                        if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
+                            for em in self.inter[incident_species]['emitted_species'][it]:
+                                fmt = (int(top.it), incident_species.name, em.name)
+                                start = time.time()
+                                with h5py.File(os.path.join(self.writeAngleDataDir, 'angledata.h5'), 'a') as f:
+                                    f['data/{}/{}/{}/incidentvelocities'.format(*fmt)] = incidentvelocities[em]
+                                    f['data/{}/{}/{}/originalvelocities'.format(*fmt)] = originalvelocities[em]
+                                    f['data/{}/{}/{}/emittedvelocities'.format(*fmt)] = emittedvelocities[em]
+                                    f['data/{}/{}/{}/emissionangles'.format(*fmt)] = emissionangles[em]
+                                    f['data/{}/{}/{}/recoilangles'.format(*fmt)] = recoilangles[em]
+                                print("Spent {} ms on hdf5 writing".format((time.time() - start)*1000))
 
         # make sure that all particles are added and cleared
         for pg in self.x:
