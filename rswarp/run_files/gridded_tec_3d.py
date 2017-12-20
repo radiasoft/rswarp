@@ -36,7 +36,7 @@ m = m_e  # electron mass in kg
 
 
 def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
-         rho_em, T_em, phi_em, T_coll, phi_coll, rho_ew, gap_distance,
+         rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance,
          run_id,
          injection_type=2, random_seed=True, install_grid=True, max_wall_time=0.,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):

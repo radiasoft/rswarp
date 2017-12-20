@@ -15,12 +15,12 @@ L = 2.44e-8  # Lorentz number in units of W*Ohms/K**2
 
 
 tec_parameters = {
-    'R_ew': [False, 'Emitter wiring resistance (Ohms)'],
+    'rho_ew': [False, 'Effective e mitter wiring resistivity (Ohms*cm)'],
     'P_em': [False, 'Emitter electron power (W/cm**2)'],
     'J_em': [False, 'Emitter current density (A/cm**2)'],
     'phi_em': [False, 'Emitter work function (eV)'],
     'T_em': [False, 'Emitter temperature (K)'],
-    'R_cw': [False, 'Collector wiring resistance (Ohms)'],
+    'rho_cw': [False, 'Effective collector wiring resistivity (Ohms*cm)'],
     'phi_coll': [False, 'Collector work function (eV)'],
     'T_coll': [False, 'Collector temperature (K)'],
     'J_ec': [False, 'Current from emitter that reaches collector (A/cm**2)'],
@@ -32,7 +32,7 @@ tec_parameters = {
     'strut_width': [False, 'Size of the strut parallel to intersecting axis (m)'],
     'strut_height': [False, 'Size of the strut along the z-axis'],
     'emiss_eff': [0.1, 'Emissivity ()'],
-    'T_env': [300., 'Ambient temperature (K)'],
+    'T_env': [293.15, 'Ambient temperature (K)'],
     'L_wire': [1.0, 'Wire length for emitter/collector (m)'],
     'rho': [4.792857143e-6, 'Resistivity (Ohm*cm)'],
     'alpha': [0.0044, 'Temperature coefficient of resistance (1/K)'],
