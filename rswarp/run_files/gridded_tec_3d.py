@@ -36,7 +36,7 @@ m = m_e  # electron mass in kg
 
 
 def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
-         T_em, phi_em, T_coll, phi_coll, R_ew, gap_distance,
+         rho_em, T_em, phi_em, T_coll, phi_coll, rho_ew, gap_distance,
          run_id,
          injection_type=2, random_seed=True, install_grid=True, max_wall_time=0.,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
@@ -438,12 +438,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         measured_charge[key] = np.sum(surface_charge[key][:, 1] * surface_charge[key][:, 3])
 
     # Set externally derived parameters
-    efficiency.tec_parameters['A_em'][0] = cathode_area * 1e4
+    efficiency.tec_parameters['A_em'][0] = cathode_area * 1e4  # cm**2
     efficiency.tec_parameters['occlusion'][0] = efficiency.calculate_occlusion(**efficiency.tec_parameters)
-    efficiency.tec_parameters['R_ew'][0] = efficiency.calculate_resistance(efficiency.tec_parameters['T_em'][0],
-                                                                        **efficiency.tec_parameters)
-    efficiency.tec_parameters['R_cw'][0] = efficiency.calculate_resistance(efficiency.tec_parameters['T_coll'][0],
-                                                                        **efficiency.tec_parameters)
+
     # Set derived parameters from simulation
     efficiency.tec_parameters['run_time'][0] = crossing_measurements * steps_per_crossing * dt
     efficiency.tec_parameters['J_em'][0] = e * (emitter_flux.shape[0] - measured_charge[scraper_dictionary['source']]) \
