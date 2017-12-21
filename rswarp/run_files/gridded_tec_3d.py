@@ -378,7 +378,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Install Zcrossing Diagnostic
     # TODO: make change to grid_height fractional
-    ZCross = ZCrossingParticles(zz=grid_height * gap_distance / 20., laccumulate=1)
+    ZCross = ZCrossingParticles(zz=grid_height * gap_distance / 200., laccumulate=1)
     emitter_flux = []
 
     crossing_wall_time = times[-1] * steps_per_crossing / ss_check_interval  # Estimate wall time for one crossing
@@ -407,7 +407,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     background_beam.rnpinject = PTCL_PER_STEP
 
     initial_population = measurement_beam.npsim[0]
-    measurement_tol = 0.02
+    measurement_tol = 0.075
     particle_diagnostic_0.period = ss_check_interval
     while measurement_beam.npsim[0] / initial_population > measurement_tol:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
