@@ -287,9 +287,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Particle/Field diagnostic options
     if particle_diagnostic_switch:
-        particleperiod = 1000
+        particleperiod = 0
         particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=top, w3d=w3d,
-                                                   species={species.name: species for species in listofallspecies},
+                                                   species={species.name: species
+                                                            for species in listofallspecies
+                                                            if species.name == 'measurement'},
                                                    comm_world=comm_world, lparallel_output=False,
                                                    write_dir=diagDir[:-5])
         installafterstep(particle_diagnostic_0.write)
@@ -369,7 +371,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     print(" Steady State Reached.\n Starting efficiency "
           "recording for {} crossing times.\n This will be {} steps".format(crossing_measurements,
                                                                             steps_per_crossing * crossing_measurements))
-
+    particle_diagnostic_0.period = steps_per_crossing
     # Switch to measurement beam species
     measurement_beam.rnpinject = PTCL_PER_STEP
     background_beam.rnpinject = 0
@@ -406,7 +408,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     initial_population = measurement_beam.npsim[0]
     measurement_tol = 0.02
-
+    particle_diagnostic_0.period = ss_check_interval
     while measurement_beam.npsim[0] / initial_population > measurement_tol:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
         if (max_wall_time - clock) < crossing_wall_time * ss_check_interval / steps_per_crossing :
