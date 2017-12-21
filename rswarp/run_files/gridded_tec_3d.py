@@ -287,7 +287,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Particle/Field diagnostic options
     if particle_diagnostic_switch:
-        particleperiod = 0
+        particleperiod = 100000
         particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=top, w3d=w3d,
                                                    species={species.name: species
                                                             for species in listofallspecies
