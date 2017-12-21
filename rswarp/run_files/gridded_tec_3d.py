@@ -146,6 +146,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     EMITTER_PHI = phi_em # work function in eV
     COLLECTOR_PHI = phi_coll  # Can be used if vacuum level is being set
     ACCEL_VOLTS = V_grid  # ACCEL_VOLTS used for velocity and CL calculations
+    collector_voltage = phi_em - phi_coll
 
     # Emitted species
     background_beam = Species(type=Electron, name='background')
@@ -253,7 +254,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         source = ZPlane(zcent=w3d.zmmin, zsign=-1., voltage=0.)
     # Create ground plate
     if install_grid:
-        plate = ZPlane(voltage=0., zcent=zplate, condid=3)
+        plate = ZPlane(voltage=collector_voltage, zcent=zplate, condid=3)
     else:
         plate = ZPlane(voltage=V_grid, zcent=zplate)
     #####
