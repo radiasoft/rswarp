@@ -15,6 +15,7 @@ L = 2.44e-8  # Lorentz number in units of W*Ohms/K**2
 
 
 tec_parameters = {
+    'A_em': [False, "Emitter/Collector area (cm**2)"],
     'rho_ew': [False, 'Effective e mitter wiring resistivity (Ohms*cm)'],
     'P_em': [False, 'Emitter electron power (W/cm**2)'],
     'J_em': [False, 'Emitter current density (A/cm**2)'],
