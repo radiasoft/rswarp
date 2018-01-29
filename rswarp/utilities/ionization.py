@@ -130,6 +130,7 @@ class Ionization(ionization.Ionization):
         self.writeAnglePeriod = writeAnglePeriod
 
         if self.writeAngleDataDir and not os.path.exists(self.writeAngleDataDir):
+            # TODO: Change to only write file on head process
             os.makedirs(self.writeAngleDataDir)
 
     def generate(self, dt=None):
