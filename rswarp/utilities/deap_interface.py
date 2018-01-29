@@ -336,3 +336,14 @@ def save_generation(filename, population, generation, labels=None, overwrite_gen
     data_set = pop_group.create_dataset('fitness', data=fitness_data)
 
     data_file.close()
+
+
+def load_generation(filename, generation):
+    gen = h5.File(filename, 'r')
+
+    try:
+        attributes = len([key for key in gen['generation{}/'.format(generation)]])
+    except KeyError:
+        raise KeyError("Generation {} is not in {}".format(filename, generation))
+
+    individuals = [[attr for attr in ]]
