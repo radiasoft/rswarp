@@ -180,7 +180,7 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
     P_load = J_ec * V_load
 
     # P_gate
-    P_gate = (J_grid * t + J_coll) * V_grid
+    P_gate = (J_grid + t * J_coll) * V_grid
 
     eta = (P_load - P_gate) / (P_ec + P_r + P_ew)
 
