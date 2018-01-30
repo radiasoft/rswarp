@@ -12,14 +12,11 @@ from warp import *
 import numpy as np
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 import sys
-import pickle
-from datetime import datetime
 
 sys.path.append('/Users/chall/research/github/rswarp/')
 
 from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.ionization import Ionization
-from rswarp.utilities.beam_distributions import createKV
 from rswarp.utilities.file_utils import cleanupPrevious
 import rsoopic.h2crosssections as h2crosssections
 diagDir = 'diags/hdf5'
@@ -32,6 +29,7 @@ if comm_world.rank == 0:
 ####################
 # General Parameters
 ####################
+w3d.solvergeom = w3d.RZgeom
 
 # Switches
 particle_diagnostic_switch = False
@@ -50,15 +48,17 @@ cathode_temperature = 1200.
 
 space_charge = True  # Controls field solve
 
+top.inject = 1  # Constant injection
 top.lrelativ = True
 top.relativity = True
 top.lhalfmaxwellinject = True
 
+ptcl_per_step = 1000  # number of particles to inject on each step
+top.npinject = ptcl_per_step
+
 beam_beta = 0.990813945176
 beam_current = 10e-3
 beam_radius = 0.01
-
-ptcl_per_step = 80000  # number of particles to inject on each step
 
 # if space_charge:
 #     beam_weight = 0.5 * beam_current / (echarge * beam_beta * clight) / ptcl_per_step
@@ -80,6 +80,9 @@ if space_charge:
 else:
     beam.ibeam = 0.0
 
+w3d.l_inj_exact = True  # if true, position and angle of injected particle are
+# computed analytically rather than interpolated
+w3d.l_inj_rz = (w3d.solvergeom == w3d.RZgeom)
 
 ##########################
 # 3D Simulation Parameters
@@ -125,8 +128,10 @@ emittedelec = Species(type=Electron, name='emitted e-', weight=1)
 # Ionization of background gas
 ##############################
 
+# TODO: Check gas pressure
+
 if simulateIonization is True:
-    target_pressure = 1  # in Pa
+    target_pressure = 1.0  # in Pa
     target_temp = 273  # in K
     target_density = target_pressure / boltzmann / target_temp  # in 1/m^3
 
@@ -160,23 +165,6 @@ if simulateIonization is True:
     )
 
 derivqty()
-
-####################
-# Injection Controls
-####################
-
-top.inject = 6  # 6 is user specified
-top.npinject = ptcl_per_step * top.dt * clight * beam_beta / (w3d.zmmax - w3d.zmmin)  # Approximate number of particles injected each step
-# or average number of particles in interval of a step
-# will determine current if ibeam is set and beam.sw = 0
-
-top.ainject = 0.0008  # Must be set even for user defined injection, doesn't seem to do anything
-top.binject = 0.0008  # Must be set even for user defined injection, doesn't seem to do anything
-
-w3d.l_inj_exact = True  # if true, position and angle of injected particle are
-# computed analytically rather than interpolated
-w3d.l_inj_area = False  # Not sure what this does
-
 
 ####################
 # Install Conductors
@@ -228,8 +216,6 @@ addnewbgrd(z_start, z_stop, xs=w3d.xmmin, dx=(w3d.xmmax - w3d.xmmin), ys=w3d.ymm
 # Register Field Solvers
 ########################
 
-w3d.solvergeom = w3d.RZgeom
-
 # prevent GIST from starting upon setup
 top.lprntpara = False
 top.lpsplots = False
@@ -252,7 +238,7 @@ scraper = ParticleScraper(conductors)
 
 # Particle/Field diagnostic options
 if particle_diagnostic_switch:
-    particleperiod = 1000
+    particleperiod = 100
     particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=top, w3d=w3d,
                                                species={species.name: species for species in listofallspecies},
                                                comm_world=comm_world, lparallel_output=False,
@@ -264,11 +250,11 @@ if field_diagnostic_switch:
     efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=top, w3d=w3d,
                                                               comm_world=comm_world,
                                                               period=fieldperiod)
-    # installafterstep(efield_diagnostic_0.write)
-    # bfield_diagnostic_0 = FieldDiagnostic.MagnetostaticFields(solver=solverB, top=top, w3d=w3d,
-    #                                                           comm_world=comm_world,
-    #                                                           period=fieldperiod)
-    # installafterstep(bfield_diagnostic_0.write)
+    installafterstep(efield_diagnostic_0.write)
+    bfield_diagnostic_0 = FieldDiagnostic.MagnetostaticFields(solver=solverB, top=top, w3d=w3d,
+                                                              comm_world=comm_world,
+                                                              period=fieldperiod)
+    installafterstep(bfield_diagnostic_0.write)
 
 
 ###########################
