@@ -40,56 +40,50 @@ field_diagnostic_switch = False
 pipe_radius = 0.1524 / 2.  # Based on ECE specs
 cooler_length = 2.0
 
+cathode_temperature = 1200.
 ####################################
 # Create Beam and Set its Parameters
 ####################################
+# parameters for electron beam:
+#   total energy: 3.2676813658 MeV
+#   beta_e: 0.990813945176
 
-SC = True  # Controls field solve
-simulateIonization = True
+space_charge = True  # Controls field solve
+
+top.lrelativ = True
+top.relativity = True
+top.lhalfmaxwellinject = True
+
+beam_beta = 0.990813945176
+beam_current = 10e-3
+beam_radius = 0.01
 
 ptcl_per_step = 80000  # number of particles to inject on each step
 
-beam_beta = 0.56823  # v/c for 110 keV electrons
-beam_current = 10e-3
-
-beam_weight = 0.5 * beam_current / (echarge * beam_beta * clight) / ptcl_per_step
-
-top.lrelativ = True
-top.relativity = 1
+# if space_charge:
+#     beam_weight = 0.5 * beam_current / (echarge * beam_beta * clight) / ptcl_per_step
+# else:
+#     beam_weight = 0.0
 
 beam = Species(type=Electron, name='Electron', weight=beam_weight)
-# These two species represent the emitted particles
-h2plus = Species(type=Dihydrogen, charge_state=+1, name='H2+', weight=2)
-emittedelec = Species(type=Electron, name='emitted e-', weight=1)
 
-if SC == False:
-    beam.sw = 0.0  # Turn off SC
+beam.a0 = beam_radius
+beam.b0 = beam_radius
+beam.ap0 = 0.0
+beam.bp0 = 0.0
 
-
-def generateDist():
-    ptclTrans = createKV(
-        npart=ptcl_per_step,
-        a=0.010,
-        b=0.010,
-        emitx=4. * 1.e-6,
-        emity=4. * 1.e-6
-    )
-
-    zrand = np.random.rand(ptcl_per_step, )
-    zvel = np.ones_like(zrand) * beam_beta * clight
-
-    return np.column_stack((ptclTrans, zrand, zvel))
+beam.vthz = sqrt(cathode_temperature * jperev / beam.mass)
+beam.vthperp = sqrt(cathode_temperature * jperev / beam.mass)
+beam.ekin = 3.2676813658e6
+if space_charge:
+    beam.ibeam = beam_current
+else:
+    beam.ibeam = 0.0
 
 
-def createmybeam():
-    ptclArray = generateDist()
-    beam.addparticles(x=ptclArray[:, 0], y=ptclArray[:, 2], z=ptclArray[:, 4],
-                      vx=ptclArray[:, 1] * ptclArray[:, 5], vy=ptclArray[:, 3] * ptclArray[:, 5], vz=ptclArray[:, 5])
-
-
-################################
-### 3D Simulation Parameters ###
-################################
+##########################
+# 3D Simulation Parameters
+##########################
 
 # Set cells
 w3d.nx = 128
@@ -121,6 +115,11 @@ top.dt = dz / (beam_beta * 3e8)
 ##################
 # Ionization Setup
 ##################
+simulateIonization = True
+
+# These two species represent the emitted particles
+h2plus = Species(type=Dihydrogen, charge_state=+1, name='H2+', weight=2)
+emittedelec = Species(type=Electron, name='emitted e-', weight=1)
 
 ##############################
 # Ionization of background gas
@@ -235,10 +234,7 @@ w3d.solvergeom = w3d.RZgeom
 top.lprntpara = False
 top.lpsplots = False
 
-package("w3d")  # package/generate Must be called after geometry is set
-generate()
-
-if SC == True:
+if space_charge:
     solverB = MagnetostaticMG()
     solverB.mgtol = [0.01] * 3
     registersolver(solverB)
@@ -278,9 +274,6 @@ if field_diagnostic_switch:
 ###########################
 # Generate and Run PIC Code
 ###########################
-
-installparticleloader(
-    createmybeam)  # for particleloader the call Must be between 1st and 2nd generate calls (or macroparticles double)
 
 package("w3d")  # package/generate must be called a second time, after solver set
 generate()
