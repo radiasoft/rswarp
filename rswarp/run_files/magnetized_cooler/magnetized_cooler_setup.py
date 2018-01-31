@@ -38,7 +38,7 @@ field_diagnostic_switch = False
 pipe_radius = 0.1524 / 2.  # Based on ECE specs
 cooler_length = 2.0
 
-cathode_temperature = 1200.
+cathode_temperature = 0.25
 ####################################
 # Create Beam and Set its Parameters
 ####################################
@@ -50,7 +50,7 @@ space_charge = True  # Controls field solve
 
 top.inject = 1  # Constant injection
 top.lrelativ = True
-top.relativity = True
+top.relativity = True  # TODO: Figure out what this actually does and how it should be set
 top.lhalfmaxwellinject = True
 
 ptcl_per_step = 1000  # number of particles to inject on each step
@@ -65,16 +65,17 @@ beam_radius = 0.01
 # else:
 #     beam_weight = 0.0
 
-beam = Species(type=Electron, name='Electron', weight=beam_weight)
+beam = Species(type=Electron, name='Electron')
 
 beam.a0 = beam_radius
 beam.b0 = beam_radius
 beam.ap0 = 0.0
 beam.bp0 = 0.0
 
+beam.vbeam = beam_beta * clight
 beam.vthz = sqrt(cathode_temperature * jperev / beam.mass)
 beam.vthperp = sqrt(cathode_temperature * jperev / beam.mass)
-beam.ekin = 3.2676813658e6
+
 if space_charge:
     beam.ibeam = beam_current
 else:
@@ -106,8 +107,8 @@ w3d.zmmin = 0.0
 w3d.zmmax = cooler_length
 
 # Longitudinal absorbing boundaries off to allow beam to recirculate
-top.pbound0 = periodic
-top.pboundnz = periodic
+top.pbound0 = absorb
+top.pboundnz = absorb
 # top.pboundxy = absorb
 
 top.ibpush = 2
