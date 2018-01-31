@@ -1,12 +1,3 @@
-"""
-Note: Due to particle loading process package/generate commands must be given twice and carefully sequenced
-1. Set geometry
-2. package/generate
-3. Field solvers instantiated
-4. Particle loading
-5. package/generate
-"""
-
 from __future__ import division
 from warp import *
 import numpy as np
@@ -19,6 +10,7 @@ from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.ionization import Ionization
 from rswarp.utilities.file_utils import cleanupPrevious
 import rsoopic.h2crosssections as h2crosssections
+
 diagDir = 'diags/hdf5'
 diagFDir = ['diags/fields/magnetic', 'diags/fields/electric']
 
@@ -114,7 +106,7 @@ top.pboundnz = absorb
 top.ibpush = 2
 
 dz = (w3d.zmmax - w3d.zmmin) / w3d.nx  # Because warp doesn't set w3d.dz until after solver instantiated
-top.dt = dz / (beam_beta * 3e8)
+top.dt = 0.9 * dz / (beam_beta * 3e8)  # Padding timestep by 10% of cell crossing time
 
 ##################
 # Ionization Setup
