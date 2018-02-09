@@ -7,80 +7,163 @@ Authors: Nathan Cook and Chris Hall
 
 from __future__ import division
 import numpy as np
-import scipy
 import sources
 
 
-#Specify constants
+# Specify constants
 from scipy.constants import e, m_e, c, k
-kb_eV = 8.6173324e-5 #Bolztmann constant in eV/K
-kb_J = k #Boltzmann constant in J/K
-m = m_e #mass of electron
+kb_eV = 8.6173324e-5  # Bolztmann constant in eV/K
+kb_J = k  # Boltzmann constant in J/K
+m = m_e  # mass of electron
 
 
+class UserInjectors(object):
 
+    def __init__(self, species, w3d, gchange, cathode_temperature, cathode_radius, ptcl_per_step,
+                 accelerating_voltage=0., zmin_scale=10.):
 
-class injectorUserDefined(object):
-    '''
-    The injector class allows for user defined injections which require parameterization from user inputs. 
-    Maintaining these 
-    
-    '''
-    
-    def __init__(self,beam,cathode_temp, channel_width, z_part_min, ptcl_per_step):
-        '''
-        Minimum class initialization for specifying particle coordinates.
-        
-        Arguments:
-            beam                    : warp beam object (e.g. Species() call)
-            cathode_temp (float)    : cathode temperature in K
-            channel_width (float)   : width of domain in x/y plane
-            z_part_min (float)      : z coordinate of particles injected - provides separation from left boundary
-            ptcl_per_step (int)     : number of macro particles injected per step
-        
-        '''
-        self.beam = beam
-        self.cathode_temp = cathode_temp
-        self.channel_width = channel_width
-        self.z_part_min = z_part_min
+        self.species = species
+        self.w3d = w3d
+        self.gchange = gchange
+        self.cathode_temperature = cathode_temperature
+        self.cathode_radius = cathode_radius
         self.ptcl_per_step = ptcl_per_step
-        #self.top = top
+        self.accelerating_voltage = accelerating_voltage
+        self.zmin_scale = zmin_scale
+
+        dz = (w3d.zmmax - w3d.zmmin) / w3d.nz
+        assert dz > 0, "Must define w3d.zmmin and w3d.zmmax before initializing injector"
+        self.z_part_min = dz / self.zmin_scale
         
     def inject_thermionic(self):
-        '''Define particle coordinates for thermionic injection. Note that this does not specify current, just macroparticle coordinates'''
-        v_coords = sources.get_MB_velocities(self.ptcl_per_step,self.cathode_temp)
-        x_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
-        y_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
-        z_vals = np.zeros(self.ptcl_per_step) + self.z_part_min #Add a minimum z coordinate to prevent absorption
-        ptclArray = np.asarray([x_vals,v_coords[:,0],y_vals,v_coords[:,1],z_vals,v_coords[:,2]]).T
-        self.beam.addparticles(x=ptclArray[:,0],y=ptclArray[:,2],z=ptclArray[:,4],
-        vx=ptclArray[:,1],vy=ptclArray[:,3],vz=ptclArray[:,5])
+        """
+        Define particle coordinates for thermionic injection.
+        Note that this does not specify current, just macroparticle coordinates
+        Returns:
+
+        """
+
+        v_coords = sources.get_MB_velocities(self.ptcl_per_step, self.cathode_temperature)
+        x_vals = self.cathode_radius * (np.random.rand(self.ptcl_per_step) - 0.5)
+        y_vals = self.cathode_radius * (np.random.rand(self.ptcl_per_step) - 0.5)
+        z_vals = np.zeros(self.ptcl_per_step) + self.z_part_min  # Add a minimum z coordinate to prevent absorption
+
+        ptclArray = np.asarray([x_vals, v_coords[:, 0], y_vals, v_coords[:, 1], z_vals, v_coords[:, 2]]).T
+
+        self.species.addparticles(x=ptclArray[:, 0], y=ptclArray[:, 2], z=ptclArray[:, 4],
+                                  vx=ptclArray[:, 1], vy=ptclArray[:, 3], vz=ptclArray[:, 5])
         
     def inject_constant(self):
-        '''Same as inject thermionic but with a very low default (4 K) temperature and no transverse velocities'''
+        """
+        Same as inject thermionic but with a very low default (4 K) temperature and no transverse velocities
+        Returns:
+
+        """
+
         v_coords = sources.get_MB_velocities(self.ptcl_per_step,4)
-        v_coords[:,0] = np.zeros(self.ptcl_per_step) #no transverse
-        v_coords[:,1] = np.zeros(self.ptcl_per_step) #no transverse
-        x_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
-        y_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
-        z_vals = np.zeros(self.ptcl_per_step) + self.z_part_min #Add a minimum z coordinate to prevent absorption
-        ptclArray = np.asarray([x_vals,v_coords[:,0],y_vals,v_coords[:,1],z_vals,v_coords[:,2]]).T
-        self.beam.addparticles(x=ptclArray[:,0],y=ptclArray[:,2],z=ptclArray[:,4],
-        vx=ptclArray[:,1],vy=ptclArray[:,3],vz=ptclArray[:,5])
+        v_coords[:, 0] = np.zeros(self.ptcl_per_step)  # no transverse
+        v_coords[:, 1] = np.zeros(self.ptcl_per_step)  # no transverse
+        x_vals = self.cathode_radius * (np.random.rand(self.ptcl_per_step) - 0.5)
+        y_vals = self.cathode_radius * (np.random.rand(self.ptcl_per_step) - 0.5)
+        z_vals = np.zeros(self.ptcl_per_step) + self.z_part_min  # Add a minimum z coordinate to prevent absorption
+
+        ptclArray = np.asarray([x_vals, v_coords[:, 0], y_vals, v_coords[:, 1], z_vals, v_coords[:, 2]]).T
+
+        self.species.addparticles(x=ptclArray[:, 0], y=ptclArray[:, 2], z=ptclArray[:, 4],
+                                  vx=ptclArray[:, 1], vy=ptclArray[:, 3], vz=ptclArray[:, 5])
         
     def inject_thermionic_egun(self):
-        '''
-        Define particle coordinates for thermionic injection. Note that this does not specify current, just macroparticle coordinates.
+        """
+        Define particle coordinates for thermionic injection.
+        Note that this does not specify current, just macroparticle coordinates.
         The "egun" mode modifies the injector call to adjust certain top quantities after a single particle addition.
-        
-        '''
-        v_coords = sources.get_MB_velocities(self.ptcl_per_step,self.cathode_temp)
-        x_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
-        y_vals = self.channel_width*(np.random.rand(self.ptcl_per_step)-0.5)
-        z_vals = np.zeros(self.ptcl_per_step) + self.z_part_min #Add a minimum z coordinate to prevent absorption
-        ptclArray = np.asarray([x_vals,v_coords[:,0],y_vals,v_coords[:,1],z_vals,v_coords[:,2]]).T
-        #print "Ready to 'addparticles'"
-        self.beam.addparticles(x=ptclArray[:,0],y=ptclArray[:,2],z=ptclArray[:,4],
-        vx=ptclArray[:,1],vy=ptclArray[:,3],vz=ptclArray[:,5], lallindomain=True)        
-        #print "Added particles"
-        #self.top.inject = 100
+        Returns:
+
+        """
+
+        v_coords = sources.get_MB_velocities(self.ptcl_per_step, self.cathode_temperature)
+        x_vals = self.cathode_radius * (np.random.rand(self.ptcl_per_step) - 0.5)
+        y_vals = self.cathode_radius * (np.random.rand(self.ptcl_per_step) - 0.5)
+        z_vals = np.zeros(self.ptcl_per_step) + self.z_part_min  # Add a minimum z coordinate to prevent absorption
+        ptclArray = np.asarray([x_vals, v_coords[:, 0], y_vals, v_coords[:, 1], z_vals, v_coords[:, 2]]).T
+
+        self.species.addparticles(x=ptclArray[:, 0], y=ptclArray[:, 2], z=ptclArray[:, 4],
+                                  vx=ptclArray[:,1], vy=ptclArray[:,3], vz=ptclArray[:,5], lallindomain=True)
+
+    def thermionic_rz_injector(self, return_coordinates=False):
+
+        mass = self.species.mass / e * c**2  # mass in eV/c**2
+
+        # Emission from thermal source
+        velocity_coords = sources.get_MB_velocities(self.ptcl_per_step, self.cathode_temperature)
+
+        # Particles are accelerated by a force F=(0, 0, Fz) generated by potential V
+        def kinetic_energy(velocity_vector):
+            velocity_magnitude = velocity_vector[:, 0]**2 + velocity_vector[:, 1]**2 + velocity_vector[:, 2]**2
+            gamma = 1. / np.sqrt(1. - velocity_magnitude / c**2)
+            kinetic_energy = mass * (gamma - 1.)
+
+            return kinetic_energy
+
+        # Assume only Fz so vx and vy unchanged, can find new vz after acceleration based on this
+        ke = kinetic_energy(velocity_coords)
+        final_ke = ke + self.accelerating_voltage
+        final_velocity = np.sqrt(1. - 1. / (final_ke / mass + 1.)**2) * c
+        final_vz = np.sqrt(final_velocity**2 - velocity_coords[:, 0]**2 - velocity_coords[:, 1]**2)
+
+        # Reassemble array for velocities
+        velocity_coords[:, 2] = final_vz
+
+        # Generate horizontal particle coordinates to give a uniform transverse density
+        r = np.random.triangular(0.,  self.cathode_radius, self.cathode_radius, size=self.ptcl_per_step)
+        theta = 2 * np.pi * np.random.rand(self.ptcl_per_step)
+        x, y = r * np.cos(theta), r * np.sin(theta)
+        # Add a minimum z coordinate to prevent absorption, reverse rnd so z != 0
+        z = (1. - np.random.rand(self.ptcl_per_step)) * self.z_part_min
+
+        coordinates = np.asarray([x, velocity_coords[:, 0], y, velocity_coords[:, 1], z, velocity_coords[:, 2]]).T
+        self.species.addparticles(x=coordinates[:, 0], y=coordinates[:, 2], z=coordinates[:, 4],
+                                  vx=coordinates[:, 1], vy=coordinates[:, 3], vz=coordinates[:, 5])
+
+        if return_coordinates:
+            return coordinates
+
+    def thermionic_rz_injector2(self):
+        if self.w3d.inj_js == self.species.js:
+            mass = self.species.mass / e * c**2  # mass in eV/c**2
+
+            # Emission from thermal source
+            velocity_coords = sources.get_MB_velocities(self.ptcl_per_step, self.cathode_temperature)
+
+            # Particles are accelerated by a force F=(0, 0, Fz) generated by potential V
+            def kinetic_energy(velocity_vector):
+                velocity_magnitude = velocity_vector[:, 0]**2 + velocity_vector[:, 1]**2 + velocity_vector[:, 2]**2
+                gamma = 1. / np.sqrt(1. - velocity_magnitude / c**2)
+                kinetic_energy = mass * (gamma - 1.)
+
+                return kinetic_energy
+
+            # Assume only Fz so vx and vy unchanged, can find new vz after acceleration based on this
+            ke = kinetic_energy(velocity_coords)
+            final_ke = ke + self.accelerating_voltage
+            final_velocity = np.sqrt(1. - 1. / (final_ke / mass + 1.)**2) * c
+            final_vz = np.sqrt(final_velocity**2 - velocity_coords[:, 0]**2 - velocity_coords[:, 1]**2)
+
+            # Reassemble array for velocities
+            velocity_coords[:, 2] = final_vz
+
+            # Generate horizontal particle coordinates to give a uniform transverse density
+            r = np.random.triangular(0.,  self.cathode_radius, self.cathode_radius, size=self.ptcl_per_step)
+            theta = 2 * np.pi * np.random.rand(self.ptcl_per_step)
+            x, y = r * np.cos(theta), r * np.sin(theta)
+            # Add a minimum z coordinate to prevent absorption, reverse rnd so z != 0
+            z = (1. - np.random.rand(self.ptcl_per_step)) * self.z_part_min
+
+            self.w3d.npgrp = self.ptcl_per_step
+            self.gchange('Setpwork3d')
+
+            self.w3d.xt[:] = x
+            self.w3d.yt[:] = y
+            self.w3d.uxt[:] = velocity_coords[:, 0]
+            self.w3d.uyt[:] = velocity_coords[:, 1]
+            self.w3d.uzt[:] = velocity_coords[:, 2]
