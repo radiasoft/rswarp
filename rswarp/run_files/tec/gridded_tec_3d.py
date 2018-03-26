@@ -19,7 +19,7 @@ from copy import deepcopy
 from random import randint
 from scipy.signal import lfilter
 from rswarp.cathode import sources
-from rswarp.run_files import efficiency
+from rswarp.run_files.tec import efficiency
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from warp.particles.extpart import ZCrossingParticles
 from rswarp.diagnostics import FieldDiagnostic
@@ -215,6 +215,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         background_beam.vthperp = measurement_beam.vthperp = np.sqrt(EMITTER_TEMP * kb_J / background_beam.mass)
         top.lhalfmaxwellinject = 1  # inject z velocities as half Maxwellian
 
+        # TODO: readout from top.curr_z is 2x beam_current
         beam_current = sources.j_rd(EMITTER_TEMP, EMITTER_PHI) * cathode_area  # steady state current in Amps
         print('beam current expected: {}, current density {}'.format(beam_current, beam_current / cathode_area))
         background_beam.ibeam = measurement_beam.ibeam = beam_current
@@ -446,15 +447,19 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Set derived parameters from simulation
     efficiency.tec_parameters['run_time'][0] = crossing_measurements * steps_per_crossing * dt
+
     efficiency.tec_parameters['J_em'][0] = e * (emitter_flux.shape[0] - measured_charge[scraper_dictionary['source']]) \
                                         * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
+
     efficiency.tec_parameters['J_grid'][0] = e * measured_charge[scraper_dictionary['grid']] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / \
                                         (efficiency.tec_parameters['occlusion'][0] *
                                          efficiency.tec_parameters['A_em'][0])
+
     efficiency.tec_parameters['J_ec'][0] = e * measured_charge[scraper_dictionary['collector']] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
+
     efficiency.tec_parameters['P_em'][0] = efficiency.calculate_power_flux(emitter_flux, measurement_beam.sw,
                                                                         efficiency.tec_parameters['phi_em'][0],
                                                                         **efficiency.tec_parameters)
@@ -532,3 +537,21 @@ def stead_state_check(particles, solver, sid, interval, tol=0.01, n=185, a=1):
         ss = 0
 
     return ss, avg, stdev
+
+
+class ExternalCircuit():
+    def __init__(self, top, rho, conductors, voltage_stride=10):
+        self.top = top
+        self.rho = rho
+        self.voltage_stride = voltage_stride
+        self.conductors = conductors
+
+    def change_voltage(self):
+        if self.voltage_stride and self.top.it % self.voltage_stride != 0:
+            return False
+        tmin = (self.top.it - self.voltage_stride) * self.top.dt
+        for cond in self.conductors:
+            times, current = cond.get_current_history(js=1, l_lost=1, l_emit=0,
+                                                     l_image=0, tmin=tmin, tmax=None, nt=1)
+            print "Current at step: {} = {}".format(self.top.it, current)
+
