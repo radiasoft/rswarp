@@ -204,10 +204,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         background_beam.npinject = PTCL_PER_STEP
         measurement_beam.npinject = PTCL_PER_STEP
 
-        # Use rnpinject to set number of macroparticles emitted
-        background_beam.rnpinject = PTCL_PER_STEP
-        measurement_beam.rnpinject = 0  # measurement beam is off at start
-
         w3d.l_inj_exact = True
 
         # Specify thermal properties
@@ -336,6 +332,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     generate()
     solverE.mgtol = regular_tol
     solverE.mgmaxiters = regular_iters
+
+    # Use rnpinject to set number of macroparticles emitted
+    background_beam.rnpinject = PTCL_PER_STEP
+    measurement_beam.rnpinject = 0  # measurement beam is off at start
 
     ##################
     # CONTROL SEQUENCE
