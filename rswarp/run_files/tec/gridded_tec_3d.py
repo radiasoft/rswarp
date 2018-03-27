@@ -256,7 +256,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     if install_grid:
         plate = ZPlane(voltage=collector_voltage, zcent=zplate, condid=3)
     else:
-        plate = ZPlane(voltage=V_grid, zcent=zplate)
+        plate = ZPlane(voltage=collector_voltage, zcent=zplate)
     #####
     # Grid dimensions used in testing
     # strut_width = 3e-9
@@ -328,7 +328,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Time Step
 
     # Determine an appropriate time step based upon estimated final velocity
-    vz_accel = sqrt(2. * abs(V_grid) * np.abs(background_beam.charge) / background_beam.mass)
+    if install_grid:
+        vz_accel = sqrt(2. * abs(V_grid) * np.abs(background_beam.charge) / background_beam.mass)
+    else:
+        vz_accel = sqrt(2. * abs(collector_voltage) * np.abs(background_beam.charge) / background_beam.mass)
     vzfinal = vz_accel + beam_beta * c
     dt = dz / vzfinal
     top.dt = dt
@@ -480,10 +483,13 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                         * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
 
-    efficiency.tec_parameters['J_grid'][0] = e * measured_charge[scraper_dictionary['grid']] * measurement_beam.sw / \
-                                        efficiency.tec_parameters['run_time'][0] / \
-                                        (efficiency.tec_parameters['occlusion'][0] *
-                                         efficiency.tec_parameters['A_em'][0])
+    try:
+        efficiency.tec_parameters['J_grid'][0] = e * measured_charge[scraper_dictionary['grid']] * measurement_beam.sw / \
+                                            efficiency.tec_parameters['run_time'][0] / \
+                                            (efficiency.tec_parameters['occlusion'][0] *
+                                             efficiency.tec_parameters['A_em'][0])
+    except KeyError:
+        efficiency.tec_parameters['J_grid'][0] = 0.0
 
     efficiency.tec_parameters['J_ec'][0] = e * measured_charge[scraper_dictionary['collector']] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
