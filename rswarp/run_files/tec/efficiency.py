@@ -34,7 +34,7 @@ tec_parameters = {
     'strut_height': [False, 'Size of the strut along the z-axis'],
     'emiss_eff': [0.1, 'Emissivity ()'],
     'T_env': [293.15, 'Ambient temperature (K)'],
-    'L_wire': [1.0, 'Wire length for emitter/collector (m)'],
+    'L_wire': [100., 'Wire length for emitter/collector (cm)'],
     'rho': [4.792857143e-6, 'Resistivity (Ohm*cm)'],
     'alpha': [0.0044, 'Temperature coefficient of resistance (1/K)'],
     'occlusion': [False, 'Fractional occlusion of collector by grid'],
@@ -63,8 +63,8 @@ def calculate_resistivity(T, L_wire, rho, alpha, **kwargs):
     Temperature dependent resistivity model.
     Args:
         T: Temperature of wire (K)
-        L_wire: Length of wire (m)
-        rho: Resistivity (Ohms*m)
+        L_wire: Length of wire (cm)
+        rho: Resistivity (Ohms*cm)
         alpha: Reference resistance coefficient
         **kwargs: Catch unused arguments
 
@@ -77,7 +77,7 @@ def calculate_resistivity(T, L_wire, rho, alpha, **kwargs):
     T_ref = 293.15  # 20 deg C Reference temperature for rho
     delta_T = T - T_ref
 
-    rho_s = rho_0 * L_wire * 1e-2
+    rho_s = rho_0 * L_wire
     rho_t = rho_s * (1 + alpha * delta_T)
 
     return rho_t
@@ -163,8 +163,10 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
 
     t = 1. - occlusion
     J_coll = rd_current(phi_coll, T_coll)
-    # Modify J_ec (emitter to collector current) for analytical collector produced current
+
+    # Modify measured J_ec (emitter to collector current) to remove analytical collector produced current
     J_ec = J_ec - J_coll
+
     # P_ew
     P_ew = 0.5 * (L / rho_ew * (T_em - T_env) ** 2 - (J_em - t * J_coll) ** 2 * rho_ew)
 
@@ -176,12 +178,23 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
 
     # P_load
     V_lead = J_ec * rho_cw + (J_ec - t * J_coll) * rho_ew
+    # TODO: In V_load (phi_em - phi_coll) is the ideal matched resistor voltage drop
+    # TODO:   this needs to be changed to be based on R_load * J_coll (accounting for units)
+    # TODO: Then There needs to be a bias between collector to emitter based on V_load
     V_load = (phi_em - phi_coll) - V_lead
     P_load = J_ec * V_load
 
     # P_gate
-    P_gate = (J_grid + t * J_coll) * V_grid
+    # TODO: multiplying by occlusion seems to give a sensible result but I'm having a hard time physically justifying
+    P_gate = (J_grid + t * J_coll) * V_grid * occlusion
 
     eta = (P_load - P_gate) / (P_ec + P_r + P_ew)
+    debug = True  # Hardwiring this because Python2 is dumb and doesn't let you set fixed kwargs and use **kwargs
+    if debug:
+        print "Power lost in wiring:", P_ew
+        print "Power lost to radiation:", P_r
+        print "Power carried away by electrons:", P_ec
+        print "Power produced in the load:", P_load
+        print "Power lost to maintain gate voltage:", P_gate
 
     return eta

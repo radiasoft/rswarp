@@ -38,7 +38,7 @@ m = m_e  # electron mass in kg
 def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
          rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance,
          run_id,
-         injection_type=2, random_seed=True, install_grid=True, max_wall_time=0.,
+         injection_type=2, random_seed=True, install_grid=True, max_wall_time=1e9,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
     """
     Run a simulation of a gridded TEC.
@@ -102,10 +102,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     Z_MAX = gap_distance
     Z_MIN = 0.
 
+    # TODO: cells in all dimensions reduced by 10x for testing, will need to verify if this is reasonable in general
     # Grid parameters
-    NUM_X = 100
-    NUM_Y = 100
-    NUM_Z = int(gap_distance / 1e-9)
+    NUM_X = 10
+    NUM_Y = 10
+    NUM_Z = int(gap_distance / 10e-9)
 
     # z mesh spacing
     dz = (Z_MAX - Z_MIN) / NUM_Z
@@ -211,9 +212,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         background_beam.vthperp = measurement_beam.vthperp = np.sqrt(EMITTER_TEMP * kb_J / background_beam.mass)
         top.lhalfmaxwellinject = 1  # inject z velocities as half Maxwellian
 
-        # TODO: readout from top.curr_z is 2x beam_current
         beam_current = sources.j_rd(EMITTER_TEMP, EMITTER_PHI) * cathode_area  # steady state current in Amps
         print('beam current expected: {}, current density {}'.format(beam_current, beam_current / cathode_area))
+        jcl = 4. / 9. * eps0 * sqrt(2. * echarge / background_beam.mass) \
+                       * ACCEL_VOLTS ** 1.5 / gap_distance ** 2 * cathode_area
+        print('child-langmuir  limit: {}, current density {}'.format(jcl, jcl / cathode_area))
         background_beam.ibeam = measurement_beam.ibeam = beam_current
         background_beam.a0 = measurement_beam.a0 = SOURCE_RADIUS_1
         background_beam.b0 = measurement_beam.b0 = SOURCE_RADIUS_1
@@ -221,7 +224,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         background_beam.bp0 = measurement_beam.bp0 = .0e0
 
     derivqty()
-    print('weight {}'.format(background_beam.sw))
+
     ##############
     # FIELD SOLVER
     ##############
@@ -279,17 +282,21 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                   lsaveintercept=True)
         scraper_dictionary = {'source': 1, 'collector': 2}
 
+    # Set up the external circuit
+    circuit = ExternalCircuit(top, 'dummy', plate)
+    installafterstep(circuit.change_voltage)
+
     #############
     # DIAGNOSTICS
     #############
 
     # Particle/Field diagnostic options
     if particle_diagnostic_switch:
-        particleperiod = 100000
+        particleperiod = 25  # TEMP
         particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=top, w3d=w3d,
                                                    species={species.name: species
-                                                            for species in listofallspecies
-                                                            if species.name == 'measurement'},
+                                                            for species in listofallspecies},
+                                                            # if species.name == 'measurement'}, # TEMP
                                                    comm_world=comm_world, lparallel_output=False,
                                                    write_dir=diagDir[:-5])
         installafterstep(particle_diagnostic_0.write)
@@ -333,6 +340,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     solverE.mgtol = regular_tol
     solverE.mgmaxiters = regular_iters
 
+    print("weights: {}, {}".format(background_beam.sw, measurement_beam.sw))
+
     # Use rnpinject to set number of macroparticles emitted
     background_beam.rnpinject = PTCL_PER_STEP
     measurement_beam.rnpinject = 0  # measurement beam is off at start
@@ -347,10 +356,17 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     early_abort = False  # If true will flag output data to notify
     startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
     crossing_measurements = 8  # Number of crossing times to record for
-    steps_per_crossing = gap_distance / vzfinal / dt
+    steps_per_crossing = gap_distance / vz_accel / dt
     ss_check_interval = int(steps_per_crossing / 5.)
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
+
+    # TEMP
+    print("vz_accel: {}\n beam_beta: {}\n v ratio: {}\nsteps per cross:{}".format(vz_accel, beam_beta * c,
+                                                                                  vz_accel / (beam_beta * c),
+                                                                                  steps_per_crossing))
+    print("time step: {}".format(dt))
+    # TEMP
 
     # Run initial block of steps
     record_time(stept, times, startup_time)
@@ -373,13 +389,24 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     print(" Steady State Reached.\n Starting efficiency "
           "recording for {} crossing times.\n This will be {} steps".format(crossing_measurements,
                                                                             steps_per_crossing * crossing_measurements))
-    particle_diagnostic_0.period = steps_per_crossing
+
+    # particle_diagnostic_0.period = steps_per_crossing #TEMP commented out
     # Switch to measurement beam species
     measurement_beam.rnpinject = PTCL_PER_STEP
     background_beam.rnpinject = 0
 
+    # # TEMP
+    # for _ in range(100):
+    #     tmin = (top.it - 10) * top.dt
+    #     tmax = (top.it - 2) * top.dt
+    #     tdat, cdat = plate.get_current_history(js=None, l_lost=1, l_emit=0,
+    #                               l_image=0, tmin=tmin, tmax=tmax, nt=1)
+    #     print("All: {}".format(cdat))
+    #
+    #     step(10)
+    # # TEMP
+
     # Install Zcrossing Diagnostic
-    # TODO: make change to grid_height fractional
     ZCross = ZCrossingParticles(zz=grid_height * gap_distance / 200., laccumulate=1)
     emitter_flux = []
 
@@ -440,6 +467,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     for key in surface_charge:
         # We can abuse the fact that js=0 for background species to filter it from the sum
         measured_charge[key] = np.sum(surface_charge[key][:, 1] * surface_charge[key][:, 3])
+        print key, measured_charge[key]
 
     # Set externally derived parameters
     efficiency.tec_parameters['A_em'][0] = cathode_area * 1e4  # cm**2
@@ -544,14 +572,22 @@ class ExternalCircuit():
         self.top = top
         self.rho = rho
         self.voltage_stride = voltage_stride
-        self.conductors = conductors
+
+        try:
+            conductors[0]
+            self.conductors = conductors
+        except TypeError:
+            self.conductors = [conductors]
 
     def change_voltage(self):
         if self.voltage_stride and self.top.it % self.voltage_stride != 0:
             return False
         tmin = (self.top.it - self.voltage_stride) * self.top.dt
         for cond in self.conductors:
-            times, current = cond.get_current_history(js=1, l_lost=1, l_emit=0,
+            times, current = cond.get_current_history(js=None, l_lost=1, l_emit=0,
                                                      l_image=0, tmin=tmin, tmax=None, nt=1)
+            # Using many bins for the current sometimes gives erroneous zeros.
+            # Using a single bin has consistently given a result ~1/2 expected current, hence the sum of the two values
+            current = np.sum(current)
             print "Current at step: {} = {}".format(self.top.it, current)
 
