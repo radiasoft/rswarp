@@ -186,7 +186,7 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
 
     # P_gate
     # TODO: multiplying by occlusion seems to give a sensible result but I'm having a hard time physically justifying
-    P_gate = (J_grid + t * J_coll) * V_grid * occlusion
+    P_gate = (J_grid + occlusion * J_coll) * V_grid * occlusion
 
     eta = (P_load - P_gate) / (P_ec + P_r + P_ew)
     debug = True  # Hardwiring this because Python2 is dumb and doesn't let you set fixed kwargs and use **kwargs
