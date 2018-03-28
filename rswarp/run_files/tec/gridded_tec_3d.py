@@ -257,14 +257,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         plate = ZPlane(voltage=collector_voltage, zcent=zplate, condid=3)
     else:
         plate = ZPlane(voltage=collector_voltage, zcent=zplate)
-    #####
-    # Grid dimensions used in testing
-    # strut_width = 3e-9
-    # strut_height = 30e-9
-    # grid_height = zplate / 2.
-    # volts_on_grid = 5.
-
-    # print "Initial Grid id:", accel_grid.condid, source.condid, plate.condid
 
     if install_grid:
         installconductor(accel_grid)
@@ -343,7 +335,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     solverE.mgtol = regular_tol
     solverE.mgmaxiters = regular_iters
 
-    print("weights: {}, {}".format(background_beam.sw, measurement_beam.sw))
+    print("weights (background) (measurement): {}, {}".format(background_beam.sw, measurement_beam.sw))
 
     # Use rnpinject to set number of macroparticles emitted
     background_beam.rnpinject = PTCL_PER_STEP
@@ -363,13 +355,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     ss_check_interval = int(steps_per_crossing / 5.)
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
-
-    # TEMP
-    print("vz_accel: {}\n beam_beta: {}\n v ratio: {}\nsteps per cross:{}".format(vz_accel, beam_beta * c,
-                                                                                  vz_accel / (beam_beta * c),
-                                                                                  steps_per_crossing))
-    print("time step: {}".format(dt))
-    # TEMP
 
     # Run initial block of steps
     record_time(stept, times, startup_time)
@@ -397,17 +382,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Switch to measurement beam species
     measurement_beam.rnpinject = PTCL_PER_STEP
     background_beam.rnpinject = 0
-
-    # # TEMP
-    # for _ in range(100):
-    #     tmin = (top.it - 10) * top.dt
-    #     tmax = (top.it - 2) * top.dt
-    #     tdat, cdat = plate.get_current_history(js=None, l_lost=1, l_emit=0,
-    #                               l_image=0, tmin=tmin, tmax=tmax, nt=1)
-    #     print("All: {}".format(cdat))
-    #
-    #     step(10)
-    # # TEMP
 
     # Install Zcrossing Diagnostic
     ZCross = ZCrossingParticles(zz=grid_height * gap_distance / 200., laccumulate=1)
@@ -439,7 +413,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     background_beam.rnpinject = PTCL_PER_STEP
 
     initial_population = measurement_beam.npsim[0]
-    measurement_tol = 0.075
+    measurement_tol = 0.03
     particle_diagnostic_0.period = ss_check_interval
     while measurement_beam.npsim[0] / initial_population > measurement_tol:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
@@ -455,7 +429,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                 ZCross.getvy(js=measurement_beam.js),
                                 ZCross.getvz(js=measurement_beam.js)]).transpose())
             ZCross.clear()  # Clear ZcrossingParticles memory
-        print "Backwards particles: {}".format(np.where(emitter_flux[-1][:, 2] < 0.)[0].shape)
+        print "Backwards particles: {}".format(np.where(emitter_flux[-1][:, 2] < 0.)[0].shape[0])
         print(" Wind-down: Taking {} steps, On Step: {}, {} Particles Left".format(ss_check_interval, top.it,
                                                                                    measurement_beam.npsim[0]))
     ######################
@@ -510,7 +484,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     if comm_world.rank == 0:
 
         filename = 'efficiency_id{}.h5'.format(str(run_id))
-        with h5.File(os.path.join(diagDir, filename), 'w') as h5file:
+        with h5.File(os.path.join('diags_id{}'.format(run_id), filename), 'w') as h5file:
             eff_group = h5file.create_group('/efficiency')
             run_group = h5file.create_group('/attributes')
             scrap_group = h5file.create_group('/scraper')
@@ -573,10 +547,11 @@ def stead_state_check(particles, solver, sid, interval, tol=0.01, n=185, a=1):
 
 
 class ExternalCircuit():
-    def __init__(self, top, rho, conductors, voltage_stride=10):
+    def __init__(self, top, rho, conductors, voltage_stride=10, debug=False):
         self.top = top
         self.rho = rho
         self.voltage_stride = voltage_stride
+        self.debug = debug
 
         try:
             conductors[0]
@@ -594,5 +569,6 @@ class ExternalCircuit():
             # Using many bins for the current sometimes gives erroneous zeros.
             # Using a single bin has consistently given a result ~1/2 expected current, hence the sum of the two values
             current = np.sum(current)
-            print "Current at step: {} = {}".format(self.top.it, current)
+            if self.debug:
+                print "Current at step: {} = {}".format(self.top.it, current)
 
