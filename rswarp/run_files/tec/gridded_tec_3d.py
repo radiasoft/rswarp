@@ -36,7 +36,7 @@ m = m_e  # electron mass in kg
 
 
 def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
-         rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance,
+         rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance, rho_load,
          run_id,
          injection_type=2, random_seed=True, install_grid=True, max_wall_time=1e9,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
@@ -56,6 +56,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         phi_coll: Collector work function, eV.
         rho_cw: Collector side wiring resistivity, ohms*cm.
         gap_distance: Distance from emitter to collector, meters.
+        rho_load: Load resistivity, ohms*cm.
         run_id: Run ID. Mainly used for parallel optimization.
         injection_type: 1: For constant current emission with only thermal velocity spread in z and CL limited emission.
                         2: For true thermionic emission. Velocity spread along all axes.
@@ -263,10 +264,18 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     else:
         source = ZPlane(zcent=w3d.zmmin, zsign=-1., voltage=0.)
     # Create ground plate
+    total_rho = efficiency.tec_parameters['rho_load'][0] + efficiency.tec_parameters['rho_cw'][0] + \
+                efficiency.tec_parameters['rho_ew'][0]
     if install_grid:
-        plate = ZPlane(voltage=collector_voltage, zcent=zplate, condid=3)
+        plate = ZPlane(zcent=zplate, condid=3)
+        # circuit = ExternalCircuit(top, total_rho, cathode_area * 1e4, plate, debug=True)
+        # plate.voltage = circuit
+        plate.voltage = collector_voltage
     else:
-        plate = ZPlane(voltage=collector_voltage, zcent=zplate)
+        plate = ZPlane(zcent=zplate)
+        # circuit = ExternalCircuit(top, total_rho, cathode_area * 1e4, plate, debug=True)
+        # plate.voltage = circuit
+        plate.voltage = collector_voltage
 
     if install_grid:
         installconductor(accel_grid)
@@ -285,8 +294,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         scraper_dictionary = {'source': 1, 'collector': 2}
 
     # Set up the external circuit
-    circuit = ExternalCircuit(top, 'dummy', plate)
-    installafterstep(circuit.change_voltage)
+    # total_rho = efficiency.tec_parameters['rho_load'][0] + efficiency.tec_parameters['rho_cw'][0] + \
+    #             efficiency.tec_parameters['rho_ew'][0]
+    # circuit = ExternalCircuit(top, total_rho, cathode_area * 1e4, plate, debug=True)
+    # installafterstep(circuit.change_voltage)
 
     #############
     # DIAGNOSTICS
@@ -364,7 +375,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     steps_per_crossing = gap_distance / vz_accel / dt
     ss_check_interval = int(steps_per_crossing / 5.)
     times = []  # Write out timing of cycle steps to file
-    clock = 0  # clock tracks if the simulation has run too long and needs to be terminated
+    clock = 0  # clock tracks the current, total simulation-runtime
 
     # Run initial block of steps
     record_time(stept, times, startup_time)
@@ -408,6 +419,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
         record_time(step, times, steps_per_crossing)
         clock += times[-1]
+
+        # Re-evaluate time for next loop
+        crossing_wall_time = times[-1]
 
         # Record velocities of emitted particles for later KE calculation
         emitter_flux.append(np.array([ZCross.getvx(js=measurement_beam.js),
@@ -456,7 +470,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     for key in surface_charge:
         # We can abuse the fact that js=0 for background species to filter it from the sum
         measured_charge[key] = np.sum(surface_charge[key][:, 1] * surface_charge[key][:, 3])
-        print key, measured_charge[key]
 
     # Set externally derived parameters
     efficiency.tec_parameters['A_em'][0] = cathode_area * 1e4  # cm**2
@@ -560,9 +573,10 @@ def stead_state_check(particles, solver, sid, interval, tol=0.01, n=185, a=1):
 
 
 class ExternalCircuit:
-    def __init__(self, top, rho, conductors, voltage_stride=10, debug=False):
+    def __init__(self, top, rho, area, conductors, voltage_stride=10, debug=False):
         self.top = top
         self.rho = rho
+        self.area = area  # in cm**2
         self.voltage_stride = voltage_stride
         self.debug = debug
 
@@ -572,9 +586,10 @@ class ExternalCircuit:
         except TypeError:
             self.conductors = [conductors]
 
-    def change_voltage(self):
-        if self.voltage_stride and self.top.it % self.voltage_stride != 0:
-            return False
+    def getvolt(self, t):
+        # t is dummy variable
+        # if self.voltage_stride and self.top.it % self.voltage_stride != 0:
+        #     return False
         tmin = (self.top.it - self.voltage_stride) * self.top.dt
         for cond in self.conductors:
             times, current = cond.get_current_history(js=None, l_lost=1, l_emit=0,
@@ -582,6 +597,10 @@ class ExternalCircuit:
             # Using many bins for the current sometimes gives erroneous zeros.
             # Using a single bin has consistently given a result ~1/2 expected current, hence the sum of the two values
             current = np.sum(current)
+            voltage = current / self.area * self.rho * 100
+            # cond.voltage = voltage
             if self.debug:
-                print "Current at step: {} = {}".format(self.top.it, current)
+                print "Current/voltage at step: {} = {}, {}".format(self.top.it, current / self.area, voltage)
+
+        return voltage
 
