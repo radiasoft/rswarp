@@ -49,13 +49,23 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         grid_height: Distance from the emitter to the grid normalized by gap_distance, unitless.
         strut_width: Transverse extent of the struts in meters.
         strut_height: Longitudinal extent of the struts in meters.
+        rho_ew: Emitter side wiring resistivity, ohms*cm.
+        T_em: Emitter temperature, kelvin.
+        phi_em: Emitter work function, eV.
+        T_coll: Collector termperature, kelvin.
+        phi_coll: Collector work function, eV.
+        rho_cw: Collector side wiring resistivity, ohms*cm.
+        gap_distance: Distance from emitter to collector, meters.
         run_id: Run ID. Mainly used for parallel optimization.
         injection_type: 1: For constant current emission with only thermal velocity spread in z and CL limited emission.
                         2: For true thermionic emission. Velocity spread along all axes.
-        cathode_temperature: Temperature of emitter. Current density is governed by Richardson-Dushman.
         random_seed: True/False. If True, will force a random seed to be used for emission positions.
         install_grid: True/False. If False the grid will not be installed. Results in simple parallel plate setup.
-                                  If False then voltage_on_grid specifies the voltage on the collector.
+                                  If False then phi_em - phi_coll specifies the voltage on the collector.
+        max_wall_time: Wall time to allow simulation to run for. Simulation is periodically checked and will halt if it
+                        appears the next segment of the simulation will exceed max_wall_time. This is not guaranteed to
+                        work since the guess is based on the run time up to that point.
+                        Intended to be used when running on system with job manager.
         particle_diagnostic_switch: True/False. Use openPMD compliant .h5 particle diagnostics.
         field_diagnostic_switch: True/False. Use rswarp electrostatic .h5 field diagnostics (Maybe openPMD compliant?).
         lost_diagnostic_switch: True/False. Enable collection of lost particle coordinates
@@ -102,7 +112,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     Z_MAX = gap_distance
     Z_MIN = 0.
 
-    # TODO: cells in all dimensions reduced by 10x for testing, will need to verify if this is reasonable in general
+    # TODO: cells in all dimensions reduced by 10x for testing, will need to verify if this is reasonable (TEMP)
     # Grid parameters
     NUM_X = 10
     NUM_Y = 10
@@ -360,7 +370,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     record_time(stept, times, startup_time)
     clock += times[-1]
 
-    print("Completed Initialization on Step {}\n Initialization run time: {}".format(top.it, times[-1]))
+    print("Completed Initialization on Step {}\nInitialization run time: {}".format(top.it, times[-1]))
 
     # Start checking for Steady State Operation
     tol = 0.05
@@ -374,8 +384,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                                                                              avg, stdev, tol))
 
     # Start Steady State Operation
-    print(" Steady State Reached.\n Starting efficiency "
-          "recording for {} crossing times.\n This will be {} steps".format(crossing_measurements,
+    print(" Steady State Reached.\nStarting efficiency "
+          "recording for {} crossing times.\nThis will be {} steps".format(crossing_measurements,
                                                                             steps_per_crossing * crossing_measurements))
 
     # particle_diagnostic_0.period = steps_per_crossing #TEMP commented out
@@ -399,6 +409,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         record_time(step, times, steps_per_crossing)
         clock += times[-1]
 
+        # Record velocities of emitted particles for later KE calculation
         emitter_flux.append(np.array([ZCross.getvx(js=measurement_beam.js),
                              ZCross.getvy(js=measurement_beam.js),
                              ZCross.getvz(js=measurement_beam.js)]).transpose())
@@ -424,6 +435,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         record_time(step, times, ss_check_interval)
         clock += times[-1]
 
+        # Record velocities of emitted particles for later KE calculation
         if ZCross.getvx(js=measurement_beam.js).shape[0] > 0:
             emitter_flux.append(np.array([ZCross.getvx(js=measurement_beam.js),
                                 ZCross.getvy(js=measurement_beam.js),
@@ -457,6 +469,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                         * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
 
+    # If grid isn't being used then J_grid will not be in scraper dict
     try:
         efficiency.tec_parameters['J_grid'][0] = e * measured_charge[scraper_dictionary['grid']] * measurement_beam.sw / \
                                             efficiency.tec_parameters['run_time'][0] / \
@@ -546,7 +559,7 @@ def stead_state_check(particles, solver, sid, interval, tol=0.01, n=185, a=1):
     return ss, avg, stdev
 
 
-class ExternalCircuit():
+class ExternalCircuit:
     def __init__(self, top, rho, conductors, voltage_stride=10, debug=False):
         self.top = top
         self.rho = rho
