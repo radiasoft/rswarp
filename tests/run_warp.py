@@ -32,6 +32,7 @@ if __name__ == '__main__':
     phi_cw: Resistivity of collector side wiring in ohm*cm
     run_id: Run id will be added to diagnostic folder name. Mainly used for parallel optimization.
     """
+    args = sys.argv[1:]
 
     # Values based on Voesch et al.
     x_struts = 1
@@ -47,12 +48,12 @@ if __name__ == '__main__':
     phi_coll = 0.381
     rho_cw = 1.1984448e-03
     gap_distance = 1e-6
-    run_id = 1
+    rho_load = 0.01648048  # matched for phi_em = 2.174, phi_coll = 0.381, and  rho_cw = rho_ew = 1.1984448e-03
+    run_id = 0
 
     main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
-         rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance,
+         rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance, rho_load,
          run_id,
          injection_type=2, random_seed=True, install_grid=False, max_wall_time=1e9,
          particle_diagnostic_switch=True, field_diagnostic_switch=False, lost_diagnostic_switch=False)
 
-    print 0
