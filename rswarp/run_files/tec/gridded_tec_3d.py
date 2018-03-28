@@ -499,31 +499,30 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                                                         **efficiency.tec_parameters)
 
     # Efficiency calculation
-    print "Efficiency", efficiency.calculate_efficiency(**efficiency.tec_parameters)
+    print("Efficiency")
+    efficiency_result = efficiency.calculate_efficiency(**efficiency.tec_parameters)
+    print("Overall Efficiency: {}".format(efficiency_result['eta']))
 
     ######################
     # FINAL RUN STATISTICS
     ######################
 
-    import pickle
-
     if comm_world.rank == 0:
-        pickle.dump(surface_charge, open("test_current_data.p", "wb"))
-        pickle.dump(efficiency.tec_parameters, open("test_parameter_data.p", "wb"))
-        with open('output_stats_id{}.txt'.format(run_id), 'w') as f1:
-            for ts in times:
-                f1.write('{}\n'.format(ts))
-            if early_abort:
-                f1.write('ABORTED')
-            f1.write('\n')
 
         filename = 'efficiency_id{}.h5'.format(str(run_id))
-        with h5.File(filename, 'w') as h5file:
+        with h5.File(os.path.join(diagDir, filename), 'w') as h5file:
+            eff_group = h5file.create_group('/efficiency')
+            run_group = h5file.create_group('/attributes')
+            scrap_group = h5file.create_group('/scraper')
             h5file.attrs['complete'] = early_abort
+            for key in efficiency_result:
+                eff_group.attrs[key] = efficiency_result[key]
             for key in run_attributes:
-                h5file.attrs[key] = run_attributes[key]
+                run_group.attrs[key] = run_attributes[key]
             for key, value in scraper_dictionary.iteritems():
-                h5file.attrs[key] = measured_charge[value]
+                scrap_group.attrs[key] = measured_charge[value]
+
+            h5file.create_dataset('times', data=times)
 
 
 def create_grid(nx, ny, volts,
