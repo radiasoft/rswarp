@@ -38,6 +38,7 @@ tec_parameters = {
     'rho': [4.792857143e-6, 'Resistivity (Ohm*cm)'],
     'alpha': [0.0044, 'Temperature coefficient of resistance (1/K)'],
     'occlusion': [False, 'Fractional occlusion of collector by grid'],
+    'rho_load': [False, 'Effective resistivity of load (Ohms*cm)'],
     'run_time': [False, 'Simulation run time (s)']
 }
 
@@ -133,7 +134,7 @@ def calculate_power_flux(velocity, weight, phi, run_time, A_em, **kwargs):
 def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
                rho_cw, J_ec, phi_coll, T_coll,
                emiss_eff, T_env, J_grid, V_grid,
-               occlusion, run_time, **kwargs):
+               occlusion, rho_load, run_time, **kwargs):
     """
     Calculate the TEC efficieny.
     All power terms should be calculated to give W/cm**2
@@ -157,9 +158,9 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
 
     rho_ew, J_em, P_em, phi_em, T_em, \
     rho_cw, J_ec, phi_coll, T_coll, \
-    emiss_eff, T_env, J_grid, V_grid, occlusion, run_time = rho_ew[0], J_em[0], P_em[0], phi_em[0], T_em[0], \
+    emiss_eff, T_env, J_grid, V_grid, occlusion, rho_load, run_time = rho_ew[0], J_em[0], P_em[0], phi_em[0], T_em[0], \
                rho_cw[0], J_ec[0], phi_coll[0], T_coll[0], \
-               emiss_eff[0], T_env[0], J_grid[0], V_grid[0], occlusion[0], run_time[0]
+               emiss_eff[0], T_env[0], J_grid[0], V_grid[0], occlusion[0], rho_load[0], run_time[0]
 
     t = 1. - occlusion
     J_coll = rd_current(phi_coll, T_coll)
@@ -178,10 +179,8 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
 
     # P_load
     V_lead = J_ec * rho_cw + (J_ec - t * J_coll) * rho_ew
-    # TODO: In V_load (phi_em - phi_coll) is the ideal matched resistor voltage drop
-    # TODO:   this needs to be changed to be based on R_load * J_coll (accounting for units)
-    # TODO: Then There needs to be a bias between collector to emitter based on V_load
-    V_load = (phi_em - phi_coll) - V_lead
+    R_total = rho_cw + rho_ew + rho_load
+    V_load = R_total * J_ec - V_lead
     P_load = J_ec * V_load
 
     # P_gate
