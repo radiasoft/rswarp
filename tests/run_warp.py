@@ -13,9 +13,9 @@ try:
     from gridded_tec_3d import main
 except ImportError:
     try:
-        from rswarp.run_files.gridded_tec_3d import main
+        from rswarp.run_files.tec.gridded_tec_3d import main
     except ImportError:
-        raise ImportError, "Could not find rswarp.run_files.simple_tec_3d"
+        raise ImportError, "Could not find rswarp.run_files.tec.gridded_tec_3d"
 
 if __name__ == '__main__':
     """
