@@ -189,6 +189,15 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
     P_gate = (J_grid + occlusion * J_coll) * V_grid * occlusion
 
     eta = (P_load - P_gate) / (P_ec + P_r + P_ew)
+
+    efficiency_data = {}
+    efficiency_data['P_ew'] = P_ew
+    efficiency_data['P_r'] = P_r
+    efficiency_data['P_ec'] = P_ec
+    efficiency_data['P_load'] = P_load
+    efficiency_data['P_gate'] = P_gate
+    efficiency_data['eta'] = eta
+
     debug = True  # Hardwiring this because Python2 is dumb and doesn't let you set fixed kwargs and use **kwargs
     if debug:
         print "Power lost in wiring:", P_ew
@@ -197,4 +206,4 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
         print "Power produced in the load:", P_load
         print "Power lost to maintain gate voltage:", P_gate
 
-    return eta
+    return efficiency_data
