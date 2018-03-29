@@ -450,6 +450,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         clock += times[-1]
 
         # Record velocities of emitted particles for later KE calculation
+        # TODO: Test using list comprehension to filter an vz<0
         if ZCross.getvx(js=measurement_beam.js).shape[0] > 0:
             emitter_flux.append(np.array([ZCross.getvx(js=measurement_beam.js),
                                 ZCross.getvy(js=measurement_beam.js),
@@ -517,6 +518,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
             h5file.attrs['complete'] = early_abort
             for key in efficiency_result:
                 eff_group.attrs[key] = efficiency_result[key]
+            for key in efficiency.tec_parameters:
+                eff_group.attrs[key] = efficiency.tec_parameters[key]
             for key in run_attributes:
                 run_group.attrs[key] = run_attributes[key]
             for key, value in scraper_dictionary.iteritems():
