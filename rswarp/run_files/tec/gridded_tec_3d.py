@@ -263,19 +263,19 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         source = ZPlane(zcent=w3d.zmmin, zsign=-1., voltage=0., condid=2)
     else:
         source = ZPlane(zcent=w3d.zmmin, zsign=-1., voltage=0.)
+
     # Create ground plate
-    total_rho = efficiency.tec_parameters['rho_load'][0] + efficiency.tec_parameters['rho_cw'][0] + \
-                efficiency.tec_parameters['rho_ew'][0]
+    total_rho = efficiency.tec_parameters['rho_load'][0]
     if install_grid:
         plate = ZPlane(zcent=zplate, condid=3)
-        # circuit = ExternalCircuit(top, total_rho, cathode_area * 1e4, plate, debug=True)
-        # plate.voltage = circuit
-        plate.voltage = collector_voltage
+        circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=True)
+        plate.voltage = circuit
+        # plate.voltage = collector_voltage
     else:
         plate = ZPlane(zcent=zplate)
-        # circuit = ExternalCircuit(top, total_rho, cathode_area * 1e4, plate, debug=True)
-        # plate.voltage = circuit
-        plate.voltage = collector_voltage
+        circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=False)
+        plate.voltage = circuit
+        # plate.voltage = collector_voltage
 
     if install_grid:
         installconductor(accel_grid)
@@ -510,6 +510,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     if comm_world.rank == 0:
 
+        np.save('iv_data.npy', np.array([circuit.current_history, circuit.voltage_history]))
         filename = 'efficiency_id{}.h5'.format(str(run_id))
         with h5.File(os.path.join('diags_id{}'.format(run_id), filename), 'w') as h5file:
             eff_group = h5file.create_group('/efficiency')
@@ -576,12 +577,17 @@ def stead_state_check(particles, solver, sid, interval, tol=0.01, n=185, a=1):
 
 
 class ExternalCircuit:
-    def __init__(self, top, rho, area, conductors, voltage_stride=10, debug=False):
+    def __init__(self, top, solver, rho, contact_potential, area, conductors, voltage_stride=20, debug=False):
         self.top = top
+        self.solver = solver
         self.rho = rho
+        self.contact_potential = contact_potential
         self.area = area  # in cm**2
         self.voltage_stride = voltage_stride
         self.debug = debug
+
+        self.voltage_history = []
+        self.current_history = []
 
         try:
             conductors[0]
@@ -591,8 +597,10 @@ class ExternalCircuit:
 
     def getvolt(self, t):
         # t is dummy variable
-        # if self.voltage_stride and self.top.it % self.voltage_stride != 0:
-        #     return False
+        if self.top.it % self.voltage_stride == 0:
+            # This will tell the solver to update voltage on all conductors
+            self.solver.gridmode = 0
+
         tmin = (self.top.it - self.voltage_stride) * self.top.dt
         for cond in self.conductors:
             times, current = cond.get_current_history(js=None, l_lost=1, l_emit=0,
@@ -600,8 +608,10 @@ class ExternalCircuit:
             # Using many bins for the current sometimes gives erroneous zeros.
             # Using a single bin has consistently given a result ~1/2 expected current, hence the sum of the two values
             current = np.sum(current)
-            voltage = current / self.area * self.rho * 100
-            # cond.voltage = voltage
+            voltage = self.contact_potential + current / self.area * self.rho
+
+            self.voltage_history.append(voltage)
+            self.current_history.append(current / self.area)
             if self.debug:
                 print "Current/voltage at step: {} = {}, {}".format(self.top.it, current / self.area, voltage)
 
