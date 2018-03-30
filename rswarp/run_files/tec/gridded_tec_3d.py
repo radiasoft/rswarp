@@ -11,15 +11,23 @@ from warp import *
 import numpy as np
 import h5py as h5
 import time
-import sys
+import sys, os
 
 sys.path.append('/global/homes/h/hallcc/github/rswarp')
+
+try:
+    import efficiency
+except ImportError:
+    try:
+        from rswarp.run_files.tec import efficiency
+    except ImportError:
+        raise ImportError, "Could not import efficiency from rswarp.run_files.tec"
+
 
 from copy import deepcopy
 from random import randint
 from scipy.signal import lfilter
 from rswarp.cathode import sources
-from rswarp.run_files.tec import efficiency
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from warp.particles.extpart import ZCrossingParticles
 from rswarp.diagnostics import FieldDiagnostic
@@ -115,12 +123,24 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # TODO: cells in all dimensions reduced by 10x for testing, will need to verify if this is reasonable (TEMP)
     # Grid parameters
-    NUM_X = 10
-    NUM_Y = 10
-    NUM_Z = int(gap_distance / 10e-9)
+    #Try 1, 5, 10 for the same grid parameters (5e-9 in each direction)
+    dx_want = 4e-9
+    dy_want = 4e-9
+    dz_want = 1e-9
+    
+    
+    NUM_X = int(round(CHANNEL_WIDTH / dx_want)) #20 #128 #10
+    NUM_Y = int(round(CHANNEL_WIDTH / dy_want)) #20 #128 #10
+    NUM_Z = int(round(gap_distance / dz_want))
 
-    # z mesh spacing
+    # mesh spacing
     dz = (Z_MAX - Z_MIN) / NUM_Z
+    dx = CHANNEL_WIDTH / NUM_X
+    dy = CHANNEL_WIDTH / NUM_Y
+    
+    print "Channel width: {}, DX = {}".format(CHANNEL_WIDTH, dx)
+    print "Channel width: {}, DY = {}".format(CHANNEL_WIDTH, dy)
+    print "Channel length: {}, DZ = {}".format(CHANNEL_WIDTH, dz)
 
     # Solver Geometry and Boundaries
 
@@ -183,7 +203,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Returns velocity beam_beta (in units of beta) for which frac of emitted particles have v < beam_beta * c
     beam_beta = sources.compute_cutoff_beta(EMITTER_TEMP, frac=0.99)
 
-    PTCL_PER_STEP = 300
+    PTCL_PER_STEP = 500 #300
 
     if injection_type == 1:
         CURRENT_MODIFIER = 0.5  # Factor to multiply CL current by when setting beam current
@@ -432,6 +452,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         print("Measurement: {} of {} intervals completed. Interval run time: {} s".format(sint + 1,
                                                                                           crossing_measurements,
                                                                                           times[-1]))
+    
+    if particle_diagnostic_switch:
+        particle_diagnostic_0.period = ss_check_interval
 
     # Run wind-down until measurement particles have cleared
     measurement_beam.rnpinject = 0
@@ -509,7 +532,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     ######################
 
     if comm_world.rank == 0:
-
+        
+        #fist ensure that the directory exists
+        diags_folder = 'diags_id{}/'.format(run_id)
+        ensure_dir(diags_folder)
+        
         filename = 'efficiency_id{}.h5'.format(str(run_id))
         with h5.File(os.path.join('diags_id{}'.format(run_id), filename), 'w') as h5file:
             eff_group = h5file.create_group('/efficiency')
@@ -527,6 +554,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
             h5file.create_dataset('times', data=times)
 
+def ensure_dir(file_path):
+    directory = os.path.dirname(file_path)
+    if not os.path.exists(directory):
+        print "Making directory: {}".format(directory)
+        os.makedirs(directory)
 
 def create_grid(nx, ny, volts,
                 grid_height, strut_width, strut_height,
