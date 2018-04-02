@@ -523,8 +523,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     ######################
 
     if comm_world.rank == 0:
+        if not os.path.exists('diags_id{}'.format(run_id)):
+            os.makedirs('diags_id{}'.format(run_id))
 
         np.save('iv_data.npy', np.array([circuit.current_history, circuit.voltage_history]))
+
         filename = 'efficiency_id{}.h5'.format(str(run_id))
         with h5.File(os.path.join('diags_id{}'.format(run_id), filename), 'w') as h5file:
             # TODO: Add current history
