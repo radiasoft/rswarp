@@ -293,12 +293,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                   lsaveintercept=True)
         scraper_dictionary = {'source': 1, 'collector': 2}
 
-    # Set up the external circuit
-    # total_rho = efficiency.tec_parameters['rho_load'][0] + efficiency.tec_parameters['rho_cw'][0] + \
-    #             efficiency.tec_parameters['rho_ew'][0]
-    # circuit = ExternalCircuit(top, total_rho, cathode_area * 1e4, plate, debug=True)
-    # installafterstep(circuit.change_voltage)
-
     #############
     # DIAGNOSTICS
     #############
@@ -384,15 +378,23 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     print("Completed Initialization on Step {}\nInitialization run time: {}".format(top.it, times[-1]))
 
     # Start checking for Steady State Operation
-    tol = 0.05
+    tol = 0.01
     steady_state = 0
     while steady_state != 1:
         record_time(step, times, ss_check_interval)
         clock += times[-1]
         steady_state, avg, stdev = stead_state_check(background_beam, solverE,
-                                                     scraper_dictionary['collector'], ss_check_interval, tol=tol)
+                                                     scraper_dictionary['collector'], 2 * ss_check_interval, tol=tol)
         print(" For {} steps: Avg particles/step={}, Stdev particles/step={}, tol={}".format(ss_check_interval,
                                                                                              avg, stdev, tol))
+
+    # TEMP
+    print("Hit steady state at: {}".format(top.it))
+    times1, current1 = plate.get_current_history(js=None, l_lost=1, l_emit=0,
+                                              l_image=0, tmin=0, tmax=None, nt=top.it)
+    if comm_world.rank == 0:
+        np.save('collector_history.npy', [times1, current1])
+    # TEMP
 
     # Start Steady State Operation
     print(" Steady State Reached.\nStarting efficiency "
@@ -503,7 +505,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     print("Efficiency")
     efficiency_result = efficiency.calculate_efficiency(**efficiency.tec_parameters)
     print("Overall Efficiency: {}".format(efficiency_result['eta']))
-
+    print("Total steps: {}".format(top.it))
     ######################
     # FINAL RUN STATISTICS
     ######################
@@ -513,6 +515,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         np.save('iv_data.npy', np.array([circuit.current_history, circuit.voltage_history]))
         filename = 'efficiency_id{}.h5'.format(str(run_id))
         with h5.File(os.path.join('diags_id{}'.format(run_id), filename), 'w') as h5file:
+            # TODO: Add current history
             eff_group = h5file.create_group('/efficiency')
             run_group = h5file.create_group('/attributes')
             scrap_group = h5file.create_group('/scraper')
@@ -562,7 +565,7 @@ def record_time(func, time_list, *args, **kwargs):
     time_list.append(t2 - t1)
 
 
-def stead_state_check(particles, solver, sid, interval, tol=0.01, n=185, a=1):
+def stead_state_check(particles, solver, sid, interval, tol=0.01, n=20, a=1):
     b = [1.0 / n] * n
     collector_current = analyze_scraped_particles(top, particles, solver)[sid]
     y = lfilter(b, a, collector_current[:, 1])[-interval:]  # Assumes that charge is being deposited ~every step
