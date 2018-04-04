@@ -4,58 +4,6 @@ import numpy as np
 import paramiko
 from time import sleep, ctime
 
-batch_header = """#!/bin/bash -l
-#SBATCH -p {queue} 
-#SBATCH -N {nodes} 
-#SBATCH -t {time}
-#SBATCH -A m2783
-#SBATCH -J {job}
-#SBATCH -C {architecture}
-
-export mydir="{base_directory}"
-
-mkdir -p $mydir
-
-cd $SLURM_SUBMIT_DIR
-
-cp ./* $mydir/.
-cd $mydir
-"""
-
-batch_srun = """srun -N 1 -n 32 -c 2 --cpu_bind=cores python-mpi {warp_file} {parameters} -p 1 1 32 &
-"""
-
-batch_tail = """wait
-echo 0 >> COMPLETE"""
-
-batch_instructions = {
-    'queue': 'debug',
-    'nodes': 1,
-    'time': '00:01:00',
-    'job': 'eaTest',
-    'architecture': 'Haswell',
-    'base_directory': 'eaTest'
-}
-
-remote_transfer_settings = {
-    'server': 'cori.nersc.gov',
-    'username': 'hallcc',
-    'project_directory': '/global/cscratch1/sd/hallcc/',
-    'get_directory': 'new_test1/',
-    'local_directory': 'new_dir/'
-}
-
-upload_settings = {
-    'server': 'cori.nersc.gov',
-    'username': 'hallcc',
-    'private_key_path': '/Users/chall/.ssh/id_rsa',
-    'private_key_phrase': 'TEST',
-    'project_directory': '.',
-    'upload_dir': 'upload_test/',
-    'upload_file': 'new_dir/test_simulation.out'
-}
-
-
 class JobRunner(object):
 
     def __init__(self, server, username):
@@ -145,7 +93,7 @@ class JobRunner(object):
         path, job_name = os.path.split(job)
         print 'Starting batch file: {} in directory {}'.format(job_name, path)
 
-        # Check for path existance
+        # Check for path existence
         stdin, stdout, stderr = self.client.exec_command('ls {}'.format(path))
         out = stdout.read()
         err = stderr.read()
@@ -285,8 +233,8 @@ class JobRunner(object):
         print "SFTP Connection Closed"
 
 
-def create_runfiles(population, filename, batch_instructions=batch_instructions,
-                    run_header=batch_header, run_command=batch_srun, run_tail=batch_tail):
+def create_runfiles(population, filename, batch_instructions,
+                    run_header, run_command, run_tail):
     run_strings = []
     for i, ind in enumerate(population):
         parameter_string = ''
@@ -338,12 +286,12 @@ def save_generation(filename, population, generation, labels=None, overwrite_gen
     data_file.close()
 
 
-def load_generation(filename, generation):
-    gen = h5.File(filename, 'r')
-
-    try:
-        attributes = len([key for key in gen['generation{}/'.format(generation)]])
-    except KeyError:
-        raise KeyError("Generation {} is not in {}".format(filename, generation))
-
-    individuals = [[attr for attr in ]]
+# def load_generation(filename, generation):
+#     gen = h5.File(filename, 'r')
+#
+#     try:
+#         attributes = len([key for key in gen['generation{}/'.format(generation)]])
+#     except KeyError:
+#         raise KeyError("Generation {} is not in {}".format(filename, generation))
+#
+#     individuals = [[attr for attr in ]]
