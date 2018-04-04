@@ -17,7 +17,6 @@ sys.path.append('/global/homes/h/hallcc/github/rswarp')
 
 from copy import deepcopy
 from random import randint
-from scipy.signal import lfilter
 from rswarp.cathode import sources
 from rswarp.run_files.tec import efficiency
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
@@ -115,14 +114,12 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # TODO: cells in all dimensions reduced by 10x for testing, will need to verify if this is reasonable (TEMP)
     # Grid parameters
-    #Try 1, 5, 10 for the same grid parameters (5e-9 in each direction)
-    dx_want = 4e-9
-    dy_want = 4e-9
-    dz_want = 1e-9
+    dx_want = 10e-9
+    dy_want = 10e-9
+    dz_want = 10e-9
 
-
-    NUM_X = int(round(CHANNEL_WIDTH / dx_want)) #20 #128 #10
-    NUM_Y = int(round(CHANNEL_WIDTH / dy_want)) #20 #128 #10
+    NUM_X = int(round(CHANNEL_WIDTH / dx_want))  # 20 #128 #10
+    NUM_Y = int(round(CHANNEL_WIDTH / dy_want))  # 20 #128 #10
     NUM_Z = int(round(gap_distance / dz_want))
 
     # mesh spacing
@@ -280,7 +277,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     total_rho = efficiency.tec_parameters['rho_load'][0]
     if install_grid:
         plate = ZPlane(zcent=zplate, condid=3)
-        circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=True)
+        circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=False)
         plate.voltage = circuit
         # plate.voltage = collector_voltage
     else:
@@ -375,43 +372,39 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Record data for effiency calculation
     # Switch off measurement species and wait for simulation to clear (background species is switched on)
 
-    early_abort = False  # If true will flag output data to notify
-    startup_time = 2 * gap_distance / vz_accel  # Roughly 2 crossing times for system to reach steady state
-    crossing_measurements = 8  # Number of crossing times to record for
-    steps_per_crossing = gap_distance / vz_accel / dt
-    ss_check_interval = int(steps_per_crossing / 5.)
+    early_abort = 0  # If true will flag output data to notify
+    startup_time = 4 * gap_distance / vz_accel  # ~4 crossing times to approach steady-state with external circuit
+    crossing_measurements = 4  # Number of crossing times to record for
+    steps_per_crossing = int(gap_distance / vz_accel / dt)
+    ss_check_interval = int(steps_per_crossing / 2.)
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks the current, total simulation-runtime
 
     # Run initial block of steps
     record_time(stept, times, startup_time)
     clock += times[-1]
+    stop_initialization = top.it  # for diag file
 
     print("Completed Initialization on Step {}\nInitialization run time: {}".format(top.it, times[-1]))
-
     # Start checking for Steady State Operation
     tol = 0.01
-    steady_state = 0
-    while steady_state != 1:
+    steady_state = SteadyState(top, plate, steps_per_crossing)
+    ss_flag = 0
+    while ss_flag != 1:
+        if (max_wall_time - clock) < times[-1]:
+            early_abort = 1
+            break
+
         record_time(step, times, ss_check_interval)
         clock += times[-1]
-        steady_state, avg, stdev = stead_state_check(background_beam, solverE,
-                                                     scraper_dictionary['collector'], 2 * ss_check_interval, tol=tol)
-        print(" For {} steps: Avg particles/step={}, Stdev particles/step={}, tol={}".format(ss_check_interval,
-                                                                                             avg, stdev, tol))
+        ss_flag = steady_state(steps_per_crossing)
 
-    # TEMP
-    print("Hit steady state at: {}".format(top.it))
-    times1, current1 = plate.get_current_history(js=None, l_lost=1, l_emit=0,
-                                              l_image=0, tmin=0, tmax=None, nt=top.it)
-    if comm_world.rank == 0:
-        np.save('collector_history.npy', [times1, current1])
-    # TEMP
+    stop_ss_check = top.it  # For diag file
 
     # Start Steady State Operation
     print(" Steady State Reached.\nStarting efficiency "
           "recording for {} crossing times.\nThis will be {} steps".format(crossing_measurements,
-                                                                            steps_per_crossing * crossing_measurements))
+                                                                           steps_per_crossing * crossing_measurements))
 
     # particle_diagnostic_0.period = steps_per_crossing #TEMP commented out
     # Switch to measurement beam species
@@ -428,7 +421,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     for sint in range(crossing_measurements):
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
         if (max_wall_time - clock) < crossing_wall_time:
-            early_abort = True
+            early_abort = 2
             break
 
         record_time(step, times, steps_per_crossing)
@@ -446,7 +439,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         print("Measurement: {} of {} intervals completed. Interval run time: {} s".format(sint + 1,
                                                                                           crossing_measurements,
                                                                                           times[-1]))
-
+    stop_eff_calc = top.it  # For diag file
     # Run wind-down until measurement particles have cleared
     measurement_beam.rnpinject = 0
     background_beam.rnpinject = PTCL_PER_STEP
@@ -457,7 +450,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     while measurement_beam.npsim[0] / initial_population > measurement_tol:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
         if (max_wall_time - clock) < crossing_wall_time * ss_check_interval / steps_per_crossing :
-            early_abort = True
+            early_abort = 3
             break
 
         record_time(step, times, ss_check_interval)
@@ -473,6 +466,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         print "Backwards particles: {}".format(np.where(emitter_flux[-1][:, 2] < 0.)[0].shape[0])
         print(" Wind-down: Taking {} steps, On Step: {}, {} Particles Left".format(ss_check_interval, top.it,
                                                                                    measurement_beam.npsim[0]))
+
+    stop_winddown = top.it  # For diag file
+
     ######################
     # CALCULATE EFFICIENCY
     ######################
@@ -541,8 +537,26 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                 eff_group.attrs[key] = efficiency.tec_parameters[key]
             for key in run_attributes:
                 run_group.attrs[key] = run_attributes[key]
-            for key, value in scraper_dictionary.iteritems():
-                scrap_group.attrs[key] = measured_charge[value]
+                run_group.attrs['dt'] = top.dt
+                run_group.attrs['stop_initialization'] = stop_initialization
+                run_group.attrs['stop_ss_check'] = stop_ss_check
+                run_group.attrs['stop_eff_calc'] = stop_eff_calc
+                run_group.attrs['stop_winddown'] = stop_winddown
+            # for key, value in scraper_dictionary.iteritems():
+            #     scrap_group.attrs[key] = measured_charge[value]
+            #
+            inv_scraper_dict = {value: key for key, value in scraper_dictionary.iteritems()}
+            for cond in solverE.conductordatalist:
+                cond_objs = cond[0]
+                scrap_group.attrs[inv_scraper_dict[cond_objs.condid]] = measured_charge[cond_objs.condid]
+                _, bckgrnd_current = cond_objs.get_current_history(js=0, l_lost=1, l_emit=0,
+                                                              l_image=0, tmin=None, tmax=None, nt=top.it)
+                _, msrmnt_current = cond_objs.get_current_history(js=1, l_lost=1, l_emit=0,
+                                                              l_image=0, tmin=None, tmax=None, nt=top.it)
+                scrap_group.create_dataset('{}_background'.format(inv_scraper_dict[cond_objs.condid]),
+                                           data=bckgrnd_current)
+                scrap_group.create_dataset('{}_measurement'.format(inv_scraper_dict[cond_objs.condid]),
+                                           data=msrmnt_current)
 
             h5file.create_dataset('times', data=times)
 
@@ -580,18 +594,32 @@ def record_time(func, time_list, *args, **kwargs):
     time_list.append(t2 - t1)
 
 
-def stead_state_check(particles, solver, sid, interval, tol=0.01, n=20, a=1):
-    b = [1.0 / n] * n
-    collector_current = analyze_scraped_particles(top, particles, solver)[sid]
-    y = lfilter(b, a, collector_current[:, 1])[-interval:]  # Assumes that charge is being deposited ~every step
-    avg = np.average(y)
-    stdev = np.std(y)
-    if stdev / avg < tol:
-        ss = 1
-    else:
-        ss = 0
+class SteadyState:
+    def __init__(self, top, cond, interval, tol=0.1):
+        # Analyze if we are in steady-state regime by means of FFT.
+        # Use estimated crossing time as the interval period and then look at
+        self.top = top
+        self.cond = cond
+        self.tol = tol
+        self.n = 0
+        self.level = 1
 
-    return ss, avg, stdev
+        tstart = (self.top.it - interval) * self.top.dt
+        _, collector_current = cond.get_current_history(js=None, l_lost=1, l_emit=0,
+                                                     l_image=0, tmin=tstart, tmax=None, nt=top.it)
+        self.y0 = np.abs(np.fft.rfft(collector_current)[1])
+
+    def __call__(self, interval):
+        tstart = (self.top.it - interval) * self.top.dt
+        _, collector_current = self.cond.get_current_history(js=None, l_lost=1, l_emit=0,
+                                                        l_image=0, tmin=tstart, tmax=None, nt=interval)
+        y = np.abs(np.fft.rfft(collector_current)[1])
+        self.level = y / self.y0
+
+        if self.level <= self.tol:
+            return 1
+        else:
+            return -1
 
 
 class ExternalCircuit:
