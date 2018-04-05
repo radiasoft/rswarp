@@ -12,7 +12,7 @@ import numpy as np
 import h5py as h5
 import time
 import sys, os
-
+import yaml
 sys.path.append('/global/homes/h/hallcc/github/rswarp')
 
 from copy import deepcopy
@@ -463,7 +463,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     initial_population = measurement_beam.npsim[0]
     measurement_tol = 0.03
-    particle_diagnostic_0.period = ss_check_interval
+    if particle_diagnostic_switch:
+        particle_diagnostic_0.period = ss_check_interval
     while measurement_beam.npsim[0] / initial_population > measurement_tol:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
         if (max_wall_time - clock) < crossing_wall_time * ss_check_interval / steps_per_crossing :
@@ -542,6 +543,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
             os.makedirs('diags_id{}'.format(run_id))
 
         np.save('iv_data.npy', np.array([circuit.current_history, circuit.voltage_history]))
+
+        write_parameters(run_attributes, filename='diags_id{}/'.format(run_id))
 
         filename = 'efficiency_id{}.h5'.format(str(run_id))
         with h5.File(os.path.join('diags_id{}'.format(run_id), filename), 'w') as h5file:
@@ -650,7 +653,7 @@ class ExternalCircuit:
         self.area = area  # in cm**2
         self.voltage_stride = voltage_stride
         self.debug = debug
-
+        # TODO: these seem to remain empty when running warp in parallel
         self.voltage_history = []
         self.current_history = []
 
@@ -681,4 +684,47 @@ class ExternalCircuit:
                 print "Current/voltage at step: {} = {}, {}".format(self.top.it, current / self.area, voltage)
 
         return voltage
+
+
+def write_parameters(pars, filename=None):
+    path, filename = os.path.split(filename)
+    if not filename:
+        try:
+            filename = 'run_attributes_{}.yaml'.format(pars['run_id'], pars['run_id'])
+        except KeyError:
+            print "No Filename or run_id, attributes will not be saved"
+            return
+        if path:
+            filename = os.path.join(path, filename)
+    else:
+        if os.path.splitext(filename)[-1] != '.yaml':
+            filename = os.path.splitext(filename)[0] + '.yaml'
+        if path:
+            filename = os.path.join(path, filename)
+        else:
+            filename = os.path.join(path, filename)
+
+    tec_keys = ['x_struts', 'y_struts', 'V_grid', 'grid_height', 'strut_width', 'strut_height',
+                'rho_ew', 'T_em', 'phi_em', 'T_coll', 'phi_coll', 'rho_cw', 'gap_distance', 'rho_load',
+                'run_id']
+    simulation_keys = ['injection_type', 'random_seed', 'install_grid', 'max_wall_time',
+                       'particle_diagnostic_switch', 'field_diagnostic_switch', 'lost_diagnostic_switch']
+
+    tec_parameters = {}
+    simulation_parameters = {}
+    other_parameters = {}
+
+    for key in pars:
+        if key in tec_keys:
+            tec_parameters[key] = pars[key]
+        elif key in simulation_keys:
+            simulation_parameters[key] = pars[key]
+        else:
+            other_parameters[key] = pars[key]
+
+    pars = {'tec': tec_parameters, 'simulation': simulation_parameters, 'other': other_parameters}
+
+    with open(filename, 'w') as outputfile:
+        yaml.dump(pars, outputfile, default_flow_style=False)
+
 
