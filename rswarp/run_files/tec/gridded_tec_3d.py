@@ -431,9 +431,12 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         crossing_wall_time = times[-1]
 
         # Record velocities of emitted particles for later KE calculation
-        emitter_flux.append(np.array([ZCross.getvx(js=measurement_beam.js),
-                             ZCross.getvy(js=measurement_beam.js),
-                             ZCross.getvz(js=measurement_beam.js)]).transpose())
+        velocity_array = np.array([ZCross.getvx(js=measurement_beam.js),
+                                   ZCross.getvy(js=measurement_beam.js),
+                                   ZCross.getvz(js=measurement_beam.js)]).transpose()
+        velocity_array = velocity_array[velocity_array[:, 2] >= 0.]  # Filter particles moving to emitter
+        emitter_flux.append(velocity_array)
+
         ZCross.clear()  # Clear ZcrossingParticles memory
 
         print("Measurement: {} of {} intervals completed. Interval run time: {} s".format(sint + 1,
@@ -457,13 +460,15 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         clock += times[-1]
 
         # Record velocities of emitted particles for later KE calculation
-        # TODO: Test using list comprehension to filter an vz<0
+        # Check is required here as measurement_beam particles will not always be passing through
         if ZCross.getvx(js=measurement_beam.js).shape[0] > 0:
-            emitter_flux.append(np.array([ZCross.getvx(js=measurement_beam.js),
-                                ZCross.getvy(js=measurement_beam.js),
-                                ZCross.getvz(js=measurement_beam.js)]).transpose())
+            velocity_array = np.array([ZCross.getvx(js=measurement_beam.js),
+                                       ZCross.getvy(js=measurement_beam.js),
+                                       ZCross.getvz(js=measurement_beam.js)]).transpose()
+            print "Backwards particles: {}".format(np.where(velocity_array[:, 2] < 0.)[0].shape[0])
+            velocity_array = velocity_array[velocity_array[:, 2] >= 0.]  # Filter particles moving to emitter
+            emitter_flux.append(velocity_array)
             ZCross.clear()  # Clear ZcrossingParticles memory
-        print "Backwards particles: {}".format(np.where(emitter_flux[-1][:, 2] < 0.)[0].shape[0])
         print(" Wind-down: Taking {} steps, On Step: {}, {} Particles Left".format(ss_check_interval, top.it,
                                                                                    measurement_beam.npsim[0]))
 
