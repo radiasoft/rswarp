@@ -377,6 +377,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     crossing_measurements = 4  # Number of crossing times to record for
     steps_per_crossing = int(gap_distance / vz_accel / dt)
     ss_check_interval = int(steps_per_crossing / 2.)
+    ss_max_checks = 20  # Maximum number of of times to run steady-state check procedure before aborting
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks the current, total simulation-runtime
 
@@ -386,18 +387,31 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     stop_initialization = top.it  # for diag file
 
     print("Completed Initialization on Step {}\nInitialization run time: {}".format(top.it, times[-1]))
+
     # Start checking for Steady State Operation
     tol = 0.01
     steady_state = SteadyState(top, plate, steps_per_crossing)
     ss_flag = 0
-    while ss_flag != 1:
+    check_count = 0  # Track number of times steady-state check performed
+
+    while ss_flag != 1 and check_count < ss_max_checks:
         if (max_wall_time - clock) < times[-1]:
             early_abort = 1
             break
 
         record_time(step, times, ss_check_interval)
         clock += times[-1]
+
+        _, current = plate.get_current_history(js=None, l_lost=1, l_emit=0,
+                                               l_image=0, tmin=ss_check_interval, tmax=None, nt=1)
+        current = np.sum(current)
+        if current < 0.5 * efficiency.tec_parameters['occlusion'][0] * beam_current:
+            # If too little current is getting through run another check cycle
+            check_count += 1
+            continue
+
         ss_flag = steady_state(steps_per_crossing)
+        check_count += 1
 
     stop_ss_check = top.it  # For diag file
 
@@ -555,9 +569,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                 cond_objs = cond[0]
                 scrap_group.attrs[inv_scraper_dict[cond_objs.condid]] = measured_charge[cond_objs.condid]
                 _, bckgrnd_current = cond_objs.get_current_history(js=0, l_lost=1, l_emit=0,
-                                                              l_image=0, tmin=None, tmax=None, nt=top.it)
+                                                                   l_image=0, tmin=None, tmax=None, nt=top.it)
                 _, msrmnt_current = cond_objs.get_current_history(js=1, l_lost=1, l_emit=0,
-                                                              l_image=0, tmin=None, tmax=None, nt=top.it)
+                                                                  l_image=0, tmin=None, tmax=None, nt=top.it)
                 scrap_group.create_dataset('{}_background'.format(inv_scraper_dict[cond_objs.condid]),
                                            data=bckgrnd_current)
                 scrap_group.create_dataset('{}_measurement'.format(inv_scraper_dict[cond_objs.condid]),
@@ -611,13 +625,13 @@ class SteadyState:
 
         tstart = (self.top.it - interval) * self.top.dt
         _, collector_current = cond.get_current_history(js=None, l_lost=1, l_emit=0,
-                                                     l_image=0, tmin=tstart, tmax=None, nt=top.it)
+                                                        l_image=0, tmin=tstart, tmax=None, nt=top.it)
         self.y0 = np.abs(np.fft.rfft(collector_current)[1])
 
     def __call__(self, interval):
         tstart = (self.top.it - interval) * self.top.dt
         _, collector_current = self.cond.get_current_history(js=None, l_lost=1, l_emit=0,
-                                                        l_image=0, tmin=tstart, tmax=None, nt=interval)
+                                                             l_image=0, tmin=tstart, tmax=None, nt=interval)
         y = np.abs(np.fft.rfft(collector_current)[1])
         self.level = y / self.y0
 
