@@ -6,11 +6,16 @@ from warp.data_dumping.openpmd_diag.particle_diag import ParticleDiagnostic
 
 from rswarp.utilities.ionization import Ionization
 from rswarp.utilities.beam_distributions import createKV
+from rswarp.utilities.file_utils import cleanupPrevious
 
 import rsoopic.h2crosssections as h2crosssections
 
 import shutil
 from shutil import os
+
+# prevent gist from starting upon setup
+top.lprntpara = false
+top.lpsplots = false
 
 simulateIonization = True
 
@@ -28,15 +33,17 @@ emittedelec = Species(type=Electron, name='emitted e-', weight=sw)
 
 beam.ibeam = 1e-6
 
-
 top.lrelativ = True
 top.relativity = 1
 
-def cleanupPrevious(outputDirectory='angleDiagnostic'):
-    if os.path.exists(outputDirectory):
-        shutil.rmtree(outputDirectory, ignore_errors=True)
+# Directory paths
+field_base_path = os.path.join(diagDir, 'fields')
+diagFDir = {'magnetic': os.path.join(field_base_path, 'magnetic'),
+            'electric': os.path.join(field_base_path, 'electric')}
 
-cleanupPrevious()
+# Cleanup command if directories already exist
+if comm_world.rank == 0:
+    cleanupPrevious(diagDir, diagFDir)
 
 ################################
 # 3D Simulation Parameters     #
@@ -148,7 +155,7 @@ if simulateIonization is True:
         # sampleEmittedAngle=lambda nnew, emitted_energy, incident_energy: np.random.uniform(0, 2*np.pi, size=nnew),
         sampleEmittedAngle=h2crosssections.generateAngle,
         # sampleIncidentAngle=lambda nnew, emitted_energy, incident_energy, emitted_theta: np.random.uniform(0, 2*np.pi, size=nnew),
-        writeAngleDataDir=diagDir + '/angleDiagnostic',
+        writeAngleDataDir=False,
         writeAnglePeriod=10,
         l_remove_incident=False,
         l_remove_target=False,
@@ -174,7 +181,7 @@ diagP = ParticleDiagnostic(
     species={species.name: species for species in listofallspecies},
     comm_world=comm_world,
     lparallel_output=False,
-    write_dir=diagDir + '/xySlice/'
+    write_dir=diagDir
 )
 
 diags = [diagP]
