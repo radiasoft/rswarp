@@ -504,7 +504,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Set externally derived parameters
     efficiency.tec_parameters['A_em'][0] = cathode_area * 1e4  # cm**2
-    efficiency.tec_parameters['occlusion'][0] = efficiency.calculate_occlusion(**efficiency.tec_parameters)
+    if install_grid:
+        efficiency.tec_parameters['occlusion'][0] = efficiency.calculate_occlusion(**efficiency.tec_parameters)
+    else:
+        efficiency.tec_parameters['occlusion'][0] = 0.0
 
     # Set derived parameters from simulation
     efficiency.tec_parameters['run_time'][0] = crossing_measurements * steps_per_crossing * dt
