@@ -332,8 +332,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     top.lprntpara = false
     top.lpsplots = false
 
-    top.verbosity = 0  # Reduce solver verbosity
-    solverE.mgverbose = 0  # further reduce output upon stepping - prevents websocket timeouts in Jupyter notebook
+    top.verbosity = -1  # Reduce solver verbosity
+    solverE.mgverbose = -1  # further reduce output upon stepping - prevents websocket timeouts in Jupyter notebook
 
     init_iters = 20000
     regular_iters = 200
