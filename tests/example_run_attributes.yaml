@@ -1,0 +1,25 @@
+other: {}
+simulation:
+  field_diagnostic_switch: false
+  injection_type: 2
+  install_grid: true
+  lost_diagnostic_switch: false
+  max_wall_time: 1000000000.0
+  particle_diagnostic_switch: false
+  random_seed: true
+tec:
+  T_coll: 323.15
+  T_em: 1687.15
+  V_grid: 15.0
+  gap_distance: 1.0e-06
+  grid_height: 0.5
+  phi_coll: 0.381
+  phi_em: 2.174
+  rho_cw: 0.0011984448
+  rho_ew: 0.0011984448
+  rho_load: 0.01648048
+  run_id: 0
+  strut_height: 1.0e-08
+  strut_width: 1.0e-08
+  x_struts: 1
+  y_struts: 1
