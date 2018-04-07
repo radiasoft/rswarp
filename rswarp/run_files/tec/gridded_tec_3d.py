@@ -192,7 +192,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Returns velocity beam_beta (in units of beta) for which frac of emitted particles have v < beam_beta * c
     beam_beta = sources.compute_cutoff_beta(EMITTER_TEMP, frac=0.99)
 
-    PTCL_PER_STEP = 500 #300
+    PTCL_PER_STEP = 100
 
     if injection_type == 1:
         CURRENT_MODIFIER = 0.5  # Factor to multiply CL current by when setting beam current
@@ -431,7 +431,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     crossing_wall_time = times[-1] * steps_per_crossing / ss_check_interval  # Estimate wall time for one crossing
     print('crossing_wall_time estimate: {}, for {} steps'.format(crossing_wall_time, steps_per_crossing))
-    print('wind-down loop time estimate: {}, for {} steps'.format(crossing_wall_time * steps_per_crossing / ss_check_interval, ss_check_interval))
+    print('wind-down loop time estimate: {}, for {} steps'.format(crossing_wall_time *
+                                                                  steps_per_crossing / ss_check_interval,
+                                                                  ss_check_interval))
     for sint in range(crossing_measurements):
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
         if (max_wall_time - clock) < crossing_wall_time:
@@ -547,7 +549,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
         np.save('iv_data.npy', np.array([circuit.current_history, circuit.voltage_history]))
 
-        write_parameters(run_attributes, filename='diags_id{}/'.format(run_id))
+        write_parameter_file(run_attributes, filename='diags_id{}/'.format(run_id))
 
         filename = 'efficiency_id{}.h5'.format(str(run_id))
         with h5.File(os.path.join('diags_id{}'.format(run_id), filename), 'w') as h5file:
@@ -689,7 +691,7 @@ class ExternalCircuit:
         return voltage
 
 
-def write_parameters(pars, filename=None):
+def write_parameter_file(pars, filename=None):
     path, filename = os.path.split(filename)
     if not filename:
         try:
@@ -729,5 +731,15 @@ def write_parameters(pars, filename=None):
 
     with open(filename, 'w') as outputfile:
         yaml.dump(pars, outputfile, default_flow_style=False)
+
+
+def read_parameter_file(filename):
+    parameters = yaml.load(open(filename, 'r'))
+    input_deck = {}
+    for key0 in parameters:
+        for key1, val in parameters[key0].iteritems():
+            input_deck[key1] = val
+
+    return input_deck
 
 
