@@ -2,10 +2,12 @@ import os
 import h5py as h5
 import numpy as np
 import paramiko
+import yaml
 from time import sleep, ctime
+from rswarp.run_files.tec.tec_utilities import write_parameter_file
+
 
 class JobRunner(object):
-
     def __init__(self, server, username):
         self.server = server
         self.username = username
@@ -204,54 +206,79 @@ class JobRunner(object):
         # Use existing client to run SFTP connection
         sftp_client = self.establish_sftp_client(self.client)
 
-        # Move to output directory
-        try:
-            sftp_client.chdir(self.output_directory)
-        except IOError as e:
-            print("Failed to create directory")
-            return e
-
-        for fil in sftp_client.listdir():
-            # If a match_string is given only retrieve files containing match_string
-            if match_string:
-                if match_string in fil:
-                    pass
-                else:
-                    continue
-            else:
-                pass
-
-            # Retrieve the next file
+        for output_directory in self.output_directory:
+            # Move to output directory
             try:
-                sftp_client.get(fil, os.path.join(local_directory, fil))
+                sftp_client.chdir(output_directory)
             except IOError as e:
-                print "File retrieval failed for: {}".format(fil)
-                print "Error returned:\n {}".format(e)
-                pass
+                print("Failed to create directory")
+                return e
+
+            for fil in sftp_client.listdir():
+                # If a match_string is given only retrieve files containing match_string
+                if match_string:
+                    if match_string in fil:
+                        pass
+                    else:
+                        continue
+                else:
+                    pass
+
+                # Retrieve the next file
+                try:
+                    sftp_client.get(fil, os.path.join(local_directory, fil))
+                except IOError as e:
+                    print "File retrieval failed for: {}".format(fil)
+                    print "Error returned:\n {}".format(e)
+                    pass
 
         sftp_client.close()
         print "SFTP Connection Closed"
 
 
-def create_runfiles(population, filename, batch_instructions,
-                    run_header, run_command, run_tail):
-    run_strings = []
-    for i, ind in enumerate(population):
-        parameter_string = ''
-        for val in ind:
-            parameter_string += '{}'.format(val) + ' '
-        parameter_string += '{}'.format(i) + ' '
-        run_strings.append(run_command.format(warp_file=batch_instructions['warp_file'],
-                                              parameters=parameter_string))
+def create_runfiles(generation, population, simulation_parameters, batch_format):
+    """
+    Create batch script for NERSC and associated YAML parameter file for each individual.
+    Args:
+        generation: Int the generation number for the given population
+        population: List containing dicts that specificy parameter attributes
+        simulation_parameters: Dictionary with additional parameters that must be supplied at the simulation start
+        batch_format: YAML template file or appropriate dictionary
 
-    with open(filename, 'w') as f1:
-        f1.write(run_header.format(**batch_instructions))
-        f1.writelines(run_strings)
-        f1.write(run_tail)
+    Returns: None
+
+    """
+    directory = 'generation_{}'.format(generation)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    # Create .yaml files
+    for i, individual in enumerate(population):
+        individual = dict(individual, **simulation_parameters)
+        individual['run_id'] = i
+
+        filepath = os.path.join(directory, 'tec_design_{}-{}.yaml'.format(generation, individual['run_id']))
+        write_parameter_file(individual, filepath)
+
+    # create associated batch files
+    if type(batch_format) == dict:
+        pass
+    elif type(batch_format) == str:
+        batch_format = yaml.load(open(batch_format, 'r'))
+    else:
+        raise TypeError("batch_format must be a file name or dictionary")
+
+    for i in range(len(population)):
+        filename = batch_format['batch_instructions']['file_base_name'] + '_{}'.format(i)
+        run_header = batch_format['batch_header']
+        run_strings = batch_format['batch_srun']
+        run_tail = batch_format['batch_tail']
+        with open(os.path.join(directory, filename), 'w') as f:
+            f.write(run_header.format(id=i, **batch_format['batch_instructions']))
+            f.writelines(run_strings.format(id=i, **batch_format['batch_instructions']))
+            f.write(run_tail)
 
 
 def save_generation(filename, population, generation, labels=None, overwrite_generation=False):
-
     # If attributes are not labled then label with an id number
     label_format = 'str'
     if not labels:
@@ -286,12 +313,13 @@ def save_generation(filename, population, generation, labels=None, overwrite_gen
     data_file.close()
 
 
-# def load_generation(filename, generation):
-#     gen = h5.File(filename, 'r')
-#
-#     try:
-#         attributes = len([key for key in gen['generation{}/'.format(generation)]])
-#     except KeyError:
-#         raise KeyError("Generation {} is not in {}".format(filename, generation))
-#
-#     individuals = [[attr for attr in ]]
+    # def load_generation(filename, generation):
+    #     gen = h5.File(filename, 'r')
+    #
+    #     try:
+    #         attributes = len([key for key in gen['generation{}/'.format(generation)]])
+    #     except KeyError:
+    #         raise KeyError("Generation {} is not in {}".format(filename, generation))
+    #
+    #     individuals = [[attr for attr in ]]
+
