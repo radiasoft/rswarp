@@ -14,13 +14,13 @@ class JobRunner(object):
 
         # Directory containing batch file, Warp input file, and COMPLETE flag file
         # Set when job started by `self.project_directory`
-        self.project_directory = None
+        self.project_directory = []
 
         # Directory containing any output from simulation
-        self.output_directory = None
+        self.output_directory = []
 
         # SLURM ID for current job being executed
-        self.jobid = None
+        self.jobid = []
         # establish canonical client for instance use
         self.client = self.establish_ssh_client(self.server, self.username)
         # if needed sftp will be opened
@@ -62,7 +62,17 @@ class JobRunner(object):
             print "SSH Client is live"
             return self.client
 
-    def upload_batch_file(self, remote_directory, upload_file):
+    def upload_file(self, remote_directory, upload_file):
+        """
+        Upload a file or series of files to a single, remote directory via sftp over an ssh client.
+        Args:
+            remote_directory: Directory path relative to server entry.
+                              Will attempt to make directory if it is not found.
+            upload_file: Relative path to file(s) to be uploaded to the remote directory.
+
+        Returns:
+            None
+        """
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
 
@@ -82,85 +92,100 @@ class JobRunner(object):
 
             sftp_client.chdir(remote_directory)
 
+        # Guarantee upload_file is iterable
+        try:
+            upload_file[0]
+        except IndexError:
+            upload_file = [upload_file, ]
+
         # Set directory
-        sftp_client.put(upload_file, os.path.split(upload_file)[-1])
-        print "{} Uploaded".format(upload_file)
+        for ufile in upload_file:
+            sftp_client.put(ufile, os.path.split(ufile)[-1])
+            print "{} Uploaded".format(ufile)
         sftp_client.close()
         print "SFTP Connection Closed"
 
-    def start_job(self, job):
+    def start_job(self, path, job_name):
+        if type(path) != list:
+            path = [path, ]
+        if type(job_name) != list:
+            job_name = [job_name, ]
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
 
-        path, job_name = os.path.split(job)
-        print 'Starting batch file: {} in directory {}'.format(job_name, path)
+        for p, j in zip(path, job_name):
+            print 'Starting batch file: {} in directory {}'.format(j, p)
 
-        # Check for path existence
-        stdin, stdout, stderr = self.client.exec_command('ls {}'.format(path))
-        out = stdout.read()
-        err = stderr.read()
-        if err:
-            print 'Could not find directory: {}'.format(path)
-            print err, out
-            return err
-        else:
-            print "Contents of job directory:", out
-            assert job_name in out, "Cannot find {}\n Run will not start".format(job_name)
+            # Check for path existence
+            stdin, stdout, stderr = self.client.exec_command('ls {}'.format(p))
+            out = stdout.read()
+            err = stderr.read()
+            if err:
+                print 'Could not find directory: {}'.format(p)
+                print err, out
+                return err
+            else:
+                assert j in out, "Cannot find {}\n Run will not start".format(j)
 
-        stdin, stdout, stderr = self.client.exec_command('cd {}; sbatch {}'.format(path, job_name))
+            stdin, stdout, stderr = self.client.exec_command('cd {}; sbatch {}'.format(p, j))
 
-        out = stdout.read()
-        err = stderr.read()
+            out = stdout.read()
+            err = stderr.read()
 
-        if err:
-            return err
-        elif out:
-            # return JobID
-            status = out.split()
-            self.jobid = status[-1]
+            if err:
+                return err
+            elif out:
+                # return JobID
+                status = out.split()
+                self.jobid.append(status[-1])
 
-            # Set launch director
-            self.project_directory = path
-            return status[-1]
+                # Set launch director
+                self.project_directory.append(p)
+
+        return self.jobid
 
     def check_job_status(self, output_directory=None):
-        if not self.jobid:
+        if len(self.jobid) == 0:
             print "No job known"
             return -1
         if output_directory:
             self.output_directory = output_directory
 
-        check_file = os.path.join(self.output_directory, 'COMPLETE')
-
-        # Make sure we have an SSH connection
         self.refresh_ssh_client()
 
-        stdin, stdout_file, stderr_file = self.client.exec_command('cat {}'.format(check_file))
-        out_file = stdout_file.read()
-        err_file = stderr_file.read()
+        status = []
+        for d, j in zip(self.output_directory, self.jobid):
+            check_file = os.path.join(d, 'COMPLETE')
 
-        stdin, stdout_job, stderr_job = self.client.exec_command('squeue --job {} -o %r'.format(self.jobid))
-        out_job = stdout_job.read()
-        err_job = stderr_job.read()
+            # Make sure we have an SSH connection
 
-        if out_file:
-            print "FOUND COMPLETE"
-            if '0' in out_file:
-                # Complete
-                "{}: Job {} complete".format(ctime(), self.jobid)
-                return 0
-            else:
+            stdin, stdout_file, stderr_file = self.client.exec_command('cat {}'.format(check_file))
+            out_file = stdout_file.read()
+            err_file = stderr_file.read()
+
+            stdin, stdout_job, stderr_job = self.client.exec_command('squeue --job {} -o %r'.format(j))
+            out_job = stdout_job.read()
+            err_job = stderr_job.read()
+
+            if out_file:
+                if '0' in out_file:
+                    # Complete
+                    "{}: Job {} complete".format(ctime(), j)
+                    status.append(0)
+                else:
+                    # Fatal error
+                    "Unknown fatal error"
+                    status.append(-1)
+            elif err_file and out_job:
+                # Job not complete but still active
+                print "{}: Job active but not complete".format(ctime())
+                status.append(1)
+            elif err_file and err_job:
                 # Fatal error
-                "Unknown fatal error"
-                return -1
-        elif err_file and out_job:
-            # Job not complete but still active
-            print "{}: Job active but not complete".format(ctime())
-            return 1
-        elif err_file and err_job:
-            # Fatal error
-            print "{}: Error on status and file".format(ctime())
-            return -1
+                print "{}: Error on status and file".format(ctime())
+                status.append(-1)
+
+        return status
 
     def monitor_job(self, timer, remote_output_directory, local_directory, match_string=None):
         self.output_directory = remote_output_directory
@@ -273,8 +298,8 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
         run_strings = batch_format['batch_srun']
         run_tail = batch_format['batch_tail']
         with open(os.path.join(directory, filename), 'w') as f:
-            f.write(run_header.format(id=i, **batch_format['batch_instructions']))
-            f.writelines(run_strings.format(id=i, **batch_format['batch_instructions']))
+            f.write(run_header.format(**batch_format['batch_instructions']))
+            f.writelines(run_strings.format(gen=generation, id=i, **batch_format['batch_instructions']))
             f.write(run_tail)
 
 
