@@ -22,7 +22,7 @@ from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from warp.particles.extpart import ZCrossingParticles
 from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.file_utils import cleanupPrevious
-from tec_utilities import create_grid, record_time, SteadyState, ExternalCircuit, write_parameter_file
+from tec_utilities import record_time, SteadyState, ExternalCircuit, write_parameter_file
 from rswarp.diagnostics.ConductorDiagnostics import analyze_scraped_particles
 
 # Constants imports
@@ -128,7 +128,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     print "Channel width: {}, DX = {}".format(CHANNEL_WIDTH, dx)
     print "Channel width: {}, DY = {}".format(CHANNEL_WIDTH, dy)
-    print "Channel length: {}, DZ = {}".format(CHANNEL_WIDTH, dz)
+    print "Channel length: {}, DZ = {}".format(gap_distance, dz)
 
     # Solver Geometry and Boundaries
 
@@ -307,7 +307,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Particle/Field diagnostic options
     if particle_diagnostic_switch:
-        particleperiod = 25  # TEMP
+        particleperiod = 250  # TEMP
         particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=top, w3d=w3d,
                                                    species={species.name: species
                                                             for species in listofallspecies},
@@ -322,6 +322,13 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                                                   comm_world=comm_world,
                                                                   period=fieldperiod)
         installafterstep(efield_diagnostic_0.write)
+
+    # Set externally derived parameters for efficiency calculation
+    efficiency.tec_parameters['A_em'][0] = cathode_area * 1e4  # cm**2
+    if install_grid:
+        efficiency.tec_parameters['occlusion'][0] = efficiency.calculate_occlusion(**efficiency.tec_parameters)
+    else:
+        efficiency.tec_parameters['occlusion'][0] = 0.0
 
     ##########################
     # SOLVER SETTINGS/GENERATE
@@ -373,10 +380,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     early_abort = 0  # If true will flag output data to notify
     startup_time = 4 * gap_distance / vz_accel  # ~4 crossing times to approach steady-state with external circuit
-    crossing_measurements = 4  # Number of crossing times to record for
+    crossing_measurements = 10  # Number of crossing times to record for
     steps_per_crossing = int(gap_distance / vz_accel / dt)
     ss_check_interval = int(steps_per_crossing / 2.)
-    ss_max_checks = 20  # Maximum number of of times to run steady-state check procedure before aborting
+    ss_max_checks = 10  # Maximum number of of times to run steady-state check procedure before aborting
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks the current, total simulation-runtime
 
@@ -389,7 +396,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Start checking for Steady State Operation
     tol = 0.01
-    steady_state = SteadyState(top, plate, steps_per_crossing)
     ss_flag = 0
     check_count = 0  # Track number of times steady-state check performed
 
@@ -404,10 +410,25 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         _, current = plate.get_current_history(js=None, l_lost=1, l_emit=0,
                                                l_image=0, tmin=ss_check_interval, tmax=None, nt=1)
         current = np.sum(current)
+
         if current < 0.5 * efficiency.tec_parameters['occlusion'][0] * beam_current:
             # If too little current is getting through run another check cycle
             check_count += 1
+            print("Completed check {}, insufficient current, running again for {} steps".format(check_count,
+                                                                                                ss_check_interval))
             continue
+
+        try:
+            # If steady_state check initialized no need to do it again
+            steady_state
+        except NameError:
+            # If this is the first pass with sufficient current then initialize the check
+            if check_count == 0:
+                # If the initial period was long enough to get current on collector then use that
+                steady_state = SteadyState(top, plate, steps_per_crossing)
+            else:
+                # If we had to run several steady state checks with no current then just use the period with current
+                steady_state = SteadyState(top, plate, ss_check_interval)
 
         ss_flag = steady_state(steps_per_crossing)
         check_count += 1
@@ -464,8 +485,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     initial_population = measurement_beam.npsim[0]
     measurement_tol = 0.03
-    if particle_diagnostic_switch:
-        particle_diagnostic_0.period = ss_check_interval
+    # if particle_diagnostic_switch:
+    #     particle_diagnostic_0.period = ss_check_interval
     while measurement_beam.npsim[0] / initial_population > measurement_tol:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
         if (max_wall_time - clock) < crossing_wall_time * ss_check_interval / steps_per_crossing :
@@ -502,13 +523,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     for key in surface_charge:
         # We can abuse the fact that js=0 for background species to filter it from the sum
         measured_charge[key] = np.sum(surface_charge[key][:, 1] * surface_charge[key][:, 3])
-
-    # Set externally derived parameters
-    efficiency.tec_parameters['A_em'][0] = cathode_area * 1e4  # cm**2
-    if install_grid:
-        efficiency.tec_parameters['occlusion'][0] = efficiency.calculate_occlusion(**efficiency.tec_parameters)
-    else:
-        efficiency.tec_parameters['occlusion'][0] = 0.0
 
     # Set derived parameters from simulation
     efficiency.tec_parameters['run_time'][0] = crossing_measurements * steps_per_crossing * dt
@@ -585,3 +599,29 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                            data=msrmnt_current)
 
             h5file.create_dataset('times', data=times)
+
+
+def create_grid(nx, ny, volts,
+                grid_height, strut_width, strut_height,
+                strut_length):
+    grid_list = []
+    positions_x = np.linspace(w3d.xmmin, w3d.xmmax, 2 * nx + 1)
+    positions_y = np.linspace(w3d.ymmin, w3d.ymmax, 2 * ny + 1)
+    for i in positions_y[1:-1:2]:
+        box = Box(strut_length, strut_width, strut_height,
+                  xcent=0., ycent=i, zcent=grid_height,
+                  voltage=volts,
+                  condid='next')
+        grid_list.append(box)
+    for j in positions_x[1:-1:2]:
+        box = Box(strut_width, strut_length, strut_height,
+                  xcent=j, ycent=0., zcent=grid_height,
+                  voltage=volts,
+                  condid='next')
+        grid_list.append(box)
+
+    grid = grid_list[0]
+    for strut in grid_list[1:]:
+        grid += strut
+
+    return grid, grid_list
