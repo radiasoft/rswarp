@@ -3,31 +3,6 @@ import os
 import yaml
 import numpy as np
 
-def create_grid(nx, ny, volts,
-                grid_height, strut_width, strut_height,
-                strut_length):
-    grid_list = []
-    positions_x = np.linspace(w3d.xmmin, w3d.xmmax, 2 * nx + 1)
-    positions_y = np.linspace(w3d.ymmin, w3d.ymmax, 2 * ny + 1)
-    for i in positions_y[1:-1:2]:
-        box = Box(strut_length, strut_width, strut_height,
-                  xcent=0., ycent=i, zcent=grid_height,
-                  voltage=volts,
-                  condid='next')
-        grid_list.append(box)
-    for j in positions_x[1:-1:2]:
-        box = Box(strut_width, strut_length, strut_height,
-                  xcent=j, ycent=0., zcent=grid_height,
-                  voltage=volts,
-                  condid='next')
-        grid_list.append(box)
-
-    grid = grid_list[0]
-    for strut in grid_list[1:]:
-        grid += strut
-
-    return grid, grid_list
-
 
 def record_time(func, time_list, *args, **kwargs):
     t1 = time.time()
