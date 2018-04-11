@@ -514,7 +514,12 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     ######################
     # CALCULATE EFFICIENCY
     ######################
-    emitter_flux = np.vstack(emitter_flux)
+    try:
+        emitter_flux = np.vstack(emitter_flux)
+    except ValueError:
+        # If this triggered then measurement emission never took place
+        # Run took too long probably and abort took place
+        emitter_flux = np.array([0., 0., 0.])
 
     # Find integrated charge on each conductor
     surface_charge = analyze_scraped_particles(top, measurement_beam, solverE)
