@@ -470,7 +470,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         velocity_array = np.array([ZCross.getvx(js=measurement_beam.js),
                                    ZCross.getvy(js=measurement_beam.js),
                                    ZCross.getvz(js=measurement_beam.js)]).transpose()
-        velocity_array = velocity_array[velocity_array[:, 2] >= 0.]  # Filter particles moving to emitter
+        # velocity_array = velocity_array[velocity_array[:, 2] >= 0.]  # Filter particles moving to emitter
         emitter_flux.append(velocity_array)
 
         ZCross.clear()  # Clear ZcrossingParticles memory
@@ -503,7 +503,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                        ZCross.getvy(js=measurement_beam.js),
                                        ZCross.getvz(js=measurement_beam.js)]).transpose()
             print "Backwards particles: {}".format(np.where(velocity_array[:, 2] < 0.)[0].shape[0])
-            velocity_array = velocity_array[velocity_array[:, 2] >= 0.]  # Filter particles moving to emitter
+            # velocity_array = velocity_array[velocity_array[:, 2] >= 0.]  # Filter particles moving to emitter
             emitter_flux.append(velocity_array)
             ZCross.clear()  # Clear ZcrossingParticles memory
         print(" Wind-down: Taking {} steps, On Step: {}, {} Particles Left".format(ss_check_interval, top.it,

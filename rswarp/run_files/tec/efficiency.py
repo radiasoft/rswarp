@@ -123,7 +123,7 @@ def calculate_power_flux(velocity, weight, phi, run_time, A_em, **kwargs):
         Power in W/cm**2
     """
     run_time, A_em = run_time[0], A_em[0]
-    v_sqr = velocity[:, 0]**2 + velocity[:, 1]**2 + velocity[:, 2]**2
+    v_sqr = (velocity[:, 0]**2 + velocity[:, 1]**2 + velocity[:, 2]**2) * np.sign(velocity[:, 2])
     ke = 0.5 * m_e * np.sum(v_sqr)
     N = v_sqr.size
     E_tot = ke + phi * e * N
