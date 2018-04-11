@@ -4,6 +4,7 @@ import numpy as np
 import paramiko
 import yaml
 from time import sleep, ctime
+from re import findall
 from rswarp.run_files.tec.tec_utilities import write_parameter_file
 
 
@@ -144,17 +145,19 @@ class JobRunner(object):
 
         return self.jobid
 
-    def check_job_status(self, output_directory=None):
+    def check_job_status(self, output_directory=None, job_flag=None):
         if len(self.jobid) == 0:
             print "No job known"
             return -1
         if output_directory:
             self.output_directory = output_directory
+        if job_flag:
+            self.job_flag = job_flag
 
         self.refresh_ssh_client()
 
         status = []
-        for d, j in zip(self.output_directory, self.jobid):
+        for d, j, f in zip(self.output_directory, self.jobid, job_flag):
             check_file = os.path.join(d, 'COMPLETE')
 
             # Make sure we have an SSH connection
@@ -167,16 +170,7 @@ class JobRunner(object):
             out_job = stdout_job.read()
             err_job = stderr_job.read()
 
-            if out_file:
-                if '0' in out_file:
-                    # Complete
-                    "{}: Job {} complete".format(ctime(), j)
-                    status.append(0)
-                else:
-                    # Fatal error
-                    "Unknown fatal error"
-                    status.append(-1)
-            elif err_file and out_job:
+            if err_file and out_job:
                 # Job not complete but still active
                 print "{}: Job active but not complete".format(ctime())
                 status.append(1)
@@ -184,20 +178,35 @@ class JobRunner(object):
                 # Fatal error
                 print "{}: Error on status and file".format(ctime())
                 status.append(-1)
+            elif out_file:
+                matches = findall('\d+', out_file)
+                if str(f) in matches:
+                    # Complete
+                    "{}: Job {} complete".format(ctime(), j)
+                    status.append(0)
+                else:
+                    # Fatal error
+                    "Unknown fatal error"
+                    status.append(-1)
 
         return status
 
-    def monitor_job(self, timer, remote_output_directory, local_directory, match_string=None):
-        self.output_directory = remote_output_directory
+    def monitor_job(self, timer, output_directory, local_directory, match_string=None, sleep_start=600):
+        if type(output_directory) != list:
+            self.output_directory = [output_directory, ]
+        if type(local_directory) != list:
+            self.local_directory = [local_directory, ]
 
-        sleep(10 * 60)
-        timer -= 10 * 60
+        sleep(sleep_start)
+        timer -= sleep_start
         status = self.check_job_status()
-        if status == 0:
-            self.retrieve_fitness(local_directory, match_string=match_string)
-            return 0
-        elif status == -1:
-            return -1
+        for s, d in zip(status, self.output_directory):  # TODO: The retrieve_fitness method will need to be updated and use outputdirectory
+            if s == 0:
+                self.retrieve_fitness(local_directory, match_string=match_string)
+                # remove entry from all lists
+                # self.output_directory, self.job_flag, self.job_id
+            elif status == -1:
+                return -1
 
         interval = 300
         while timer > 0:
@@ -300,7 +309,7 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
         with open(os.path.join(directory, filename), 'w') as f:
             f.write(run_header.format(**batch_format['batch_instructions']))
             f.writelines(run_strings.format(gen=generation, id=i, **batch_format['batch_instructions']))
-            f.write(run_tail)
+            f.write(run_tail.format(**batch_format['batch_instructions']))
 
 
 def save_generation(filename, population, generation, labels=None, overwrite_generation=False):
