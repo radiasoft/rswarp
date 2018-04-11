@@ -435,6 +435,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     stop_ss_check = top.it  # For diag file
 
+    # If there was a failure to reach steady state after specified number of checks then pass directly end
+    crossing_measurements = 0
+
     # Start Steady State Operation
     print(" Steady State Reached.\nStarting efficiency "
           "recording for {} crossing times.\nThis will be {} steps".format(crossing_measurements,
@@ -532,7 +535,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Set derived parameters from simulation
     efficiency.tec_parameters['run_time'][0] = crossing_measurements * steps_per_crossing * dt
 
-    efficiency.tec_parameters['J_em'][0] = e * (emitter_flux.shape[0] - measured_charge[scraper_dictionary['source']]) \
+    # Find total number of measurement particles that were emitted
+    total_macroparticles = measurement_beam.npsim[0] + np.sum([measured_charge[key] for key in surface_charge])
+    efficiency.tec_parameters['J_em'][0] = e * (total_macroparticles - measured_charge[scraper_dictionary['source']]) \
                                         * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
 
