@@ -436,7 +436,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     stop_ss_check = top.it  # For diag file
 
     # If there was a failure to reach steady state after specified number of checks then pass directly end
-    crossing_measurements = 0
+    if check_count == ss_max_checks:
+        crossing_measurements = 0
 
     # Start Steady State Operation
     print(" Steady State Reached.\nStarting efficiency "
@@ -522,7 +523,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     except ValueError:
         # If this triggered then measurement emission never took place
         # Run took too long probably and abort took place
-        emitter_flux = np.array([0., 0., 0.])
+        emitter_flux = np.array([[0., 0., 0.]])
 
     # Find integrated charge on each conductor
     surface_charge = analyze_scraped_particles(top, measurement_beam, solverE)
