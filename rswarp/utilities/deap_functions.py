@@ -162,7 +162,7 @@ def mutIntorGauss(individual, template=tec_template):
     return individual,
 
 
-def mutBoundedExp(individual, r, k, template=tec_template):
+def mutBoundedExp(individual, template=tec_template):
     """
     Describes a variable step size bounded mutation operator.
     Performs Var_i = Var_i + s_i * r_i * a_i. Chance for variable to mutate should be given in template.
@@ -184,6 +184,8 @@ def mutBoundedExp(individual, r, k, template=tec_template):
 
     """
     for key in individual:
+        r = template[key]['mutation']['r']
+        k = template[key]['mutation']['k']
         indpbInteger = template[key]['mutation']['probability']
         if random.random() >= indpbInteger:
             continue
