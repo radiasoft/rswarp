@@ -158,35 +158,36 @@ class JobRunner(object):
 
         status = []
         for d, j, f in zip(self.output_directory, self.jobid, job_flag):
-            check_file = os.path.join(d, 'COMPLETE')
-
+            # Status file deposited one level up from diagnostic files
+            check_file = os.path.join(os.path.split(d)[0], 'COMPLETE')
+            print check_file
             # Make sure we have an SSH connection
 
             stdin, stdout_file, stderr_file = self.client.exec_command('cat {}'.format(check_file))
             out_file = stdout_file.read()
             err_file = stderr_file.read()
-
+            print 'm1'
             stdin, stdout_job, stderr_job = self.client.exec_command('squeue --job {} -o %r'.format(j))
             out_job = stdout_job.read()
             err_job = stderr_job.read()
-
+            print 'm2'
             if err_file and out_job:
                 # Job not complete but still active
-                print "{}: Job active but not complete".format(ctime())
+                print "{}: Job for run_id {} active but not complete".format(ctime(), f)
                 status.append(1)
             elif err_file and err_job:
                 # Fatal error
-                print "{}: Error on status and file".format(ctime())
+                print "{}: Error on status and file for run_id {}".format(ctime(), f)
                 status.append(-1)
             elif out_file:
                 matches = findall('\d+', out_file)
                 if str(f) in matches:
                     # Complete
-                    "{}: Job {} complete".format(ctime(), j)
+                    print "{}: Job {}, running run_id {}, complete ".format(ctime(), j, f)
                     status.append(0)
                 else:
                     # Fatal error
-                    "Unknown fatal error"
+                    print "Unknown fatal error for run_id {}".format(f)
                     status.append(-1)
 
         return status
@@ -245,8 +246,8 @@ class JobRunner(object):
             try:
                 sftp_client.chdir(output_directory)
             except IOError as e:
-                print("Failed to create directory")
-                return e
+                print("Failed to retrieve from directory {}".format(output_directory))
+                continue
 
             for fil in sftp_client.listdir():
                 # If a match_string is given only retrieve files containing match_string
@@ -309,7 +310,7 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
         with open(os.path.join(directory, filename), 'w') as f:
             f.write(run_header.format(**batch_format['batch_instructions']))
             f.writelines(run_strings.format(gen=generation, id=i, **batch_format['batch_instructions']))
-            f.write(run_tail.format(**batch_format['batch_instructions']))
+            f.write(run_tail.format(gen=generation, id=i, **batch_format['batch_instructions']))
 
 
 def save_generation(filename, population, generation, labels=None, overwrite_generation=False):
@@ -356,4 +357,29 @@ def save_generation(filename, population, generation, labels=None, overwrite_gen
     #         raise KeyError("Generation {} is not in {}".format(filename, generation))
     #
     #     individuals = [[attr for attr in ]]
+
+
+def return_efficiency(generation, population, directory):
+    """
+
+    Args:
+        generation: Int indicating generation number
+        population: Iterable containing population individuals constructed by DEAP
+        directory: Directory holding files to calculate efficiency from
+
+    Returns:
+
+    """
+    efficiency = []
+    files = os.listdir(directory)
+    for i, individual in enumerate(population):
+        if "efficiency_id{}-{}.h5".format(generation, i) not in files:
+            efficiency.append(0.0)
+            continue
+        else:
+            f = os.path.join(directory, "efficiency_id{}-{}.h5".format(generation, i))
+            data = h5.File(f, 'r')
+            efficiency.append(data['efficiency'].attrs['eta'])
+
+    return efficiency
 
