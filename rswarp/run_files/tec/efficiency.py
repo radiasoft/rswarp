@@ -163,7 +163,9 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
                emiss_eff[0], T_env[0], J_grid[0], V_grid[0], occlusion[0], rho_load[0], run_time[0]
 
     t = 1. - occlusion
-    J_coll = rd_current(phi_coll, T_coll)
+    # Turning off analytic backward current. Is a small effect but creates misleading results in low forward current
+    #  cases encountered frequently in optimization
+    J_coll = 0.0  # rd_current(phi_coll, T_coll)
 
     # Modify measured J_ec (emitter to collector current) to remove analytical collector produced current
     J_ec = J_ec - J_coll
