@@ -383,7 +383,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     crossing_measurements = 10  # Number of crossing times to record for
     steps_per_crossing = int(gap_distance / vz_accel / dt)
     ss_check_interval = int(steps_per_crossing / 2.)
-    ss_max_checks = 10  # Maximum number of of times to run steady-state check procedure before aborting
+    ss_max_checks = 8  # Maximum number of of times to run steady-state check procedure before aborting
     times = []  # Write out timing of cycle steps to file
     clock = 0  # clock tracks the current, total simulation-runtime
 
@@ -437,6 +437,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # If there was a failure to reach steady state after specified number of checks then pass directly end
     if check_count == ss_max_checks:
+        early_abort = -1
         crossing_measurements = 0
 
     # Start Steady State Operation
@@ -491,7 +492,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     measurement_tol = 0.03
     # if particle_diagnostic_switch:
     #     particle_diagnostic_0.period = ss_check_interval
-    while measurement_beam.npsim[0] / initial_population > measurement_tol:
+    while measurement_beam.npsim[0] > measurement_tol * initial_population:
         # Kill the loop and proceed to writeout if we don't have time to complete the loop
         if (max_wall_time - clock) < crossing_wall_time * ss_check_interval / steps_per_crossing :
             early_abort = 3
@@ -535,6 +536,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Set derived parameters from simulation
     efficiency.tec_parameters['run_time'][0] = crossing_measurements * steps_per_crossing * dt
+    if crossing_measurements == 0:
+        # Set to large value to force all powers and currents to zero
+        efficiency.tec_parameters['run_time'][0] = 1e20
 
     # Find total number of measurement particles that were emitted
     total_macroparticles = measurement_beam.npsim[0] + np.sum([measured_charge[key] for key in surface_charge])
