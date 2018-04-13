@@ -36,7 +36,7 @@ m = m_e  # electron mass in kg
 def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
          rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance, rho_load,
          run_id,
-         injection_type=2, random_seed=True, install_grid=True, max_wall_time=1e9,
+         injection_type=2, magnetic_field=0.0, random_seed=True, install_grid=True, max_wall_time=1e9,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
     """
     Run a simulation of a gridded TEC.
@@ -247,6 +247,15 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     ##############
     # FIELD SOLVER
     ##############
+    # Add Uniform B_z field if turned on
+    if magnetic_field:
+        bz = np.zeros([w3d.nx, w3d.ny, w3d.nz])
+        bz[:, :, :] = magnetic_field
+        z_start = w3d.zmmin
+        z_stop = w3d.zmmax
+        top.ibpush = 2
+        addnewbgrd(z_start, z_stop, xs=w3d.xmmin, dx=(w3d.xmmax - w3d.xmmin), ys=w3d.ymmin, dy=(w3d.ymmax - w3d.ymmin),
+                   nx=w3d.nx, ny=w3d.ny, nz=w3d.nz, bz=bz)
 
     # Set up fieldsolver
     f3d.mgtol = 1e-6
@@ -407,30 +416,33 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         record_time(step, times, ss_check_interval)
         clock += times[-1]
 
-        _, current = plate.get_current_history(js=None, l_lost=1, l_emit=0,
-                                               l_image=0, tmin=ss_check_interval, tmax=None, nt=1)
-        current = np.sum(current)
+        tstart = (top.it - ss_check_interval) * top.dt
+        _, current1 = plate.get_current_history(js=None, l_lost=1, l_emit=0,
+                                               l_image=0, tmin=tstart, tmax=None, nt=1)
+        current = np.sum(current1)
 
-        if current < 0.5 * efficiency.tec_parameters['occlusion'][0] * beam_current:
+        if np.abs(current) < 0.5 * efficiency.tec_parameters['occlusion'][0] * beam_current:
             # If too little current is getting through run another check cycle
             check_count += 1
             print("Completed check {}, insufficient current, running again for {} steps".format(check_count,
                                                                                                 ss_check_interval))
             continue
 
-        try:
-            # If steady_state check initialized no need to do it again
-            steady_state
-        except NameError:
-            # If this is the first pass with sufficient current then initialize the check
-            if check_count == 0:
-                # If the initial period was long enough to get current on collector then use that
-                steady_state = SteadyState(top, plate, steps_per_crossing)
-            else:
-                # If we had to run several steady state checks with no current then just use the period with current
-                steady_state = SteadyState(top, plate, ss_check_interval)
-
-        ss_flag = steady_state(steps_per_crossing)
+        ss_flag = 1
+        # print np.abs(current), 0.5 * efficiency.tec_parameters['occlusion'][0] * beam_current
+        # try:
+        #     # If steady_state check initialized no need to do it again
+        #     steady_state
+        # except NameError:
+        #     # If this is the first pass with sufficient current then initialize the check
+        #     if check_count == 0:
+        #         # If the initial period was long enough to get current on collector then use that
+        #         steady_state = SteadyState(top, plate, steps_per_crossing)
+        #     else:
+        #         # If we had to run several steady state checks with no current then just use the period with current
+        #         steady_state = SteadyState(top, plate, ss_check_interval)
+        #
+        # ss_flag = steady_state(steps_per_crossing)
         check_count += 1
 
     stop_ss_check = top.it  # For diag file
