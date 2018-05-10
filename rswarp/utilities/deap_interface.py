@@ -63,7 +63,7 @@ class JobRunner(object):
             print "SSH Client is live"
             return self.client
 
-    def upload_file(self, remote_directory, upload_file):
+    def upload_file(self, remote_directory, upload_file, debug=False):
         """
         Upload a file or series of files to a single, remote directory via sftp over an ssh client.
         Args:
@@ -74,37 +74,46 @@ class JobRunner(object):
         Returns:
             None
         """
+        if type(remote_directory) != list:
+            remote_directory = [remote_directory, ]
+        if type(upload_file) != list:
+            upload_file = [upload_file, ]
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
 
         # Use existing client to run SFTP connection
         sftp_client = self.establish_sftp_client(self.client)
-
-        # Make new directory to upload file to, if required
-        # Move to new directory
-        try:
-            sftp_client.chdir(remote_directory)
-        except IOError:
+        home_directory = sftp_client.getcwd()
+        for dir, ufile in zip(remote_directory, upload_file):
+            # Make new directory to upload file to, if required
+            # Move to new directory
             try:
-                sftp_client.mkdir(remote_directory)
-            except IOError as e:
-                print("Failed to create directory")
-                return e
+                sftp_client.chdir(dir)
+            except IOError:
+                try:
+                    sftp_client.mkdir(dir)
+                except IOError as e:
+                    print("Failed to create directory")
+                    return e
 
-            sftp_client.chdir(remote_directory)
+                sftp_client.chdir(dir)
 
-        # Guarantee upload_file is iterable
-        try:
-            upload_file[0]
-        except IndexError:
-            upload_file = [upload_file, ]
+            # Guarantee upload_file is iterable
+            try:
+                upload_file[0]
+            except IndexError:
+                upload_file = [upload_file, ]
 
-        # Set directory
-        for ufile in upload_file:
             sftp_client.put(ufile, os.path.split(ufile)[-1])
-            print "{} Uploaded".format(ufile)
+            # Back to home before next file uploaded
+            sftp_client.chdir(home_directory)
+            if debug:
+                print "{} Uploaded".format(ufile)
+
         sftp_client.close()
         print "SFTP Connection Closed"
+
+        return 0
 
     def start_job(self, path, job_name):
         if type(path) != list:
@@ -308,7 +317,7 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
         run_strings = batch_format['batch_srun']
         run_tail = batch_format['batch_tail']
         with open(os.path.join(directory, filename), 'w') as f:
-            f.write(run_header.format(**batch_format['batch_instructions']))
+            f.write(run_header.format(id=i, **batch_format['batch_instructions']))
             f.writelines(run_strings.format(gen=generation, id=i, **batch_format['batch_instructions']))
             f.write(run_tail.format(gen=generation, id=i, **batch_format['batch_instructions']))
 
@@ -379,7 +388,19 @@ def return_efficiency(generation, population, directory):
         else:
             f = os.path.join(directory, "efficiency_id{}-{}.h5".format(generation, i))
             data = h5.File(f, 'r')
-            efficiency.append(data['efficiency'].attrs['eta'])
+
+            penalty = 0
+            total_power = 0.0
+            for attr in ['P_ew', 'P_r', 'P_ec', 'P_load', 'P_gate']:
+                total_power += abs(data['efficiency'].attrs[attr])
+                if data['efficiency'].attrs[attr] < 0.0:
+                    penalty += data['efficiency'].attrs[attr]
+
+            penalty = 1.0 + abs(penalty / total_power)
+            # print penalty, data['efficiency'].attrs['eta'], abs(data['efficiency'].attrs['eta']) * -penalty, \
+            #     data['efficiency'].attrs['P_load'] > data['efficiency'].attrs['P_gate'], i
+            efficiency.append(abs(data['efficiency'].attrs['eta']) * -penalty)
+            data.close()
 
     return efficiency
 
