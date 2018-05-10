@@ -20,6 +20,7 @@ from rswarp.cathode import sources
 from rswarp.run_files.tec import efficiency
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from warp.particles.extpart import ZCrossingParticles
+from warp.utils.loadbalance import LoadBalancer
 from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.file_utils import cleanupPrevious
 from tec_utilities import record_time, SteadyState, ExternalCircuit, write_parameter_file
@@ -35,7 +36,7 @@ m = m_e  # electron mass in kg
 
 def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
          rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance, rho_load,
-         run_id,
+         run_id, channel_width=100e-9,
          injection_type=2, magnetic_field=0.0, random_seed=True, install_grid=True, max_wall_time=1e9,
          particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
     """
@@ -97,37 +98,36 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         if comm_world.rank == 0:
             cleanupPrevious(diagDir, diagFDir)
 
+    load_balance = LoadBalancer()
     ######################
     # DOMAIN/GEOMETRY/MESH
     ######################
 
-    CHANNEL_WIDTH = 100e-9  # width of simulation box
-
     # Dimensions
-    X_MAX = +CHANNEL_WIDTH / 2.
+    X_MAX = +channel_width / 2.
     X_MIN = -X_MAX
-    Y_MAX = +CHANNEL_WIDTH / 2.
+    Y_MAX = +channel_width / 2.
     Y_MIN = -Y_MAX
     Z_MAX = gap_distance
     Z_MIN = 0.
 
     # TODO: cells in all dimensions reduced by 10x for testing, will need to verify if this is reasonable (TEMP)
     # Grid parameters
-    dx_want = 10e-9
-    dy_want = 10e-9
-    dz_want = 10e-9
+    dx_want = 5e-9
+    dy_want = 5e-9
+    dz_want = 5e-9
 
-    NUM_X = int(round(CHANNEL_WIDTH / dx_want))  # 20 #128 #10
-    NUM_Y = int(round(CHANNEL_WIDTH / dy_want))  # 20 #128 #10
+    NUM_X = int(round(channel_width / dx_want))  # 20 #128 #10
+    NUM_Y = int(round(channel_width / dy_want))  # 20 #128 #10
     NUM_Z = int(round(gap_distance / dz_want))
 
     # mesh spacing
     dz = (Z_MAX - Z_MIN) / NUM_Z
-    dx = CHANNEL_WIDTH / NUM_X
-    dy = CHANNEL_WIDTH / NUM_Y
+    dx = channel_width / NUM_X
+    dy = channel_width / NUM_Y
 
-    print "Channel width: {}, DX = {}".format(CHANNEL_WIDTH, dx)
-    print "Channel width: {}, DY = {}".format(CHANNEL_WIDTH, dy)
+    print "Channel width: {}, DX = {}".format(channel_width, dx)
+    print "Channel width: {}, DY = {}".format(channel_width, dy)
     print "Channel length: {}, DZ = {}".format(gap_distance, dz)
 
     # Solver Geometry and Boundaries
@@ -173,8 +173,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     measurement_beam = Species(type=Electron, name='measurement')
 
     # Emitter area and position
-    SOURCE_RADIUS_1 = 0.5 * CHANNEL_WIDTH  # a0 parameter - X plane
-    SOURCE_RADIUS_2 = 0.5 * CHANNEL_WIDTH  # b0 parameter - Y plane
+    SOURCE_RADIUS_1 = 0.5 * channel_width  # a0 parameter - X plane
+    SOURCE_RADIUS_2 = 0.5 * channel_width  # b0 parameter - Y plane
     Z_PART_MIN = dz / 1000.  # starting particle z value
 
     # Compute cathode area for geomtry-specific current calculations
@@ -269,7 +269,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     if install_grid:
         accel_grid, gl = create_grid(x_struts, y_struts, V_grid,
                                      grid_height * gap_distance, strut_width, strut_height,
-                                     CHANNEL_WIDTH)
+                                     channel_width)
         accel_grid.voltage = V_grid
 
     # --- Anode Location
@@ -413,7 +413,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
             early_abort = 1
             break
 
-        record_time(step, times, ss_check_interval)
+        record_time(step, times, ss_check_interval*4)
         clock += times[-1]
 
         tstart = (top.it - ss_check_interval) * top.dt
@@ -604,11 +604,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                 eff_group.attrs[key] = efficiency.tec_parameters[key]
             for key in run_attributes:
                 run_group.attrs[key] = run_attributes[key]
-                run_group.attrs['dt'] = top.dt
-                run_group.attrs['stop_initialization'] = stop_initialization
-                run_group.attrs['stop_ss_check'] = stop_ss_check
-                run_group.attrs['stop_eff_calc'] = stop_eff_calc
-                run_group.attrs['stop_winddown'] = stop_winddown
+            run_group.attrs['dt'] = top.dt
+            run_group.attrs['stop_initialization'] = stop_initialization
+            run_group.attrs['stop_ss_check'] = stop_ss_check
+            run_group.attrs['stop_eff_calc'] = stop_eff_calc
+            run_group.attrs['stop_winddown'] = stop_winddown
             # for key, value in scraper_dictionary.iteritems():
             #     scrap_group.attrs[key] = measured_charge[value]
             #
