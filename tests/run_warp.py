@@ -10,10 +10,12 @@ sys.path.append('/home/vagrant/jupyter/repos/rswarp/rswarp/run_files/tec/')
 # Path for use on local
 sys.path.append('/Users/chall/research/github/rswarp/rswarp/run_files/tec/')
 try:
-    from gridded_tec_3d import main, read_parameter_file
+    from gridded_tec_3d import main
+    from tec_utilities import read_parameter_file
 except ImportError:
     try:
-        from rswarp.run_files.tec.gridded_tec_3d import main, read_parameter_file
+        from rswarp.run_files.tec.gridded_tec_3d import main
+        from tec_utilities import read_parameter_file
     except ImportError:
         raise ImportError, "Could not find rswarp.run_files.tec.gridded_tec_3d"
 
