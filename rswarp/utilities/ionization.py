@@ -116,6 +116,13 @@ class Ionization(ionization.Ionization):
         writeAnglePeriod - period to write out angle diagnostics
         """
         # Do all of Warp's normal initialization
+        if not iterable(emitted_species):
+            emitted_species = [emitted_species]
+        for i in range(len(emitted_species)):
+            if emitted_species[i].sw != emitted_species[i - 1]:
+                print("WARNING: Not all emitted species have the same weight\n "
+                      "For incident species: {}".format(incident_species.name))
+
         ionization.Ionization.add(self, incident_species, emitted_species, cross_section,
                                   target_species, ndens, target_fluidvel,
                                   emitted_energy0, emitted_energy_sigma,
@@ -306,7 +313,7 @@ class Ionization(ionization.Ionization):
 
                     # probability
                     ncol = dp * cross_section * vi * \
-                        dt * ipg.ndts[js] * self.stride
+                        dt * ipg.ndts[js] * self.stride / self.inter[incident_species]['emitted_species'][0].sw
                     if top.boost_gamma > 1.:
                         ncol *= top.gammabar_lab / top.gammabar
 
