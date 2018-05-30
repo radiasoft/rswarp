@@ -313,7 +313,7 @@ class Ionization(ionization.Ionization):
 
                     # probability
                     ncol = dp * cross_section * vi * \
-                        dt * ipg.ndts[js] * self.stride / self.inter[incident_species]['emitted_species'][0].sw
+                        dt * ipg.ndts[js] * self.stride / self.inter[incident_species]['emitted_species'][0][0].sw
                     if top.boost_gamma > 1.:
                         ncol *= top.gammabar_lab / top.gammabar
 
@@ -395,7 +395,8 @@ class Ionization(ionization.Ionization):
                                     emitted_energy_sigma = 0
                                 # [uxnew, uynew, uznew] = self.generateEmittedVelocity(
                                 #     nnew, emitted_energy0, emitted_energy_sigma)
-                                emitted_energy = emitted_energy0 + emitted_energy_sigma * np.random.normal(np.size(emitted_energy_sigma))
+                                emitted_energy = np.abs(emitted_energy0 +
+                                                        np.random.normal(loc=0., scale=emitted_energy_sigma, size=nnew))
                             else:
                                 uxnew = uxnewsave
                                 uynew = uynewsave
