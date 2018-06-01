@@ -119,9 +119,11 @@ class Ionization(ionization.Ionization):
         if not iterable(emitted_species):
             emitted_species = [emitted_species]
         for i in range(len(emitted_species)):
-            if emitted_species[i].sw != emitted_species[i - 1]:
-                print("WARNING: Not all emitted species have the same weight\n "
-                      "For incident species: {}".format(incident_species.name))
+            if emitted_species[i].sw != emitted_species[i - 1].sw:
+                print("WARNING: Not all emitted species have the same weight\n"
+                      "         For incident species: {}".format(incident_species.name))
+                print("         Using weighting of species: {}".format(emitted_species[0].name))
+                break
 
         ionization.Ionization.add(self, incident_species, emitted_species, cross_section,
                                   target_species, ndens, target_fluidvel,
