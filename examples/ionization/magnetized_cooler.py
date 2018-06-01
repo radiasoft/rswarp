@@ -9,6 +9,9 @@ from rswarp.cathode.injectors import UserInjectors
 from rswarp.utilities.file_utils import cleanupPrevious
 import rsoopic.h2crosssections as h2crosssections
 
+# Seed set for testing
+np.random.seed(123456)
+
 diagDir = 'diags/hdf5'
 diagFDir = ['diags/fields/magnetic', 'diags/fields/electric']
 
@@ -21,15 +24,22 @@ if wp.comm_world.rank == 0:
 ####################
 # General Parameters
 ####################
-# Set the solver geometry
+# Set the solver geometry to cylindrical
 wp.w3d.solvergeom = wp.w3d.RZgeom
 
 # Switches
 particle_diagnostic_switch = True  # Record particle data periodically
 field_diagnostic_switch = True  # Record field/potential data periodically
-user_injection = True  # Switches injection type
+user_injection = False  # Switches injection type
 space_charge = True  # Controls field solve on/off
 simulateIonization = True  # Include ionization in simulation
+
+if user_injection:
+    # User injection thermionic_rz_injector method uses a r**2 scaling to distribute particles uniformly
+    variable_weight = False
+else:
+    # Warp default injection uses radially weighted particles to make injection uniform in r
+    variable_weight = True
 
 # Dimensions for the electron cooler
 pipe_radius = 0.1524 / 2.  # m (Based on ECE specs)
@@ -38,7 +48,7 @@ cooler_length = 2.0  # m
 cathode_temperature = 0.25  # eV
 
 # Beam
-beam_beta = 0.990813945176
+beam_beta = 0.05  # 0.990813945176
 beam_ke = 3.26e6  # eV
 beam_current = 10e-3  # A
 beam_radius = 0.01  # m
@@ -88,7 +98,7 @@ wp.top.relativity = True
 ptcl_per_step = 1000  # number of particles to inject on each step
 wp.top.npinject = ptcl_per_step
 
-beam = wp.Species(type=wp.Electron, name='Electron')
+beam = wp.Species(type=wp.Electron, name='Electron', lvariableweights=variable_weight)
 if space_charge:
     beam.ibeam = beam_current
 else:
@@ -97,31 +107,35 @@ else:
 wp.w3d.l_inj_exact = True  # if true, position and angle of injected particle are
 #  computed analytically rather than interpolated
 
+"""
+A custom injector routine is used here to allow for a very relativistic beam to be injected directly into the simulation
+because Warp's built in routine is not based on relativistic kinematics. Setting user_injection = False should work 
+well for lower energy beams.
+"""
+
 if user_injection:
     wp.top.inject = 6  # Option 6 is a user specified input distribution
-    wp.top.ainject = beam_radius
-    wp.top.binject = beam_radius
+    wp.top.ainject = beam_radius  # Width of injection area in x
+    wp.top.binject = beam_radius  # Wdith of injection area in y
     injector = UserInjectors(beam, wp.w3d, wp.gchange, cathode_temperature=cathode_temperature,
                              cathode_radius=beam_radius,
                              ptcl_per_step=ptcl_per_step, accelerating_voltage=beam_ke, zmin_scale=0.545)
 
-    # TODO: Check if this does anything
-    wp.top.npinject = ptcl_per_step * wp.top.dt * wp.clight * beam_beta / dz
-
     wp.installuserinjection(injector.thermionic_rz_injector)
 else:
     wp.top.inject = 1  # Option 1 is a constant injection (default: particles injected from xy plane at z=0)
-    wp.top.lhalfmaxwellinject = True
+    wp.top.lhalfmaxwellinject = True  # Use half maxwell in axis perpendicular to emission surface (full in other axes)
 
-    beam.a0 = beam_radius
-    beam.b0 = beam_radius
-    beam.ap0 = 0.0
-    beam.bp0 = 0.0
+    beam.a0 = beam_radius  # Width of injected beam in x
+    beam.b0 = beam_radius  # Width of injected beam in y
+    beam.ap0 = 0.0  # Width of injected beam in vx/vz
+    beam.bp0 = 0.0  # Width of injected beam in vy/vz
 
     beam.vbeam = beam_beta * wp.clight
-    beam.vthz = np.sqrt(cathode_temperature * wp.jperev / beam.mass)
-    beam.vthperp = np.sqrt(cathode_temperature * wp.jperev / beam.mass)
-
+    assert beam.vbeam < 0.1 * wp.clight, "Injection velocity > 0.1c. " \
+                                         "Constant injection does not use relativistic kinematics"
+    beam.vthz = np.sqrt(cathode_temperature * wp.jperev / beam.mass)  # z thermal velocity
+    beam.vthperp = np.sqrt(cathode_temperature * wp.jperev / beam.mass)  # x and y thermal velocity
     wp.w3d.l_inj_rz = (wp.w3d.solvergeom == wp.w3d.RZgeom)
 
 ##############################
@@ -132,8 +146,8 @@ else:
 
 if simulateIonization is True:
     # Particle species for emission products of an ionization event
-    h2plus = wp.Species(type=wp.Dihydrogen, charge_state=+1, name='H2+', weight=50)
-    emittedelec = wp.Species(type=wp.Electron, name='emitted e-', weight=50)
+    h2plus = wp.Species(type=wp.Dihydrogen, charge_state=+1, name='H2+', weight=2)
+    emittedelec = wp.Species(type=wp.Electron, name='emitted e-', weight=2)
 
     target_pressure = 0.4  # in Pa
     target_temp = 273  # in K
@@ -255,19 +269,22 @@ scraper = wp.ParticleScraper(conductors)
 # HDF5 Particle/Field diagnostic options
 
 if particle_diagnostic_switch:
-    particleperiod = 500  # Particle diagnostic write frequency
-    particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=wp.top, w3d=wp.w3d,  # Should be set every time
-                                               species={species.name: species for species in wp.listofallspecies},  # Include data from all existing species in write
-                                               comm_world=wp.comm_world, lparallel_output=False,  # Option for parallel write (if available on system)
+    particleperiod = 50  # Particle diagnostic write frequency
+    particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=wp.top, w3d=wp.w3d,  # Should always be set
+                                               # Include data from all existing species in write
+                                               species={species.name: species for species in wp.listofallspecies},
+                                               # Option for parallel write (if available on system)
+                                               comm_world=wp.comm_world, lparallel_output=False,
+                                               # `ParticleDiagnostic` automatically append 'hdf5' to path name
                                                write_dir=diagDir[:-5])
     wp.installafterstep(particle_diagnostic_0.write)  # Write method is installed as an after-step action
 
 if field_diagnostic_switch:
-    fieldperiod = 1000  # Field diagnostic write frequency
-    efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=wp.top, w3d=wp.w3d,  # Should be set every time
+    fieldperiod = 100  # Field diagnostic write frequency
+    efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=wp.top, w3d=wp.w3d,
                                                               comm_world=wp.comm_world,
                                                               period=fieldperiod)
-    wp.installafterstep(efield_diagnostic_0.write)   # Write method is installed as an after-step action
+    wp.installafterstep(efield_diagnostic_0.write)
 
     # No B-Field diagnostic since magnetostatic solve turned off
 
@@ -280,10 +297,10 @@ if field_diagnostic_switch:
 ###########################
 # Generate and Run PIC Code
 ###########################
+
 wp.derivqty()  # Set derived beam properties if any are required
 wp.package("w3d")  # Use w3d solver/geometry package
 wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
-
 # Run PIC loop for x steps
-wp.step(30000)
+wp.step(3000)
