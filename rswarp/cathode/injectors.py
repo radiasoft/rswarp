@@ -91,7 +91,17 @@ class UserInjectors(object):
                                   vx=ptclArray[:,1], vy=ptclArray[:,3], vz=ptclArray[:,5], lallindomain=True)
 
     def thermionic_rz_injector(self, return_coordinates=False):
+        """
+        Injector for imitating thermionic injection and dc acceleration of a beam up to relativistic energy.
+        Will create a beam with energy spread based on `cathode_temperature` and then apply a uniform Ez field
+        to accelerate up to voltage set by `accelerating_voltage`.
+        Args:
+            return_coordinates: If true, the function will return an array of the particle coordinates.
+               otherwise the coordinates are just added directly to the Species object.
 
+        Returns:
+             Array of 6D phase space (optional)
+        """
         mass = self.species.mass / e * c**2  # mass in eV/c**2
 
         # Emission from thermal source
@@ -128,7 +138,19 @@ class UserInjectors(object):
         if return_coordinates:
             return coordinates
 
-    def thermionic_rz_injector2(self):
+    def _thermionic_rz_injector2(self):
+        """
+        This function only differs from `thermionic_rz_injector` in how the injector is internally set up in Warp.
+        It is normally recommended that `thermionic_rz_injector` be used unless you have a good reason otherwise.
+
+        Injector for imitating thermionic injection and dc acceleration of a beam up to relativistic energy.
+        Will create a beam with energy spread based on `cathode_temperature` and then apply a uniform Ez field
+        to accelerate up to voltage set by `accelerating_voltage`.
+        Args:
+
+        Returns:
+             None
+        """
         if self.w3d.inj_js == self.species.js:
             mass = self.species.mass / e * c**2  # mass in eV/c**2
 
