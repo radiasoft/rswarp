@@ -30,7 +30,7 @@ wp.w3d.solvergeom = wp.w3d.RZgeom
 # Switches
 particle_diagnostic_switch = True  # Record particle data periodically
 field_diagnostic_switch = True  # Record field/potential data periodically
-user_injection = False  # Switches injection type
+user_injection = True  # Switches injection type
 space_charge = True  # Controls field solve on/off
 simulateIonization = True  # Include ionization in simulation
 
@@ -48,8 +48,8 @@ cooler_length = 2.0  # m
 cathode_temperature = 0.25  # eV
 
 # Beam
-beam_beta = 0.05  # 0.990813945176
-beam_ke = 3.26e6  # eV
+beam_beta = 0.990813945176
+beam_ke = wp.emass / wp.jperev * wp.clight**2 * (1. / np.sqrt(1-beam_beta**2) - 1.)  # eV
 beam_current = 10e-3  # A
 beam_radius = 0.01  # m
 
@@ -109,7 +109,7 @@ wp.w3d.l_inj_exact = True  # if true, position and angle of injected particle ar
 
 """
 A custom injector routine is used here to allow for a very relativistic beam to be injected directly into the simulation
-because Warp's built in routine is not based on relativistic kinematics. Setting user_injection = False should work 
+because Warp's built in routine is not based on relativistic kinematics. Setting user_injection = False should work
 well for lower energy beams.
 """
 
@@ -192,6 +192,7 @@ if simulateIonization is True:
 
 pipe_voltage = 0.0  # Set main pipe section to ground
 electrode_voltage = +2e3  # electrodes held at several kV relative to main pipe
+assert electrode_voltage < beam_ke, "Electrodes potential greater than beam KE."
 
 pipe_radius = pipe_radius
 electrode_length = 0.25

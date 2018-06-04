@@ -78,7 +78,7 @@ def readparticles(filename):
         parray = f['data/%s/particles/%s/position/x' % (step, species)]
         for dim in dims:
             parray = np.column_stack((parray, f['data/%s/particles/%s/' % (step, species) + dim]))
-
+        parray = np.column_stack((parray, f['data/%s/particles/%s/weighting' % (step, species)]))
         particle_arrays[species] = parray
         particle_arrays['time'] = time
         particle_arrays['dt'] = dt
