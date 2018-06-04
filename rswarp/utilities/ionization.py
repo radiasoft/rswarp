@@ -397,8 +397,9 @@ class Ionization(ionization.Ionization):
                                     emitted_energy_sigma = 0
                                 # [uxnew, uynew, uznew] = self.generateEmittedVelocity(
                                 #     nnew, emitted_energy0, emitted_energy_sigma)
-                                emitted_energy = np.abs(emitted_energy0 +
-                                                        np.random.normal(loc=0., scale=emitted_energy_sigma, size=nnew))
+                                else:
+                                    emitted_energy = np.abs(emitted_energy0 +
+                                                            np.random.normal(loc=0., scale=emitted_energy_sigma, size=nnew))
                             else:
                                 uxnew = uxnewsave
                                 uynew = uynewsave
@@ -407,13 +408,16 @@ class Ionization(ionization.Ionization):
                             ui = np.vstack((uxi[io], uyi[io], uzi[io])).T
                             incidentvelocities[emitted_species] = np.append(incidentvelocities[emitted_species], ui)
 
-                            scale = self.scalePrimaryVelocities(incident_species, ipg, emitted_energy0, emitted_energy_sigma, i1, i2, io)
-                            gnew = 1. + emitted_energy*jperev / (emass*clight**2)
+                            # Initial calculation of emitted particle velocity components
+                            gnew = 1. + emitted_energy*jperev / (emitted_species.mass * clight**2)
                             bnew = np.sqrt(1 - 1/gnew**2)
                             norm = np.linalg.norm(ui, axis=1)
                             uxnew = uxi[io]/norm * bnew*gnew*clight
                             uynew = uyi[io]/norm * bnew*gnew*clight
                             uznew = uzi[io]/norm * bnew*gnew*clight
+
+                            # Remove energy from incident particle
+                            scale = self.scalePrimaryVelocities(incident_species, ipg, emitted_energy0, emitted_energy_sigma, i1, i2, io)
                             uxi[io] *= scale
                             uyi[io] *= scale
                             uzi[io] *= scale
@@ -431,7 +435,7 @@ class Ionization(ionization.Ionization):
                                 if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                     originalvelocities[emitted_species] = np.append(originalvelocities[emitted_species], uemit)
                                     emissionangles[emitted_species] = np.append(emissionangles[emitted_species], angles)
-
+                                uemit_hold = uemit.copy()
                                 # Altitude
                                 uxnew, uynew, uznew = [l.flatten() for l in rotateVec(vec=uemit, rotaxis=rotvec, theta=angles)]
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
@@ -440,7 +444,7 @@ class Ionization(ionization.Ionization):
                                 uxnew, uynew, uznew = [l.flatten() for l in rotateVec(vec=uemit, rotaxis=v1, theta=np.random.uniform(size=uemit.shape[0])*2*np.pi)]
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
 
-                                assert np.all(np.abs(uemit) < clight), "Vemit >= c"
+                                assert np.all(np.abs(uemit) < clight), "{}     {}\n{}hh".format(uemit, uemit_hold, emitted_species.name)
                                 if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                     emittedvelocities[emitted_species] = np.append(emittedvelocities[emitted_species], uemit)
 
