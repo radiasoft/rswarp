@@ -65,8 +65,8 @@ class Ionization(ionization.Ionization):
         uznew = u_long
         return [uxnew, uynew, uznew]
 
-    def scalePrimaryVelocities(self, incident_species, ipg, emitted_energy0,
-                               emitted_energy_sigma, i1, i2, io):
+    def scale_primary_momenta(self, incident_species, ipg, emitted_energy0,
+                              emitted_energy_sigma, i1, i2, io):
         m = incident_species.mass
         Erest = m*clight**2
         uxi = ipg.uxp[i1:i2:self.stride][io]
@@ -83,9 +83,8 @@ class Ionization(ionization.Ionization):
         Enew = np.maximum(Erest, Enew)
         gaminvinew = np.minimum(Erest / Enew, 1.)
         assert(np.all(gaminvinew <= 1)), "Gamma should be <= than 1"
-        unew = clight * sqrt(1 - gaminvinew**2)
+        unew = clight * sqrt(1 - gaminvinew**2) / gaminvinew
         uold = sqrt(uxi**2 + uyi**2 + uzi**2)
-        gaminvi = gaminvinew
         uscale = unew / uold
         return uscale
 
@@ -356,11 +355,11 @@ class Ionization(ionization.Ionization):
                     emittedvelocities = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
                     recoilangles = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
 
-                    # --- Loop until there are no more collision events that need handling
+                    # Loop until there are no more collision events that need handling
                     while(nnew > 0):
 
-                        # --- The emitted particles positions, in some cases, are slightly
-                        # --- offset from the incident
+                        # The emitted particles positions, in some cases, are slightly
+                        # offset from the incident
                         xnewp = xnew[io]
                         ynewp = ynew[io]
                         znewp = znew[io]
@@ -372,31 +371,31 @@ class Ionization(ionization.Ionization):
                         else:
                             w = wi[io]
 
-                        # --- The injdatapid value needs to be copied to the emitted particles
-                        # --- so that they are handled properly in the region near the source.
+                        # The injdatapid value needs to be copied to the emitted particles
+                        # so that they are handled properly in the region near the source.
                         if top.injdatapid > 0:
                             injdatapid = injdatapid[io]
 
-                        # --- If the emitted energy was not specified, the emitted particle will be
-                        # --- given the same velocity of the incident particle.
+                        # If the emitted energy was not specified, the emitted particle will be
+                        # given the same velocity of the incident particle.
+                        # TODO: Not sure if the None case for emitted_energy0 is properly handled
                         if None in self.inter[incident_species]['emitted_energy0'][it]:
                             uxnewsave = uxnewsave[io]
                             uynewsave = uynewsave[io]
                             uznewsave = uznewsave[io]
 
+                        # For each collision calculate product velocity components and modify incident particle
                         for ie, emitted_species in enumerate(self.inter[incident_species]['emitted_species'][it]):
 
-                            gaminviold = ipg.gaminv[io * self.stride + i1]
                             incident_ke = (incident_species.mass*clight**2)/jperev * (1. / ipg.gaminv[io * self.stride + i1] - 1.)
 
+                            # If no emitted_energy0 then emission particle velocity set to incident particle velocity
                             if self.inter[incident_species]['emitted_energy0'][it][ie] is not None:
                                 # --- Create new velocities for the emitted particles.
                                 emitted_energy0 = tryFunctionalForm(self.inter[incident_species]['emitted_energy0'][it][ie], vi=vi, nnew=nnew)
                                 emitted_energy_sigma = tryFunctionalForm(self.inter[incident_species]['emitted_energy_sigma'][it][ie], vi=vi, nnew=nnew)
                                 if emitted_energy_sigma is None:
                                     emitted_energy_sigma = 0
-                                # [uxnew, uynew, uznew] = self.generateEmittedVelocity(
-                                #     nnew, emitted_energy0, emitted_energy_sigma)
                                 else:
                                     emitted_energy = np.abs(emitted_energy0 +
                                                             np.random.normal(loc=0., scale=emitted_energy_sigma, size=nnew))
@@ -415,9 +414,10 @@ class Ionization(ionization.Ionization):
                             uxnew = uxi[io]/norm * bnew*gnew*clight
                             uynew = uyi[io]/norm * bnew*gnew*clight
                             uznew = uzi[io]/norm * bnew*gnew*clight
-
                             # Remove energy from incident particle
-                            scale = self.scalePrimaryVelocities(incident_species, ipg, emitted_energy0, emitted_energy_sigma, i1, i2, io)
+                            scale = self.scale_primary_momenta(incident_species, ipg,
+                                                               emitted_energy0, emitted_energy_sigma, i1, i2, io)
+
                             uxi[io] *= scale
                             uyi[io] *= scale
                             uzi[io] *= scale
@@ -428,14 +428,13 @@ class Ionization(ionization.Ionization):
                             v2[:, 2] = 0
                             rotvec = np.cross(v1, v2)
 
-
                             if hasattr(self.sampleEmittedAngle, '__call__'):
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
                                 angles = np.array(self.sampleEmittedAngle(nnew=nnew, emitted_energy=emitted_energy, incident_energy=incident_ke))
                                 if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                     originalvelocities[emitted_species] = np.append(originalvelocities[emitted_species], uemit)
                                     emissionangles[emitted_species] = np.append(emissionangles[emitted_species], angles)
-                                uemit_hold = uemit.copy()
+
                                 # Altitude
                                 uxnew, uynew, uznew = [l.flatten() for l in rotateVec(vec=uemit, rotaxis=rotvec, theta=angles)]
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
@@ -444,7 +443,6 @@ class Ionization(ionization.Ionization):
                                 uxnew, uynew, uznew = [l.flatten() for l in rotateVec(vec=uemit, rotaxis=v1, theta=np.random.uniform(size=uemit.shape[0])*2*np.pi)]
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
 
-                                assert np.all(np.abs(uemit) < clight), "{}     {}\n{}hh".format(uemit, uemit_hold, emitted_species.name)
                                 if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                     emittedvelocities[emitted_species] = np.append(emittedvelocities[emitted_species], uemit)
 
