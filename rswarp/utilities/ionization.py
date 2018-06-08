@@ -25,9 +25,10 @@ def tryFunctionalForm(f, *args, **kwargs):
 
 class Ionization(ionization.Ionization):
     """
-    Extension of Warp's Ionization class including provisions for more detailed ionization physics.
+    Extension of Warp's warp.particles.ionization.Ionization class
+     including provisions for more detailed ionization physics.
     """
-    def generateEmittedVelocity(self, nnew, emitted_energy0, emitted_energy_sigma=None):
+    def _generate_emitted_velocity(self, nnew, emitted_energy0, emitted_energy_sigma=None):
         """
         Generate array of emitted particle velocities
 
@@ -65,8 +66,8 @@ class Ionization(ionization.Ionization):
         uznew = u_long
         return [uxnew, uynew, uznew]
 
-    def scale_primary_momenta(self, incident_species, ipg, emitted_energy0,
-                              emitted_energy_sigma, i1, i2, io):
+    def _scale_primary_momenta(self, incident_species, ipg, emitted_energy0,
+                               emitted_energy_sigma, i1, i2, io):
         m = incident_species.mass
         Erest = m*clight**2
         uxi = ipg.uxp[i1:i2:self.stride][io]
@@ -95,24 +96,61 @@ class Ionization(ionization.Ionization):
             l_remove_incident=None, l_remove_target=None, emitted_tag=None,
             sampleIncidentAngle=None, sampleEmittedAngle=None, writeAngleDataDir=None,
             writeAnglePeriod=100):
+        # TODO: Not sure of exactly what target_fluidvel does. Just for adding an overall drift velocity to macroparticles?
         """
-        Add a particular class of ionization event to the simulation.  Any given
-        ionization event looks like:
+        Add an ionization event to the `Ionization` instance. The structure of an event varies depending on
+        what parameters are set in `add`:
 
-        incident + target -> incident(?) + target(?) + emitted
+        If `target_species` is set:
+        incident + target -> incident(*) + target(*) + emitted
+         where (*) indicates that these can be removed from the simulation in a collision
 
-        Where the (?) events are controlled by l_remove_incident and l_remove_target
+        If `ndens` is set and `target_species` is None then a gas 'reservoir' is used to calculate the 'target'
+        species density instead of macroparticles and the process is:
+        incident + (reservoir) -> incident(*) + emitted
+         where (*) indicates that these can be removed from the simulation in a collision
 
-        emitted_energy0 - may be a callable returning a numpy array of cetnral
-            energies (in eV) or a scalar value (or an array of length
-            len(emitted_species) of the same)
-        emitted_energy_sigma - the same as emitted_energy0, but for distribution width
-        sampleIncidentAngle - callable (or array of len(emitted_species)) for
-            sampling scattering angles of incident species
-        sampleIncidentAngle - callable (or array of len(emitted_species)) for
-            sampling scattering angles of emitted species
-        writeAngleDataDir - directory used to write emission angle diagnostics
-        writeAnglePeriod - period to write out angle diagnostics
+        A number of parameters have different operational modes depending on the input applied. Most are specfied
+        below in Args. Additionally, not setting `emitted_energy0` will cause emitted particles to be created
+        with the same momentum vector as the incident particle. This is probably completely unphysical and retained
+        for legacy purposes.
+
+        For any user supplied functions that require velocity as an input it should be expected that velocity
+        supplied will have units of m/s.
+
+        Args:
+            incident_species: warp.particles.species.Species instance for incident species of the ionization event
+            emitted_species: warp.particles.species.Species instance or iterable of instances for the emitted species
+                of the ionization event
+            cross_section: Scalar or callable function representing the interaction cross section. Function must take
+                incident velocity as input and return the cross section. Cross section is in units of m^2.
+            target_species: warp.particles.species.Species instance for target species of the ionization event. Should
+                not be set in ndens being used.
+            ndens: Gas density of reservoir if being used. Density is in units of 1/m^3.
+            emitted_energy0: Iterable of length len(emitted_species) with scalar or callable functions for the
+                energy of each emitted particle. Functions should take (incident velocity, number of events)
+                as parameters. Energy is in units of eV.
+            emitted_energy_sigma: Iterable of length len(emitted_species) with scalar or callable functions for the
+                energy spread of each emitted particle. This will be added to the value of emitted_energy0 when
+                a particle is emitted. If nothing is set then this parameter defaults to 0.
+                Functions should take (incident velocity, number of events)as parameters. If scalar values are set then
+                they indicate the width of a gaussian distribution from which to sample the energy spread.
+                Energy spread is in units of eV.
+            incident_pgroup: Default - top.pgroup. `ParticleGroup` instance containing incident `Species`.
+            target_pgroup: Default - top.pgroup. `ParticleGroup` instance containing target `Species`.
+            emitted_pgroup: Default - top.pgroup. `ParticleGroup` instance containing emitted `Species`.
+            l_remove_incident: Incident macroparticles in ionization event will be removed from the simulation.
+            l_remove_target: Target macroparticles in ionization event will be removed from the simulation.
+            emitted_tag: Tag for emitted species.
+            sampleIncidentAngle: Callable function (or array of len(emitted_species)) for sampling scattering angles
+                of incident species.
+            sampleEmittedAngle: Callable function (or array of len(emitted_species)) for sampling scattering angles
+                of emitted species.
+            writeAngleDataDir: Directory to write HDF5 files with incident and emission angle data. Optional.
+            writeAnglePeriod: Default - 100. Step period to write out angle data.
+
+        Returns:
+                None
         """
         # Do all of Warp's normal initialization
         if not iterable(emitted_species):
@@ -183,7 +221,7 @@ class Ionization(ionization.Ionization):
                     ndens[...] = 0.
 
                     for jstarget in target_species.jslist:
-                        self.depositTargetSpecies(jstarget)
+                        self._deposit_target_species(jstarget)
 
         for incident_species in self.inter:
             npinc = 0
@@ -415,8 +453,8 @@ class Ionization(ionization.Ionization):
                             uynew = uyi[io]/norm * bnew*gnew*clight
                             uznew = uzi[io]/norm * bnew*gnew*clight
                             # Remove energy from incident particle
-                            scale = self.scale_primary_momenta(incident_species, ipg,
-                                                               emitted_energy0, emitted_energy_sigma, i1, i2, io)
+                            scale = self._scale_primary_momenta(incident_species, ipg,
+                                                                emitted_energy0, emitted_energy_sigma, i1, i2, io)
 
                             uxi[io] *= scale
                             uyi[io] *= scale
@@ -429,6 +467,8 @@ class Ionization(ionization.Ionization):
                             v2[:, 2] = 0
                             rotvec = np.cross(v1, v2)
 
+                            # If emission angle spectrum is provided then sample and rotate emitted particles
+                            # If not used then emission momentum vector is scaled from incident (above)
                             if hasattr(self.sampleEmittedAngle, '__call__'):
                                 uemit = np.vstack((uxnew, uynew, uznew)).T
                                 angles = np.array(self.sampleEmittedAngle(nnew=nnew, emitted_energy=emitted_energy, incident_energy=incident_ke))
@@ -502,7 +542,7 @@ class Ionization(ionization.Ionization):
                 if self.l_timing:
                     print 'time ionization = ', time.clock() - t1, 's'
 
-    def depositTargetSpecies(self, jstarget):
+    def _deposit_target_species(self, jstarget):
         """ Depositing target species to the grid """
         tpg = self.inter[incident_species]['target_pgroup']
         i1 = tpg.ins[jstarget] - 1  # ins is index of first member of species
