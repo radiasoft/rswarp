@@ -189,7 +189,6 @@ class Ionization(ionization.Ionization):
             npinc = 0
             ispushed = 0
             ipg = self.inter[incident_species]['incident_pgroup']
-            tpg = self.inter[incident_species]['target_pgroup']
             epg = self.inter[incident_species]['emitted_pgroup']
             for js in incident_species.jslist:
                 npinc += ipg.nps[js]
@@ -312,21 +311,22 @@ class Ionization(ionization.Ionization):
                     cross_section = self.getcross_section(
                         self.inter[incident_species]['cross_section'][it], vi)
 
-                    # probability
-                    ncol = dp * cross_section * vi * \
-                        dt * ipg.ndts[js] * self.stride / self.inter[incident_species]['emitted_species'][0][0].sw
+                    # Number of collisions
+                    ncol = dp * cross_section * vi * dt * ipg.ndts[js] * \
+                        self.stride / self.inter[incident_species]['emitted_species'][0][0].sw * \
+                        ipg.sw[js]
                     if top.boost_gamma > 1.:
                         ncol *= top.gammabar_lab / top.gammabar
 
-                    # --- If the incident species is being removed, then only one collision event can happen.
-                    # --- Otherwise, a single particle may collide multiple times in a time step if ncol > 1.
+                    # If the incident species is being removed, then only one collision event can happen.
+                    # Otherwise, a single particle may collide multiple times in a time step if ncol > 1.
                     if self.inter[incident_species]['remove_incident'][it]:
-                        # --- Note that ncol is being set to slightly less than one. In the code below, adding ranf
-                        # --- to it will guarantee that it will end up as one. (Is this needed?)
+                        # Note that ncol is being set to slightly less than one. In the code below, adding ranf
+                        # to it will guarantee that it will end up as one. (Is this needed?)
                         ncol = where(ncol >= 1., 1. - 1.e-10, ncol)
 
-                    # --- Get a count of the number of collisions for each particle. A random number is added to
-                    # --- ncol so that a fractional value has chance to result in a collision.
+                    # Get a count of the number of collisions for each particle. A random number is added to
+                    # ncol so that a fractional value has chance to result in a collision.
                     ncoli = aint(ncol + ranf(ncol))
 
                     # --- Select the particles that will collide
@@ -334,17 +334,17 @@ class Ionization(ionization.Ionization):
                     nnew = len(io)
 
                     if None in self.inter[incident_species]['emitted_energy0'][it]:
-                        # --- When emitted_energy0 is not specified, use the velocity of
-                        # --- the incident particles for the emitted particles.
+                        # When emitted_energy0 is not specified, use the velocity of
+                        # the incident particles for the emitted particles.
                         uxnewsave = uxi
                         uynewsave = uyi
                         uznewsave = uzi
 
                     if self.inter[incident_species]['remove_incident'][it]:
-                        # --- if projectile is modified, then need to delete it
+                        # If projectile is modified, then need to delete it
                         put(ipg.gaminv, array(io) * self.stride + i1, 0.)
 
-                    # --- The position of the incident particle is at or near the incident particle
+                    # The position of the incident particle is at or near the incident particle
                     xnew = xi
                     ynew = yi
                     znew = zi
@@ -356,7 +356,7 @@ class Ionization(ionization.Ionization):
                     recoilangles = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
 
                     # Loop until there are no more collision events that need handling
-                    while(nnew > 0):
+                    while nnew > 0:
 
                         # The emitted particles positions, in some cases, are slightly
                         # offset from the incident
@@ -423,6 +423,7 @@ class Ionization(ionization.Ionization):
                             uzi[io] *= scale
 
                             assert np.all(vzi != 0), "Not all components of vzi are non-zero"
+
                             v1 = np.vstack((vxi, vyi, vzi)).T[io]
                             v2 = v1.copy()
                             v2[:, 2] = 0
@@ -454,7 +455,7 @@ class Ionization(ionization.Ionization):
                                     vxi[io], vyi[io], vzi[io] = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=rangles)]
 
                             ginew = 1. / sqrt(1. + (uxnew**2 + uynew ** 2 + uznew**2) / clight**2)
-                            # --- get velocity in boosted frame if using a boosted frame of reference
+                            # get velocity in boosted frame if using a boosted frame of reference
                             if top.boost_gamma > 1.:
                                 setu_in_uzboosted_frame3d(shape(ginew)[0], uxnew, uynew, uznew, ginew,
                                                           uzboost,
