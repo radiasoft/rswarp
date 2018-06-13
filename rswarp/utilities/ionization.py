@@ -64,10 +64,10 @@ class Ionization(ionization.Ionization):
         uxnew = u_trans * cos(phi)
         uynew = u_trans * sin(phi)
         uznew = u_long
+
         return [uxnew, uynew, uznew]
 
-    def _scale_primary_momenta(self, incident_species, ipg, emitted_energy0,
-                               emitted_energy_sigma, i1, i2, io):
+    def _scale_primary_momenta(self, incident_species, ipg, energy, i1, i2, io):
         m = incident_species.mass
         Erest = m*clight**2
         uxi = ipg.uxp[i1:i2:self.stride][io]
@@ -75,7 +75,7 @@ class Ionization(ionization.Ionization):
         uzi = ipg.uzp[i1:i2:self.stride][io]
         gaminviold = ipg.gaminv[i1:i2:self.stride][io]
         Eold = Erest * 1./gaminviold
-        Enew = Eold - (emitted_energy0 + (emitted_energy_sigma or 0)) * jperev
+        Enew = Eold - energy * jperev
         if np.any(Enew < Erest):
             print("WARNING: requested emitted_energy0 would reduce energy of {} "
                   "particles to less than rest mass, clamping incident energy "
@@ -96,7 +96,6 @@ class Ionization(ionization.Ionization):
             l_remove_incident=None, l_remove_target=None, emitted_tag=None,
             sampleIncidentAngle=None, sampleEmittedAngle=None, writeAngleDataDir=None,
             writeAnglePeriod=100):
-        # TODO: Not sure of exactly what target_fluidvel does. Just for adding an overall drift velocity to macroparticles?
         """
         Add an ionization event to the `Ionization` instance. The structure of an event varies depending on
         what parameters are set in `add`:
@@ -115,22 +114,27 @@ class Ionization(ionization.Ionization):
         with the same momentum vector as the incident particle. This is probably completely unphysical and retained
         for legacy purposes.
 
+        When using a gas reservoir it may be desirable to attribute some thermal velocity distribution to the gas
+        when the ions are created.
+
         For any user supplied functions that require velocity as an input it should be expected that velocity
         supplied will have units of m/s.
 
         Args:
             incident_species: warp.particles.species.Species instance for incident species of the ionization event
-            emitted_species: warp.particles.species.Species instance or iterable of instances for the emitted species
+            emitted_species: warp.particles.species.Species instance or list of instances for the emitted species
                 of the ionization event
             cross_section: Scalar or callable function representing the interaction cross section. Function must take
                 incident velocity as input and return the cross section. Cross section is in units of m^2.
             target_species: warp.particles.species.Species instance for target species of the ionization event. Should
                 not be set in ndens being used.
             ndens: Gas density of reservoir if being used. Density is in units of 1/m^3.
-            emitted_energy0: Iterable of length len(emitted_species) with scalar or callable functions for the
+            target_fluidvel: (list) List containing Cartesian velocity vector components of the gas reservoir. Can be
+                used to update the position of the gas reservoir in time. Velocity in m/s.
+            emitted_energy0: (list) List of length len(emitted_species) with scalar or callable functions for the
                 energy of each emitted particle. Functions should take (incident velocity, number of events)
                 as parameters. Energy is in units of eV.
-            emitted_energy_sigma: Iterable of length len(emitted_species) with scalar or callable functions for the
+            emitted_energy_sigma: (list) List of length len(emitted_species) with scalar or callable functions for the
                 energy spread of each emitted particle. This will be added to the value of emitted_energy0 when
                 a particle is emitted. If nothing is set then this parameter defaults to 0.
                 Functions should take (incident velocity, number of events)as parameters. If scalar values are set then
@@ -174,7 +178,8 @@ class Ionization(ionization.Ionization):
         self.sampleEmittedAngle = sampleEmittedAngle
         self.writeAngleDataDir = writeAngleDataDir
         self.writeAnglePeriod = writeAnglePeriod
-
+        self.inter[incident_species]['thermal'] = []
+        self.inter[incident_species]['thermal'] += [[False] * len(emitted_energy0)]
         if self.writeAngleDataDir and not os.path.exists(self.writeAngleDataDir):
             os.makedirs(self.writeAngleDataDir)
 
@@ -435,8 +440,17 @@ class Ionization(ionization.Ionization):
                                 if emitted_energy_sigma is None:
                                     emitted_energy_sigma = 0
                                 else:
-                                    emitted_energy = np.abs(emitted_energy0 +
-                                                            np.random.normal(loc=0., scale=emitted_energy_sigma, size=nnew))
+                                    emitted_energy_sigma = np.random.normal(loc=0., scale=emitted_energy_sigma, size=nnew)
+
+                                emitted_energy = emitted_energy0 + emitted_energy_sigma
+                                # Initial calculation of emitted particle velocity components
+                                gnew = 1. + emitted_energy * jperev / (emitted_species.mass * clight ** 2)
+                                bnew = np.sqrt(1 - 1 / gnew ** 2)
+                                norm = np.linalg.norm(ui, axis=1)
+                                uxnew = uxi[io] / norm * bnew * gnew * clight
+                                uynew = uyi[io] / norm * bnew * gnew * clight
+                                uznew = uzi[io] / norm * bnew * gnew * clight
+
                             else:
                                 uxnew = uxnewsave
                                 uynew = uynewsave
@@ -445,16 +459,9 @@ class Ionization(ionization.Ionization):
                             ui = np.vstack((uxi[io], uyi[io], uzi[io])).T
                             incidentvelocities[emitted_species] = np.append(incidentvelocities[emitted_species], ui)
 
-                            # Initial calculation of emitted particle velocity components
-                            gnew = 1. + emitted_energy*jperev / (emitted_species.mass * clight**2)
-                            bnew = np.sqrt(1 - 1/gnew**2)
-                            norm = np.linalg.norm(ui, axis=1)
-                            uxnew = uxi[io]/norm * bnew*gnew*clight
-                            uynew = uyi[io]/norm * bnew*gnew*clight
-                            uznew = uzi[io]/norm * bnew*gnew*clight
-                            # Remove energy from incident particle
-                            scale = self._scale_primary_momenta(incident_species, ipg,
-                                                                emitted_energy0, emitted_energy_sigma, i1, i2, io)
+                            # Remove energy from incident particle if energy is not attributed to thermal motion
+                            if not self.inter[incident_species]['thermal'][it][ie]:
+                                scale = self._scale_primary_momenta(incident_species, ipg, emitted_energy, i1, i2, io)
 
                             uxi[io] *= scale
                             uyi[io] *= scale
@@ -566,15 +573,37 @@ class Ionization(ionization.Ionization):
             weights = ones(tpg.nps[jstarget], 'd')
         else:
             weights = tpg.pid[i1:i2, top.wpid - 1]
-        # --- deposit density
+        # deposit density
         deposgrid3d(1, tpg.nps[jstarget], xt, yt, zt,
                     tpg.sw[jstarget] * self.invvol * fact * weights,
                     self.nx, self.ny, self.nz, ndens, self.ndensc,
                     self.xmin, self.xmax, self.ymin, self.ymax,
                     self.zmin, self.zmax)
-        # --- computes target fluid velocity
+        # computes target fluid velocity
         deposgrid3dvect(0, tpg.nps[jstarget], xt, yt, zt, vxt, vyt, vzt,
                         tpg.sw[jstarget] * self.invvol * fact * weights,
                         self.nx, self.ny, self.nz, target_fluidvel, self.ndensc,
                         self.xmin, self.xmax, self.ymin, self.ymax,
                         self.zmin, self.zmax)
+
+    def _generate_thermal_velocity(self, nnew, temperature, incident_species):
+        """
+        Provide thermal velocity to emitted ions when the target is a gas reservoir
+        Args:
+            nnew (int): Number of new particles.
+            temperature (float): Temperature of gas reservoir. Units of Kelvin.
+            incident_species: warp.particles.species.Species instance for the incident species.
+
+        Returns:
+            (ndarray) Momentum normalized by particle mass of emitted ions.
+        """
+        mass = self.inter[incident_species]['emitted_species'][0][0].mass  # kg
+        var_xyz = boltzmann * temperature / mass
+        var_vs = np.asarray([var_xyz, var_xyz, var_xyz])
+        distr_mean = [0., 0., 0.]  # Each distribution has a native mean of 0.
+        distr_cov = np.multiply(var_vs, np.identity(3))  # distributions are assumed to be independent
+
+        velocity = np.random.multivariate_normal(distr_mean, distr_cov, int(np.round(nnew * 3)))
+        gamma = 1. / np.sqrt(1. - (velocity / clight)**2)
+
+        return velocity * gamma
