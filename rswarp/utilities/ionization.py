@@ -429,7 +429,7 @@ class Ionization(ionization.Ionization):
 
                         # For each collision calculate product velocity components and modify incident particle
                         for ie, emitted_species in enumerate(self.inter[incident_species]['emitted_species'][it]):
-
+                            print("ON DEVEL")
                             incident_ke = (incident_species.mass*clight**2)/jperev * (1. / ipg.gaminv[io * self.stride + i1] - 1.)
 
                             # If no emitted_energy0 then emission particle velocity set to incident particle velocity
