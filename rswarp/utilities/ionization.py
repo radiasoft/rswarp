@@ -446,7 +446,11 @@ class Ionization(ionization.Ionization):
                                 # Initial calculation of emitted particle velocity components
                                 gnew = 1. + emitted_energy * jperev / (emitted_species.mass * clight ** 2)
                                 bnew = np.sqrt(1 - 1 / gnew ** 2)
+
+                                ui = np.vstack((uxi[io], uyi[io], uzi[io])).T
+                                incidentvelocities[emitted_species] = np.append(incidentvelocities[emitted_species], ui)
                                 norm = np.linalg.norm(ui, axis=1)
+
                                 uxnew = uxi[io] / norm * bnew * gnew * clight
                                 uynew = uyi[io] / norm * bnew * gnew * clight
                                 uznew = uzi[io] / norm * bnew * gnew * clight
@@ -456,13 +460,11 @@ class Ionization(ionization.Ionization):
                                 uynew = uynewsave
                                 uznew = uznewsave
 
-                            ui = np.vstack((uxi[io], uyi[io], uzi[io])).T
-                            incidentvelocities[emitted_species] = np.append(incidentvelocities[emitted_species], ui)
-
                             # Remove energy from incident particle if energy is not attributed to thermal motion
                             if not self.inter[incident_species]['thermal'][it][ie]:
                                 scale = self._scale_primary_momenta(incident_species, ipg, emitted_energy, i1, i2, io)
-
+                            else:
+                                scale = 1.0
                             uxi[io] *= scale
                             uyi[io] *= scale
                             uzi[io] *= scale
