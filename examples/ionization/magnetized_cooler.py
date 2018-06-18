@@ -175,8 +175,10 @@ if simulateIonization is True:
         incident_species=beam,
         emitted_species=[h2plus, emittedelec],  # iterable of species created from ionization
         cross_section=h2crosssections.h2_ioniz_crosssection,  # Cross section, can be float or function
-        emitted_energy0=[0, h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
+        emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
+        # or set to 'thermal' to create ions with a thermal energy spread set by temperature
         emitted_energy_sigma=[0, 0],  # Energy spread of emitted species (gives width of gaussian distribution)
+        temperature=[target_temp, None],
         sampleEmittedAngle=h2crosssections.generateAngle,
         writeAngleDataDir=False,  # Write file recording statistics of angles
         writeAnglePeriod=1000,  # Period to write angle data, if used
@@ -191,7 +193,10 @@ if simulateIonization is True:
 # Create conductors that will represent electrodes placed inside vacuum vessel
 
 pipe_voltage = 0.0  # Set main pipe section to ground
-electrode_voltage = +2e3  # electrodes held at several kV relative to main pipe
+
+# Electrodes turned off for thermal ion distribution test
+electrode_voltage = +0.0  # electrodes held at +2.3 relative to main pipe
+
 assert electrode_voltage < beam_ke, "Electrodes potential greater than beam KE."
 
 pipe_radius = pipe_radius

@@ -91,7 +91,7 @@ class Ionization(ionization.Ionization):
 
     def add(self, incident_species, emitted_species, cross_section=None,
             target_species=None, ndens=None, target_fluidvel=None,
-            emitted_energy0=None, emitted_energy_sigma=None,
+            emitted_energy0=None, emitted_energy_sigma=None, temperature=None,
             incident_pgroup=top.pgroup, target_pgroup=top.pgroup, emitted_pgroup=top.pgroup,
             l_remove_incident=None, l_remove_target=None, emitted_tag=None,
             sampleIncidentAngle=None, sampleEmittedAngle=None, writeAngleDataDir=None,
@@ -133,13 +133,19 @@ class Ionization(ionization.Ionization):
                 used to update the position of the gas reservoir in time. Velocity in m/s.
             emitted_energy0: (list) List of length len(emitted_species) with scalar or callable functions for the
                 energy of each emitted particle. Functions should take (incident velocity, number of events)
-                as parameters. Energy is in units of eV.
+                as parameters. To create species with a thermal energy distribution set to 'thermal'.
+                the value of `temperature` must aslo be set. Thermal energy will not be removed from incident particles.
+                Energy is in units of eV.
             emitted_energy_sigma: (list) List of length len(emitted_species) with scalar or callable functions for the
                 energy spread of each emitted particle. This will be added to the value of emitted_energy0 when
                 a particle is emitted. If nothing is set then this parameter defaults to 0.
                 Functions should take (incident velocity, number of events)as parameters. If scalar values are set then
                 they indicate the width of a gaussian distribution from which to sample the energy spread.
                 Energy spread is in units of eV.
+            temperature (list): List of length len(emitted_species) giving temperature in the case of species having
+                a thermal velocity distribution. This is intended to account for the thermal motion of the background
+                gas in cases where a gas reservior is being used. Temperature value is ignored unless the species
+                has emitted_energy0[species] = 'thermal. Temperature in units of Kelvin.
             incident_pgroup: Default - top.pgroup. `ParticleGroup` instance containing incident `Species`.
             target_pgroup: Default - top.pgroup. `ParticleGroup` instance containing target `Species`.
             emitted_pgroup: Default - top.pgroup. `ParticleGroup` instance containing emitted `Species`.
@@ -179,7 +185,14 @@ class Ionization(ionization.Ionization):
         self.writeAngleDataDir = writeAngleDataDir
         self.writeAnglePeriod = writeAnglePeriod
         self.inter[incident_species]['thermal'] = []
-        self.inter[incident_species]['thermal'] += [[False] * len(emitted_energy0)]
+        self.inter[incident_species]['temperature'] = []
+        self.inter[incident_species]['thermal'].append([energy == 'thermal' for energy in emitted_energy0])
+        self.inter[incident_species]['temperature'].append(temperature)
+        for i, ip in enumerate(self.inter[incident_species]['thermal']):
+            for j, ep in enumerate(ip):
+                if ep:
+                    self.inter[incident_species]['emitted_energy0'][i][j] = 0
+
         if self.writeAngleDataDir and not os.path.exists(self.writeAngleDataDir):
             os.makedirs(self.writeAngleDataDir)
 
@@ -372,7 +385,7 @@ class Ionization(ionization.Ionization):
                     # ncol so that a fractional value has chance to result in a collision.
                     ncoli = aint(ncol + ranf(ncol))
 
-                    # --- Select the particles that will collide
+                    # Select the particles that will collide
                     io = compress(ncoli > 0, arange(ni))
                     nnew = len(io)
 
@@ -434,7 +447,7 @@ class Ionization(ionization.Ionization):
 
                             # If no emitted_energy0 then emission particle velocity set to incident particle velocity
                             if self.inter[incident_species]['emitted_energy0'][it][ie] is not None:
-                                # --- Create new velocities for the emitted particles.
+                                # Create new momenta for the emitted particles.
                                 emitted_energy0 = tryFunctionalForm(self.inter[incident_species]['emitted_energy0'][it][ie], vi=vi, nnew=nnew)
                                 emitted_energy_sigma = tryFunctionalForm(self.inter[incident_species]['emitted_energy_sigma'][it][ie], vi=vi, nnew=nnew)
                                 if emitted_energy_sigma is None:
@@ -464,7 +477,11 @@ class Ionization(ionization.Ionization):
                             if not self.inter[incident_species]['thermal'][it][ie]:
                                 scale = self._scale_primary_momenta(incident_species, ipg, emitted_energy, i1, i2, io)
                             else:
+                                # Set emitted momenta from thermal motion but do not remove energy from incident
                                 scale = 1.0
+                                temperature = self.inter[incident_species]['temperature'][it][ie]
+                                uxnew, uynew, uznew = self._generate_thermal_momentum(nnew, temperature, incident_species)
+
                             uxi[io] *= scale
                             uyi[io] *= scale
                             uzi[io] *= scale
@@ -497,7 +514,7 @@ class Ionization(ionization.Ionization):
                                     emittedvelocities[emitted_species] = np.append(emittedvelocities[emitted_species], uemit)
 
                                 if hasattr(self.sampleIncidentAngle, '__call__'):
-                                    rangles = np.array(self.sampleIncidentAngle(nnew=nnew, emitted_energy=emitted_energy0, incident_energy=incident_ke, emitted_theta=emissionangles))
+                                    rangles = np.array(self.sampleIncidentAngle(nnew=nnew, emitted_energy=emitted_energy, incident_energy=incident_ke, emitted_theta=emissionangles))
                                     if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                         recoilangles[emitted_species] = np.append(recoilangles[emitted_species], rangles)
                                     vin = np.vstack((vxi[io], vyi[io], vzi[io])).T
@@ -588,7 +605,7 @@ class Ionization(ionization.Ionization):
                         self.xmin, self.xmax, self.ymin, self.ymax,
                         self.zmin, self.zmax)
 
-    def _generate_thermal_velocity(self, nnew, temperature, incident_species):
+    def _generate_thermal_momentum(self, nnew, temperature, incident_species):
         """
         Provide thermal velocity to emitted ions when the target is a gas reservoir
         Args:
@@ -597,7 +614,8 @@ class Ionization(ionization.Ionization):
             incident_species: warp.particles.species.Species instance for the incident species.
 
         Returns:
-            (ndarray) Momentum normalized by particle mass of emitted ions.
+            px (ndarray), py (ndarray), pz (ndarray): Momentum vector components
+                normalized by particle mass of emitted ions.
         """
         mass = self.inter[incident_species]['emitted_species'][0][0].mass  # kg
         var_xyz = boltzmann * temperature / mass
@@ -605,7 +623,7 @@ class Ionization(ionization.Ionization):
         distr_mean = [0., 0., 0.]  # Each distribution has a native mean of 0.
         distr_cov = np.multiply(var_vs, np.identity(3))  # distributions are assumed to be independent
 
-        velocity = np.random.multivariate_normal(distr_mean, distr_cov, int(np.round(nnew * 3)))
+        velocity = np.random.multivariate_normal(distr_mean, distr_cov, nnew)
         gamma = 1. / np.sqrt(1. - (velocity / clight)**2)
 
-        return velocity * gamma
+        return (velocity * gamma)[:, 0], (velocity * gamma)[:, 1], (velocity * gamma)[:, 2]
