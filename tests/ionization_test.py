@@ -25,9 +25,6 @@ beam_gamma = beam_ke/511e3 + 1
 beam_beta = np.sqrt(1-1/beam_gamma**2)
 sw = 1
 
-diagDir = ('.')
-#diagDir = ('/dev/null')
-
 beam = Species(type=Electron, name='e-', weight=sw)
 # These two species represent the emitted particles
 h2plus = Species(type=Dihydrogen, charge_state=+1, name='H2+', weight=sw)
@@ -37,15 +34,6 @@ beam.ibeam = 1e-6
 
 top.lrelativ = True
 top.relativity = 1
-
-# Directory paths
-field_base_path = os.path.join(diagDir, 'fields')
-diagFDir = {'magnetic': os.path.join(field_base_path, 'magnetic'),
-            'electric': os.path.join(field_base_path, 'electric')}
-
-# Cleanup command if directories already exist
-if comm_world.rank == 0:
-    cleanupPrevious(diagDir, diagFDir)
 
 ################################
 # 3D Simulation Parameters     #
@@ -175,26 +163,6 @@ top.inject = 6                       # 2 means space-charge limited injection, 6
 top.npinject = ptcl_per_step           # Approximate number of particles injected each step
 top.ainject = 0.0008                      # Must be set even for user defined injection, doesn't seem to do anything
 top.binject = 0.0008                      # Must be set even for user defined injection, doesn't seem to do anything
-
-diagP = ParticleDiagnostic(
-    period=100,
-    top=top,
-    w3d=w3d,
-    species={species.name: species for species in listofallspecies},
-    comm_world=comm_world,
-    lparallel_output=False,
-#    write_dir=diagDir
-    write_dir='/dev/null'
-)
-
-diags = [diagP]
-
-def writeDiagnostics():
-    print 'Not dumping diags'
-#    for d in diags:
-#        d.write()
-
-#installafterstep(writeDiagnostics)
 
 package("w3d")
 generate()
