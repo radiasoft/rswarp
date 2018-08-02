@@ -25,7 +25,8 @@ beam_gamma = beam_ke/511e3 + 1
 beam_beta = np.sqrt(1-1/beam_gamma**2)
 sw = 1
 
-diagDir = ("diags%.3fkeV" % (beam_ke/1e3))
+diagDir = ('.')
+#diagDir = ('/dev/null')
 
 beam = Species(type=Electron, name='e-', weight=sw)
 # These two species represent the emitted particles
@@ -182,21 +183,28 @@ diagP = ParticleDiagnostic(
     species={species.name: species for species in listofallspecies},
     comm_world=comm_world,
     lparallel_output=False,
-    write_dir=diagDir
+#    write_dir=diagDir
+    write_dir='/dev/null'
 )
 
 diags = [diagP]
 
 def writeDiagnostics():
-    for d in diags:
-        d.write()
+    print 'Not dumping diags'
+#    for d in diags:
+#        d.write()
 
-installafterstep(writeDiagnostics)
+#installafterstep(writeDiagnostics)
 
 package("w3d")
 generate()
 
 stept(10.0e-9)  # Simulate 10 ns
 
-with open(diagDir + '/emitelec_ke.npy', 'w') as f:
-    np.save(f, emittedelec.getke())
+print (emittedelec.getke().shape)[0], emittedelec.getn()
+print np.mean(emittedelec.getx()), np.std(emittedelec.getx())
+print np.mean(emittedelec.gety()), np.std(emittedelec.gety())
+print np.mean(emittedelec.getz()), np.std(emittedelec.getz())
+print np.mean(emittedelec.getvx()), np.std(emittedelec.getvx())
+print np.mean(emittedelec.getvy()), np.std(emittedelec.getvy())
+print np.mean(emittedelec.getvz()), np.std(emittedelec.getvz())
