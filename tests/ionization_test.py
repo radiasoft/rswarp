@@ -11,7 +11,7 @@ from rswarp.utilities.file_utils import cleanupPrevious
 
 import rsoopic.h2crosssections as h2crosssections
 
-from rsbeams.rsstats import stats6d
+#from rsbeams.rsstats import stats6d
 
 #import shutil
 #from shutil import os
@@ -174,39 +174,21 @@ def test_ionization():
     stept(10.0e-9) # Simulate 10 ns
 
     # Check that number of emitted electrons is within expected range
-    print emittedelec.getn() # should be around 3620
-    assert stats6d.specify_significant_figures(emittedelec.getn()+30, 2) == \
-           stats6d.specify_significant_figures(3650, 2)
+    print emittedelec.getn() # should be around 3650
+    np.testing.assert_approx_equal(emittedelec.getn()-150, 3500, 1) # accept 3150 <= n < 4150
     # Check that mean and standard deviation is reasonable for all six phasespace coordinates
     print np.mean(emittedelec.getx()), np.std(emittedelec.getx())
-    #assert stats6d.specify_significant_figures(np.mean(emittedelec.getx()), 1) == \
-    #       stats6d.specify_significant_figures(1.0e-4, 1)
-    assert stats6d.specify_significant_figures(np.std(emittedelec.getx()), 1) == \
-           stats6d.specify_significant_figures(9.0e-3, 1)
+    np.testing.assert_approx_equal(np.std(emittedelec.getx()), 9.0e-3, 1)
     print np.mean(emittedelec.gety()), np.std(emittedelec.gety())
-    #assert stats6d.specify_significant_figures(np.mean(emittedelec.gety()), 1) == \
-    #       stats6d.specify_significant_figures(1.0e-4, 1)
-    assert stats6d.specify_significant_figures(np.std(emittedelec.gety()), 1) == \
-           stats6d.specify_significant_figures(9.0e-3, 1)
+    np.testing.assert_approx_equal(np.std(emittedelec.gety()), 9.0e-3, 1)
     print np.mean(emittedelec.getz()), np.std(emittedelec.getz())
-    #assert stats6d.specify_significant_figures(np.mean(emittedelec.getz()), 1) == \
-    #       stats6d.specify_significant_figures(6.0e-2, 1)
-    assert stats6d.specify_significant_figures(np.std(emittedelec.getz()), 1) == \
-           stats6d.specify_significant_figures(4.0e-2, 1)
+    np.testing.assert_approx_equal(np.std(emittedelec.getz()), 4.0e-2, 1)
     print np.mean(emittedelec.getvx()), np.std(emittedelec.getvx())
-    #assert stats6d.specify_significant_figures(np.mean(emittedelec.getvx()), 1) == \
-    #       stats6d.specify_significant_figures(1.0, 1)
-    assert stats6d.specify_significant_figures(np.std(emittedelec.getvx()), 2) == \
-           stats6d.specify_significant_figures(1.9e6, 2)
+    np.testing.assert_approx_equal(np.std(emittedelec.getvx()), 1.9e6, 2)
     print np.mean(emittedelec.getvy()), np.std(emittedelec.getvy())
-    #assert stats6d.specify_significant_figures(np.mean(emittedelec.getvy()), 1) == \
-    #       stats6d.specify_significant_figures(1.0, 1)
-    assert stats6d.specify_significant_figures(np.std(emittedelec.getvy()), 2) == \
-           stats6d.specify_significant_figures(1.9e6, 2)
+    np.testing.assert_approx_equal(np.std(emittedelec.getvy()), 1.9e6, 2)
     print np.mean(emittedelec.getvz()), np.std(emittedelec.getvz())
-    assert stats6d.specify_significant_figures(np.mean(emittedelec.getvz()), 1) == \
-           stats6d.specify_significant_figures(5.0e5, 1)
-    assert stats6d.specify_significant_figures(np.std(emittedelec.getvz()), 2) == \
-           stats6d.specify_significant_figures(1.5e6, 2)
+    np.testing.assert_approx_equal(np.mean(emittedelec.getvz()), 5.0e5, 1)
+    np.testing.assert_approx_equal(np.std(emittedelec.getvz()), 1.5e6, 2)
 
 test_ionization()
