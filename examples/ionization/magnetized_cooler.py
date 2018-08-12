@@ -8,6 +8,7 @@ from rswarp.utilities.ionization import Ionization
 from rswarp.cathode.injectors import UserInjectors
 from rswarp.utilities.file_utils import cleanupPrevious
 import rsoopic.h2crosssections as h2crosssections
+import sys
 
 # Seed set for testing
 np.random.seed(123456)
@@ -50,6 +51,8 @@ cathode_temperature = 0.25  # eV
 # Beam
 beam_beta = 0.990813945176
 beam_ke = wp.emass / wp.jperev * wp.clight**2 * (1. / np.sqrt(1-beam_beta**2) - 1.)  # eV
+print '*** beam_ke, beam_gamma =', beam_ke,  1. / np.sqrt(1-beam_beta**2)
+#sys.exit(0)
 beam_current = 10e-3  # A
 beam_radius = 0.01  # m
 
