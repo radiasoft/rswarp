@@ -1,8 +1,12 @@
 from matplotlib.colors import Normalize
 from matplotlib.colorbar import ColorbarBase
+try:
+    from mayavi import mlab
+except ImportError:
+    print("MayaVi not found. 3D plotting not enabled.")
 from sys import maxint
 from scipy.interpolate import interp1d
-from warp.field_solvers.generateconductors import ZPlane
+from ConductorTemplates import conductor_type
 import numpy as np
 import matplotlib.cm as cm
 
@@ -45,14 +49,16 @@ class PlotDensity(object):
             cmap: matplotlib.cm colormap. Defaults to coolwarm.
             normalization: matplotlib.colors normalization function. Defaults to Normalize (linear normalization).
         """
+        assert scraper.lcollectlpdata, "Flag 'lcollectlpdata' not enabled for scraper. No particle data to plot."
 
-        self.ax = ax
-        self.ax_colorbar = ax_colorbar
         self.scraper = scraper
         self.top = top
         self.w3d = w3d
 
         self.gated_ids = {}
+        self.conductors = {}  # will replace gated_ids
+        for cond in scraper.conductors:
+            self.conductors[cond.condid] = conductor_type[type(cond)](top, w3d, cond)
         self.dx = w3d.dx
         self.dz = w3d.dz
         self.scale = 1e6
@@ -60,12 +66,19 @@ class PlotDensity(object):
         self.numlost = top.npslost[0]
         assert self.numlost > 1, "No particles lost in simulation. Nothing to plot."
 
-        self.zplost = self.top.zplost[:self.numlost]
         self.xplost = self.top.xplost[:self.numlost]
+        self.yplost = self.top.yplost[:self.numlost]
+        self.zplost = self.top.zplost[:self.numlost]
 
-        self.cmap = cm.coolwarm
-        self.normalization = Normalize
-        self.cmap_normalization = None
+        if w3d.solvergeom == w3d.XZgeom or w3d.solvergeom == w3d.RZgeom:
+            self.ax = ax
+            self.ax_colorbar = ax_colorbar
+            self.cmap = cm.coolwarm
+            self.normalization = Normalize
+            self.cmap_normalization = None
+        else:
+            self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(400, 300))
+            self.clf = mlab.clf()
 
     def __call__(self, *args, **kwargs):
         """
@@ -77,59 +90,69 @@ class PlotDensity(object):
         Returns:
 
         """
-        self.gate_scraped_particles()
-        self.map_density()
-        self.generate_plots()
+        # self.gate_scraped_particles()
+        # self.map_density()
+        # self.generate_plots()
 
-    def gate_scraped_particles(self):
-        """
-        Isolate particle PIDs for each conductor surface.
-        Returns:
+    # def gate_scraped_particles_3d(self):
+    #     # If we don't go a class route:
+    #     # for cond in self.scraper.conductors:
+    #     #     self.conductors[cond.condid] = {}
+    #
+    #     for cond in self.conductors:
+    #         scraped_particles = np.where(self.top.pidlost[:, -1] == cond.condid)
 
-        """
-        xmmin = self.w3d.xmmin
-        xmmax = self.w3d.xmmax
-        zmmin = self.w3d.zmmin
-        zmmax = self.w3d.zmmax
 
-        for cond in self.scraper.conductors:
-            self.gated_ids[cond.condid] = {}
-
-            if isinstance(cond, ZPlane):
-                zmin, zmax = cond.zcent - self.dz / 2., cond.zcent + self.dz / 2.
-                xmin, xmax = xmmin, xmmax
-                ids = np.where((zmin < self.zplost) & (self.zplost < zmax) &
-                               (xmin < self.xplost) & (self.xplost < xmax))
-                self.gated_ids[cond.condid]['left'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
-                continue
-
-            # top
-            zmin, zmax = cond.zcent - cond.zsize / 2., cond.zcent + cond.zsize / 2.
-            xmin, xmax = cond.xcent + cond.xsize / 2. - self.dx / 2., cond.xcent + cond.xsize / 2. + self.dx / 2.
-
-            ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
-            self.gated_ids[cond.condid]['top'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
-
-            # bottom
-            zmin, zmax = cond.zcent - cond.zsize / 2., cond.zcent + cond.zsize / 2.
-            xmin, xmax = cond.xcent - cond.xsize / 2. - self.dx / 2., cond.xcent - cond.xsize / 2. + self.dx / 2.
-
-            ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
-            self.gated_ids[cond.condid]['bottom'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
-
-            # left
-            zmin, zmax = cond.zcent - cond.zsize / 2. - self.dz / 2., cond.zcent - cond.zsize / 2. + self.dz / 2.
-            xmin, xmax = cond.xcent - cond.xsize / 2., cond.xcent + cond.xsize / 2.
-
-            ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
-            self.gated_ids[cond.condid]['left'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
-
-            # right
-            zmin, zmax = cond.zcent + cond.zsize / 2. - self.dz / 2., cond.zcent + cond.zsize / 2. + self.dz / 2.
-            xmin, xmax = cond.xcent - cond.xsize / 2., cond.xcent + cond.xsize / 2.
-
-            ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
-            self.gated_ids[cond.condid]['right'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+    #
+    # def gate_scraped_particles(self):
+    #     """
+    #     Isolate particle PIDs for each conductor surface.
+    #     Returns:
+    #
+    #     """
+    #     xmmin = self.w3d.xmmin
+    #     xmmax = self.w3d.xmmax
+    #     zmmin = self.w3d.zmmin
+    #     zmmax = self.w3d.zmmax
+    #
+    #     for cond in self.scraper.conductors:
+    #         self.gated_ids[cond.condid] = {}
+    #
+    #         if isinstance(cond, ZPlane):
+    #             zmin, zmax = cond.zcent - self.dz / 2., cond.zcent + self.dz / 2.
+    #             xmin, xmax = xmmin, xmmax
+    #             ids = np.where((zmin < self.zplost) & (self.zplost < zmax) &
+    #                            (xmin < self.xplost) & (self.xplost < xmax))
+    #             self.gated_ids[cond.condid]['left'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+    #             continue
+    #
+    #         # top
+    #         zmin, zmax = cond.zcent - cond.zsize / 2., cond.zcent + cond.zsize / 2.
+    #         xmin, xmax = cond.xcent + cond.xsize / 2. - self.dx / 2., cond.xcent + cond.xsize / 2. + self.dx / 2.
+    #
+    #         ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
+    #         self.gated_ids[cond.condid]['top'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+    #
+    #         # bottom
+    #         zmin, zmax = cond.zcent - cond.zsize / 2., cond.zcent + cond.zsize / 2.
+    #         xmin, xmax = cond.xcent - cond.xsize / 2. - self.dx / 2., cond.xcent - cond.xsize / 2. + self.dx / 2.
+    #
+    #         ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
+    #         self.gated_ids[cond.condid]['bottom'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+    #
+    #         # left
+    #         zmin, zmax = cond.zcent - cond.zsize / 2. - self.dz / 2., cond.zcent - cond.zsize / 2. + self.dz / 2.
+    #         xmin, xmax = cond.xcent - cond.xsize / 2., cond.xcent + cond.xsize / 2.
+    #
+    #         ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
+    #         self.gated_ids[cond.condid]['left'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
+    #
+    #         # right
+    #         zmin, zmax = cond.zcent + cond.zsize / 2. - self.dz / 2., cond.zcent + cond.zsize / 2. + self.dz / 2.
+    #         xmin, xmax = cond.xcent - cond.xsize / 2., cond.xcent + cond.xsize / 2.
+    #
+    #         ids = np.where((zmin < self.zplost) & (self.zplost < zmax) & (xmin < self.xplost) & (self.xplost < xmax))
+    #         self.gated_ids[cond.condid]['right'] = {'pids': list(ids), 'limits': [zmin, zmax, xmin, xmax]}
 
     def map_density(self):
         """
@@ -210,3 +233,24 @@ class PlotDensity(object):
                     scatter_plots.append(plot)
 
         ColorbarBase(self.ax_colorbar, cmap=self.cmap, norm=self.cmap_normalization)
+
+    def generate_plots_3d(self):
+        minS, maxS = maxint, 0
+        contour_plots = []
+        for cond in self.conductors.itervalues():
+            for face in cond.generate_faces():
+                x, y, z, s = face[0] * self.scale, face[1] * self.scale, face[2] * self.scale, face[3]
+                if np.min(s) < minS:
+                    minS = np.min(s)
+                if np.max(s) > maxS:
+                    maxS = np.max(s)
+                contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='coolwarm'))
+
+        for cp in contour_plots:
+            cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS, maxS])
+
+        mlab.xlabel('X')
+        mlab.ylabel('Y')
+        mlab.zlabel('Z')
+        mlab.draw()
+        mlab.show()
