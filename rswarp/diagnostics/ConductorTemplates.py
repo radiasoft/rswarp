@@ -27,12 +27,12 @@ class Conductor(object):
             self.cell_size = [w3d.dx, w3d.dy, w3d.dz]
 
     def get_pids(self):
-        scraped_particles = np.where(self.top.pidlost[:, -1] == self.conductor.condid)
+        scraped_particles = np.where(self.top.pidlost[:, -1] == self.conductor.condid)[0]
 
         return scraped_particles
 
     def _generate_face(self, resolution=100):
-        scraped_parts = np.array([self.top.xplost, self.top.yplost, self.top.zplost])
+        scraped_parts = np.array([self.top.xplost, self.top.yplost, self.top.zplost])[self.pids]
         for bound, axis, face in zip(self.cbounds, self.axis, self.faces):
             x, y = np.meshgrid(np.linspace(self.cbounds[(axis + 1) % 3],
                                            self.cbounds[(axis + 1) % 3 + 3], resolution),
@@ -42,12 +42,13 @@ class Conductor(object):
             positions = np.vstack([x.ravel(), y.ravel()])
             kernel = gaussian_kde(scraped_parts[face, :][:, [(axis + 1) % 3, (axis + 2) % 3]].T * 1e6)
             s = np.reshape(kernel(positions).T, x.shape)
+
             yield x, y, z, s
 
 
 class BoxPlot(Conductor):
-    def __init__(self, conductor):
-        super(Conductor, self).__init__(conductor)
+    def __init__(self, top, w3d, conductor):
+        super(BoxPlot, self).__init__(top, w3d, conductor)
         self.center = conductor.xcent, conductor.ycent, conductor.zcent
         self.size = conductor.xsize, conductor.ysize, conductor.zsize
 
@@ -64,7 +65,9 @@ class BoxPlot(Conductor):
             pof = np.where(np.abs(scraped_parts[:, axis] - bound) <= cell_size)
             self.faces.append(pof[0])
 
-    def generate_box_faces(self):
+    def generate_faces(self):
+        if len(self.faces) == 0:
+            self.get_particles()
         for axis, mesh in zip(self.axis, self._generate_face()):
             x, y, z = [mesh[0], mesh[1], mesh[2]][(2 * axis + 2) % 3], \
                       [mesh[0], mesh[1], mesh[2]][(2 * axis + 3) % 3], \
@@ -72,19 +75,32 @@ class BoxPlot(Conductor):
             s = mesh[3]
             yield x, y, z, s
 
+
 class XPlanePlot(Conductor):
-    def __init__(self, conductor):
-        super(Conductor, self).__init__(conductor)
+    def __init__(self, top, w3d, conductor):
+        super(XPlanePlot, self).__init__(top, w3d, conductor)
 
 
 class YPlanePlot(Conductor):
-    def __init__(self, conductor):
-        super(Conductor, self).__init__(conductor)
+    def __init__(self, top, w3d, conductor):
+        super(YPlanePlot, self).__init__(top, w3d, conductor)
 
 
 class ZPlanePlot(Conductor):
-    def __init__(self, conductor):
-        super(Conductor, self).__init__(conductor)
+    def __init__(self, top, w3d, conductor):
+        super(ZPlanePlot, self).__init__(top, w3d, conductor)
+        self.center = [conductor.zcent, ]
+
+    def get_particles(self):
+        scraped_parts = np.array([self.top.xplost, self.top.yplost, self.top.zplost])[self.pids]
+
+        self.faces.append(scraped_parts)
+
+    def generate_faces(self):
+        for axis, mesh in zip(self.axis, self._generate_face()):
+            x, y, z = mesh[0], mesh[1], mesh[2]
+            s = mesh[3]
+            yield x, y, z, s
 
 
 conductor_type = {XPlane: XPlanePlot,
