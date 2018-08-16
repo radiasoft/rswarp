@@ -41,11 +41,13 @@ class Conductor(object):
                                            self.cbounds[(axis + 2) % 3 + 3], resolution))
             z = np.ones_like(x) * bound
             positions = np.vstack([x.ravel(), y.ravel()])
-            if scraped_parts.size > 1:
+
+            if face.size > 30:
                 kernel = gaussian_kde(scraped_parts[face, :][:, [(axis + 1) % 3, (axis + 2) % 3]].T)
                 s = np.reshape(kernel(positions).T, x.shape)
+                # s, _, _ = np.histogram2d(scraped_parts[face, (axis + 1) % 3], scraped_parts[face, (axis + 2) % 3], bins=100)
             else:
-                s = np.ones_like(x)
+                s = np.ones_like(x) * -1.0
 
             yield x, y, z, s
 
@@ -104,7 +106,7 @@ class ZPlanePlot(Conductor):
         if len(self.faces) == 0:
             self.get_particles()
         for mesh in self._generate_face():
-            x, y, z = mesh[0], mesh[1], mesh[2]
+            x, y, z = mesh[0], mesh[1], np.ones_like(mesh[0]) * self.center[0]
             s = mesh[3]
             yield x, y, z, s
 
