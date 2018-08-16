@@ -5,9 +5,9 @@ import numpy as np
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.ionization import Ionization
+import rswarp.utilities.h2crosssections as h2crosssections
 from rswarp.cathode.injectors import UserInjectors
 from rswarp.utilities.file_utils import cleanupPrevious
-import rsoopic.h2crosssections as h2crosssections
 import sys
 
 # Seed set for testing
