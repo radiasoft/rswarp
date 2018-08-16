@@ -61,7 +61,7 @@ class PlotDensity(object):
             self.conductors[cond.condid] = conductor_type[type(cond)](top, w3d, cond)
         self.dx = w3d.dx
         self.dz = w3d.dz
-        self.scale = 1e6
+        self.scale = [1e9, 1e9, 1e6]
         # categorize the number lost to avoid padded values at end of array
         self.numlost = top.npslost[0]
         assert self.numlost > 1, "No particles lost in simulation. Nothing to plot."
@@ -238,8 +238,10 @@ class PlotDensity(object):
         minS, maxS = maxint, 0
         contour_plots = []
         for cond in self.conductors.itervalues():
+            print(cond)
             for face in cond.generate_faces():
-                x, y, z, s = face[0] * self.scale, face[1] * self.scale, face[2] * self.scale, face[3]
+                x, y, z, s = face[0] * self.scale[0], face[1] * self.scale[1], face[2] * self.scale[2], face[3]
+                print(np.min(s), np.max(s))
                 if np.min(s) < minS:
                     minS = np.min(s)
                 if np.max(s) > maxS:
