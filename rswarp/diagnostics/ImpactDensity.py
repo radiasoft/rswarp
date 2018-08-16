@@ -61,7 +61,7 @@ class PlotDensity(object):
             self.conductors[cond.condid] = conductor_type[type(cond)](top, w3d, cond)
         self.dx = w3d.dx
         self.dz = w3d.dz
-        self.scale = [1e9, 1e9, 1e6]
+        self.scale = [1e9, 1e9, 1e8]
         # categorize the number lost to avoid padded values at end of array
         self.numlost = top.npslost[0]
         assert self.numlost > 1, "No particles lost in simulation. Nothing to plot."
@@ -77,7 +77,7 @@ class PlotDensity(object):
             self.normalization = Normalize
             self.cmap_normalization = None
         else:
-            self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(400, 300))
+            self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
             self.clf = mlab.clf()
 
     def __call__(self, *args, **kwargs):
@@ -241,18 +241,24 @@ class PlotDensity(object):
             print(cond)
             for face in cond.generate_faces():
                 x, y, z, s = face[0] * self.scale[0], face[1] * self.scale[1], face[2] * self.scale[2], face[3]
-                print(np.min(s), np.max(s))
-                if np.min(s) < minS:
-                    minS = np.min(s)
-                if np.max(s) > maxS:
-                    maxS = np.max(s)
-                contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='coolwarm'))
+                print("m/m by face", np.min(s), np.max(s))
+                # if 0 <= np.min(s) < minS:  # -1 value indicates no particle anywhere on face
+                #     minS = np.min(s)
+                # if np.max(s) > maxS:
+                #     maxS = np.max(s)
 
+                if np.min(s) < 0.0:
+                    contour_plots.append(mlab.mesh(x, y, z, color=(0, 0, 0)))
+                else:
+                    contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='coolwarm'))
+
+        print("min", minS, "max", maxS)
         for cp in contour_plots:
             cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS, maxS])
 
-        mlab.xlabel('X')
-        mlab.ylabel('Y')
-        mlab.zlabel('Z')
+        # mlab.xlabel('X')
+        # mlab.ylabel('Y')
+        # mlab.zlabel('Z')
+        mlab.outline()
         mlab.draw()
         mlab.show()
