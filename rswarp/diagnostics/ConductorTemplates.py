@@ -35,17 +35,24 @@ class Conductor(object):
     def _generate_face(self, resolution=100):
         scraped_parts = np.array([self.top.xplost, self.top.yplost, self.top.zplost]).T[self.pids, :]
         for bound, axis, face in zip(self.cbounds, self.axis, self.faces):
+            xp = 1 + 5 * np.abs(self.cbounds[(axis + 1) % 3] - self.cbounds[(axis + 1) % 3 + 3]) \
+                 / self.cell_size[(axis + 1) % 3]
+            yp = 1 + 5 * np.abs(self.cbounds[(axis + 2) % 3] - self.cbounds[(axis + 2) % 3 + 3]) \
+                 / self.cell_size[(axis + 2) % 3]
             x, y = np.meshgrid(np.linspace(self.cbounds[(axis + 1) % 3],
-                                           self.cbounds[(axis + 1) % 3 + 3], resolution),
+                                           self.cbounds[(axis + 1) % 3 + 3], xp),
                                np.linspace(self.cbounds[(axis + 2) % 3],
-                                           self.cbounds[(axis + 2) % 3 + 3], resolution))
+                                           self.cbounds[(axis + 2) % 3 + 3], yp))
             z = np.ones_like(x) * bound
             positions = np.vstack([x.ravel(), y.ravel()])
 
             if face.size > 30:
+                # 30 is empirically chosen as a bound where the KDE returns reasonable results
                 kernel = gaussian_kde(scraped_parts[face, :][:, [(axis + 1) % 3, (axis + 2) % 3]].T)
                 s = np.reshape(kernel(positions).T, x.shape)
-                # s, _, _ = np.histogram2d(scraped_parts[face, (axis + 1) % 3], scraped_parts[face, (axis + 2) % 3], bins=100)
+            elif face.size > 1:
+                s, _, _ = np.histogram2d(scraped_parts[face, (axis + 1) % 3], scraped_parts[face, (axis + 2) % 3],
+                                         bins=x.shape)
             else:
                 s = np.ones_like(x) * -1.0
 
@@ -81,22 +88,7 @@ class BoxPlot(Conductor):
             yield x, y, z, s
 
 
-class XPlanePlot(Conductor):
-    def __init__(self, top, w3d, conductor):
-        super(XPlanePlot, self).__init__(top, w3d, conductor)
-
-
-class YPlanePlot(Conductor):
-    def __init__(self, top, w3d, conductor):
-        super(YPlanePlot, self).__init__(top, w3d, conductor)
-
-
-class ZPlanePlot(Conductor):
-    def __init__(self, top, w3d, conductor):
-        super(ZPlanePlot, self).__init__(top, w3d, conductor)
-        self.axis = [2, ]
-        self.center = [conductor.zcent, ]
-        self.cbounds = self.domain
+class Plane(Conductor):
 
     def get_particles(self):
         # The plane has only one face so we use all particles with appropriate pid
@@ -109,6 +101,30 @@ class ZPlanePlot(Conductor):
             x, y, z = mesh[0], mesh[1], np.ones_like(mesh[0]) * self.center[0]
             s = mesh[3]
             yield x, y, z, s
+
+
+class XPlanePlot(Plane):
+    def __init__(self, top, w3d, conductor):
+        super(XPlanePlot, self).__init__(top, w3d, conductor)
+        self.axis = [0, ]
+        self.center = [conductor.xcent, ]
+        self.cbounds = self.domain
+
+
+class YPlanePlot(Plane):
+    def __init__(self, top, w3d, conductor):
+        super(YPlanePlot, self).__init__(top, w3d, conductor)
+        self.axis = [1, ]
+        self.center = [conductor.ycent, ]
+        self.cbounds = self.domain
+
+
+class ZPlanePlot(Plane):
+    def __init__(self, top, w3d, conductor):
+        super(ZPlanePlot, self).__init__(top, w3d, conductor)
+        self.axis = [2, ]
+        self.center = [conductor.zcent, ]
+        self.cbounds = self.domain
 
 
 conductor_type = {XPlane: XPlanePlot,
