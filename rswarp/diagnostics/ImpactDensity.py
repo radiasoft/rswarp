@@ -9,6 +9,7 @@ from scipy.interpolate import interp1d
 from ConductorTemplates import conductor_type
 import numpy as np
 import matplotlib.cm as cm
+from scipy.units import e
 
 # TODO: Add attributes:
 #   scatter points for surfaces?
@@ -79,6 +80,7 @@ class PlotDensity(object):
         else:
             self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
             self.clf = mlab.clf()
+        self.time = top.dt * top.it
 
     def __call__(self, *args, **kwargs):
         """
@@ -238,27 +240,28 @@ class PlotDensity(object):
         minS, maxS = maxint, 0
         contour_plots = []
         for cond in self.conductors.itervalues():
-            print(cond)
+
             for face in cond.generate_faces():
-                x, y, z, s = face[0] * self.scale[0], face[1] * self.scale[1], face[2] * self.scale[2], face[3]
+                x, y, z, s = face[0] * self.scale[0], face[1] * self.scale[1], \
+                             face[2] * self.scale[2], face[3] * e / self.time * 1e-4
                 print("m/m by face", np.min(s), np.max(s))
-                # if 0 <= np.min(s) < minS:  # -1 value indicates no particle anywhere on face
-                #     minS = np.min(s)
-                # if np.max(s) > maxS:
-                #     maxS = np.max(s)
+                if 0 <= np.min(s) < minS:  # -1 value indicates no particle anywhere on face
+                    minS = np.min(s)
+                if np.max(s) > maxS:
+                    maxS = np.max(s)
 
                 if np.min(s) < 0.0:
                     contour_plots.append(mlab.mesh(x, y, z, color=(0, 0, 0)))
                 else:
-                    contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='coolwarm'))
+                    contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='viridis'))
 
-        print("min", minS, "max", maxS)
         for cp in contour_plots:
-            cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS, maxS])
+            cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
 
         # mlab.xlabel('X')
         # mlab.ylabel('Y')
         # mlab.zlabel('Z')
-        mlab.outline()
+
         mlab.draw()
+        mlab.colorbar(object=contour_plots[1], orientation='vertical')
         mlab.show()
