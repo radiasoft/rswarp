@@ -9,7 +9,7 @@ from scipy.interpolate import interp1d
 from ConductorTemplates import conductor_type
 import numpy as np
 import matplotlib.cm as cm
-from scipy.units import e
+from scipy.constants import e
 
 # TODO: Add attributes:
 #   scatter points for surfaces?
@@ -21,13 +21,14 @@ class PlotDensity(object):
 
     """
 
-    def __init__(self, ax, ax_colorbar, scraper, top, w3d):
+    def __init__(self, ax, ax_colorbar, scraper, top, w3d, interpolation='kde'):
         """
         Plots density of scraped particles on conducting objects.
 
         Can evaluate density on each surface of a Box or ZPlane separately and produce shaded density plots.
         To run automatically: call an initialized PlotDensity object.
 
+        # TODO: Change line below when new plotting capabilities are finished
         Warning: Only Box and ZPlane are supported at this time. Other conductor shapes will not be evaluated correctly.
                 Only for 2D XZ simulations at this time.
 
@@ -51,6 +52,8 @@ class PlotDensity(object):
             normalization: matplotlib.colors normalization function. Defaults to Normalize (linear normalization).
         """
         assert scraper.lcollectlpdata, "Flag 'lcollectlpdata' not enabled for scraper. No particle data to plot."
+        assert interpolation == 'kde' or interpolation == 'cubic', "Interpolation must be either 'cubic' or 'kde'"
+        self.interpolation = interpolation
 
         self.scraper = scraper
         self.top = top
@@ -59,7 +62,11 @@ class PlotDensity(object):
         self.gated_ids = {}
         self.conductors = {}  # will replace gated_ids
         for cond in scraper.conductors:
-            self.conductors[cond.condid] = conductor_type[type(cond)](top, w3d, cond)
+            try:
+                self.conductors[cond.condid] = conductor_type[type(cond)](top, w3d, cond,
+                                                                          interpolation=self.interpolation)
+            except KeyError:
+                print("{} not currently implemented.".format(type(cond)))
         self.dx = w3d.dx
         self.dz = w3d.dz
         self.scale = [1e9, 1e9, 1e8]
@@ -70,6 +77,7 @@ class PlotDensity(object):
         self.xplost = self.top.xplost[:self.numlost]
         self.yplost = self.top.yplost[:self.numlost]
         self.zplost = self.top.zplost[:self.numlost]
+        self.time = top.dt * top.it
 
         if w3d.solvergeom == w3d.XZgeom or w3d.solvergeom == w3d.RZgeom:
             self.ax = ax
@@ -80,7 +88,6 @@ class PlotDensity(object):
         else:
             self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
             self.clf = mlab.clf()
-        self.time = top.dt * top.it
 
     def __call__(self, *args, **kwargs):
         """
@@ -257,10 +264,6 @@ class PlotDensity(object):
 
         for cp in contour_plots:
             cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
-
-        # mlab.xlabel('X')
-        # mlab.ylabel('Y')
-        # mlab.zlabel('Z')
 
         mlab.draw()
         mlab.colorbar(object=contour_plots[1], orientation='vertical')
