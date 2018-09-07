@@ -5,10 +5,9 @@ import numpy as np
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.ionization import Ionization
-import rswarp.utilities.h2crosssections as h2crosssections
+import rsoopic.h2crosssections as h2crosssections
 from rswarp.cathode.injectors import UserInjectors
 from rswarp.utilities.file_utils import cleanupPrevious
-import sys
 
 # Seed set for testing
 np.random.seed(123456)
@@ -52,7 +51,6 @@ cathode_temperature = 0.25  # eV
 beam_beta = 0.990813945176
 beam_ke = wp.emass / wp.jperev * wp.clight**2 * (1. / np.sqrt(1-beam_beta**2) - 1.)  # eV
 print '*** beam_ke, beam_gamma =', beam_ke,  1. / np.sqrt(1-beam_beta**2)
-#sys.exit(0)
 beam_current = 10e-3  # A
 beam_radius = 0.01  # m
 
