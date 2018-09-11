@@ -155,8 +155,8 @@ if simulateIonization is True:
         # sampleEmittedAngle=lambda nnew, emitted_energy, incident_energy: np.random.uniform(0, 2*np.pi, size=nnew),
         sampleEmittedAngle=h2crosssections.generateAngle,
         # sampleIncidentAngle=lambda nnew, emitted_energy, incident_energy, emitted_theta: np.random.uniform(0, 2*np.pi, size=nnew),
-        writeAngleDataDir=False,
-        writeAnglePeriod=10,
+        writeAngleDataDir='ionization.diags',
+        writeAnglePeriod=1,
         l_remove_incident=False,
         l_remove_target=False,
         ndens=target_density
