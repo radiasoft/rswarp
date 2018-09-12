@@ -19,7 +19,7 @@ top.lpsplots = false
 
 simulateIonization = True
 
-beam_ke = 1e3  # beam kinetic energy, in eV
+beam_ke = 100e3  # beam kinetic energy, in eV
 beam_gamma = beam_ke/511e3 + 1
 beam_beta = np.sqrt(1-1/beam_gamma**2)
 sw = 1
@@ -68,7 +68,8 @@ top.pboundxy = absorb
 
 Lz = (w3d.zmmax - w3d.zmmin)
 dz =  Lz / w3d.nz
-top.dt = 0.1e-9
+top.dt = 0.01e-9
+#import sys; from scipy.constants import c; print beam_beta, beam_beta * c * top.dt, '<', dz, '?'; sys.exit(0)
 ptcl_per_step = int(beam.ibeam * top.dt / echarge / sw)  # number of particles to inject on each step
 
 top.ibpush = 1  # 0:off, 1:fast, 2:accurate
@@ -155,7 +156,7 @@ if simulateIonization is True:
         # sampleEmittedAngle=lambda nnew, emitted_energy, incident_energy: np.random.uniform(0, 2*np.pi, size=nnew),
         sampleEmittedAngle=h2crosssections.generateAngle,
         # sampleIncidentAngle=lambda nnew, emitted_energy, incident_energy, emitted_theta: np.random.uniform(0, 2*np.pi, size=nnew),
-        writeAngleDataDir='ionization.diags',
+        writeAngleDataDir=diagDir,
         writeAnglePeriod=1,
         l_remove_incident=False,
         l_remove_target=False,
