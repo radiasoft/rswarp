@@ -19,12 +19,12 @@ top.lpsplots = false
 
 simulateIonization = True
 
-beam_ke = 100e3  # beam kinetic energy, in eV
+beam_ke = 1e3  # beam kinetic energy, in eV
 beam_gamma = beam_ke/511e3 + 1
 beam_beta = np.sqrt(1-1/beam_gamma**2)
 sw = 1
 
-diagDir = ("diags%.3fkeV" % (beam_ke/1e3))
+diagDir = ("diags-%.3fkeV" % (beam_ke/1e3))
 
 beam = Species(type=Electron, name='e-', weight=sw)
 # These two species represent the emitted particles
@@ -68,7 +68,7 @@ top.pboundxy = absorb
 
 Lz = (w3d.zmmax - w3d.zmmin)
 dz =  Lz / w3d.nz
-top.dt = 0.01e-9
+top.dt = 0.1e-9
 #import sys; from scipy.constants import c; print beam_beta, beam_beta * c * top.dt, '<', dz, '?'; sys.exit(0)
 ptcl_per_step = int(beam.ibeam * top.dt / echarge / sw)  # number of particles to inject on each step
 
