@@ -65,8 +65,8 @@ class IonizationTarget:
         vi = vi[0:nnew]  # We may be given more velocities than we actually need
 
         tstart = time.time()
-        gamma_inc = 1/np.sqrt(1-(vi/clight)**2)
-        impactEnergy = (gamma_inc-1) * self.emassEV
+        gamma_inc = 1./np.sqrt(1.-(vi/clight)**2)
+        impactEnergy = (gamma_inc-1.) * self.emassEV
 
         if self.useMollerApproximation:
             wOutMoller = np.empty((nnew))
@@ -267,20 +267,14 @@ class MollerIonizationTarget(IonizationTarget):
         warp as vxi = uxi * gaminvi)
         Cross section sigma is given by Eq. 2.15 in Ref. [2]
         """
-        t = self.normalizedKineticEnergy(vi)
-        if t <= 1:
-            return 0.
-
         # initialize needed variables
         r_0 = physical_constants['classical electron radius'][0]
-        beta_t = vi / clight
-        bprime = self.I / self.emassEV
-        tprime = t * bprime
-        # now add terms to sigma, one by one:
         mec2 = emass * clight**2
+        beta_t = vi / clight
         kappa = 2. * math.pi * r_0**2 * mec2 / (beta_t * beta_t)
         eps_min = self.eps_min * jperev
-        eps = tprime * mec2
+        eps = mec2 * (1. / math.sqrt(1. - beta_t**2) - 1.)
+        # now add terms to sigma, one by one:
         sigma = 1. / eps_min - 1. / (eps - eps_min)
         sigma += (eps - 2. * eps_min) / (2. * (mec2 + eps)**2)
         sigma += mec2 * (mec2 + 2. * eps) / (eps * (mec2 + eps)**2) * \
