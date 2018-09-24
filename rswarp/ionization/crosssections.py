@@ -35,7 +35,7 @@ class IonizationTarget:
     useMollerApproximation = True
     eps_min = 10. # value for which Kim and Lehtinen versions of Moller agree
 
-    def getCrossSection(vi):
+    def getCrossSection(self, vi):
         """
         Compute and return the total cross-section for electron impact ionization
         (in units of m**2)
@@ -43,7 +43,7 @@ class IonizationTarget:
         warp as vxi = uxi * gaminvi)
         Cross section sigma is given by Eq. 16 in Ref. [1]
         """
-        t = normalizedKineticEnergy(vi)
+        t = self.normalizedKineticEnergy(vi)
         if t <= 1:
             return 0.
 
@@ -57,7 +57,7 @@ class IonizationTarget:
 
         return sigma
 
-    def ejectedEnergy(vi, nnew):
+    def ejectedEnergy(self, vi, nnew):
         """
         Selection of an ejected electron energy (in eV), adapted from
         XOOPIC's MCCPackage::ejectedEnergy routine
@@ -77,15 +77,15 @@ class IonizationTarget:
 
         tPlusMC = impactEnergy + self.emassEV
         twoTplusMC = impactEnergy + tPlusMC
-        tPlusI = impactEnergy + I
-        tMinusI = impactEnergy - I
+        tPlusI = impactEnergy + self.I
+        tMinusI = impactEnergy - self.I
 
         invTplusMCsq = 1. / (tPlusMC * tPlusMC)
         tPlusIsq = tPlusI ** 2
-        iOverT = I / impactEnergy
+        iOverT = self.I / impactEnergy
 
         funcT1 = 14./3. + .25 * tPlusIsq * invTplusMCsq - self.emassEV * twoTplusMC * iOverT * invTplusMCsq
-        funcT2 = 5./3. - iOverT - 2.*iOverT*iOverT/3. + .5 * I * tMinusI * invTplusMCsq + self.emassEV*twoTplusMC*I*invTplusMCsq*np.log(iOverT)/tPlusI
+        funcT2 = 5./3. - iOverT - 2.*iOverT*iOverT/3. + .5 * self.I * tMinusI * invTplusMCsq + self.emassEV*twoTplusMC*self.I*invTplusMCsq*np.log(iOverT)/tPlusI
 
         aGreaterThan = funcT1 * tMinusI / funcT2 / tPlusI
 
@@ -106,20 +106,20 @@ class IonizationTarget:
             randomFW = frand(size=nnew) * aGreaterThan
 
             # wTest is the inverse of F(W)
-            wTest = I*funcT2*randomFW/(funcT1-funcT2*randomFW)
+            wTest = self.I*funcT2*randomFW/(funcT1-funcT2*randomFW)
 
             # Because we are not working directly with the distribution function,
             #   we must use the "rejection method".  This involves generating
             #   another random number and seeing whether it is > the ratio of
             #   the true probability over the phony_but_simple probability.
 
-            wPlusI       = wTest + I
+            wPlusI       = wTest + self.I
             wPlusIsq     = wPlusI * wPlusI
             invTminusW   = 1./(impactEnergy-wTest)
             invTminusWsq = invTminusW**2
             invTminusW3  = invTminusW**3
 
-            probabilityRatio = (1. + 4.*I/wPlusI/3. + wPlusIsq*invTminusWsq + 4.*I*wPlusIsq*invTminusW3/3. - self.emassEV*twoTplusMC*wPlusI*invTminusW*invTplusMCsq + wPlusIsq*invTplusMCsq) / funcT1
+            probabilityRatio = (1. + 4.*self.I/wPlusI/3. + wPlusIsq*invTminusWsq + 4.*self.I*wPlusIsq*invTminusW3/3. - self.emassEV*twoTplusMC*wPlusI*invTminusW*invTplusMCsq + wPlusIsq*invTplusMCsq) / funcT1
 
             mask = (probabilityRatio >= frand(size=nnew))
             # npart -= np.sum(mask)  # Decrement by the number of passing particles
@@ -130,7 +130,7 @@ class IonizationTarget:
         print("Spent %.3f s generating ejected energies" % (time.time()-tstart))
         return wOut[0:nnew]  # Might possibly have more particles than necessary, but should have at least that many
 
-    def generateAngle(nnew, emitted_energy, incident_energy):
+    def generateAngle(self, nnew, emitted_energy, incident_energy):
         """
         emitted_energy - emitted electon energy (in eV)
         incident_energy - incident electon energy (in eV)
@@ -171,8 +171,8 @@ class IonizationTarget:
 
         T = incident_energy
         W = emitted_energy
-        g2 = G_2(T, W)
-        g3 = G_3(T, W)
+        g2 = self.G_2(T, W)
+        g3 = self.G_3(T, W)
         F = np.random.uniform(size=nnew)
 
         theta = np.nan_to_num(np.arccos(g2 + g3 * np.tan(
@@ -180,33 +180,33 @@ class IonizationTarget:
         ))
         return theta
 
-    def alpha(E):
+    def alpha(self, E):
         """
         E - electron energy (in eV)
         """
         return 0.6 * (self.emassEV / (E + self.emassEV))**2
 
-    def G_2(T, W):
+    def G_2(self, T, W):
         """
         T - incident electron energy (in eV)
         W - emitted electon energy (in eV)
         """
         return np.sqrt(np.divide(W+I, T) * np.divide(T+2*self.emassEV, W+2*self.emassEV))
 
-    def G_3(T, W):
+    def G_3(self, T, W):
         """
         T - incident electron energy (in eV)
         W - emitted electon energy (in eV)
         """
-        return alpha(T) * np.sqrt(np.divide(I, W) * np.divide(T - (W+I), T))
+        return self.alpha(T) * np.sqrt(np.divide(I, W) * np.divide(T - (W+I), T))
 
-    def normalizedKineticEnergy(vi=None):
+    def normalizedKineticEnergy(self, vi=None):
         """
         Compute the normalized kinetic energy n = T/I given an input velocity
         """
         gamma_in = 1. / np.sqrt(1 - (vi/clight)**2)
         T = (gamma_in - 1) * emass * clight**2 / jperev  # kinetic energy (in eV) of incident electron
-        t = T / I  # normalized kinetic energy
+        t = T / self.I  # normalized kinetic energy
         return t
 
 class H2IonizationTarget(IonizationTarget):
@@ -222,7 +222,7 @@ class H2IonizationTarget(IonizationTarget):
     def __init__(self):
         self.useMollerApproximation = False
 
-    def getCrossSection(vi):
+    def getCrossSection(self, vi):
         """
         Compute and return the total cross-section for electron impact ionization
         (in units of m**2)
@@ -230,7 +230,7 @@ class H2IonizationTarget(IonizationTarget):
         warp as vxi = uxi * gaminvi)
         Cross section sigma is given by Eq. 22 in Ref. [1]
         """
-        t = normalizedKineticEnergy(vi)
+        t = self.normalizedKineticEnergy(vi)
         if t <= 1:
             return 0.
 
@@ -238,16 +238,16 @@ class H2IonizationTarget(IonizationTarget):
 
         # initialize needed variables
         beta_t = vi / clight
-        beta_u = beta(U)
-        beta_b = beta(I)
-        bprime = I / self.emassEV
+        beta_u = beta(self.U)
+        beta_b = beta(self.I)
+        bprime = self.I / self.emassEV
         tprime = t * bprime
         # now add terms to sigma, one by one:
         sigma = math.log(beta_t**2 / (1. - beta_t**2)) - beta_t**2 - math.log(2. * bprime)
         sigma *= .5 * (1. - 1. / (t * t))
         sigma += 1. - 1. / t - math.log(t) / (t + 1.) * (1. + 2. * tprime) / (1. + .5 * tprime)**2
         sigma += bprime**2 / (1. + .5 * tprime)**2 * (t - 1) / 2.
-        sigma *= 4. * np.pi * self.a_0**2 * fine_structure**4 * N / (beta_t**2 + beta_u**2 + beta_b**2) / (2. * bprime)
+        sigma *= 4. * np.pi * self.a_0**2 * fine_structure**4 * self.N / (beta_t**2 + beta_u**2 + beta_b**2) / (2. * bprime)
 
         return sigma
 
@@ -259,7 +259,7 @@ class MollerIonizationTarget(IonizationTarget):
     def setEps_min(self, val):
         self.eps_min = val
 
-    def getCrossSection(vi):
+    def getCrossSection(self, vi):
         """
         Compute and return the total cross-section for electron impact ionization
         (in units of m**2)
@@ -267,14 +267,14 @@ class MollerIonizationTarget(IonizationTarget):
         warp as vxi = uxi * gaminvi)
         Cross section sigma is given by Eq. 2.15 in Ref. [2]
         """
-        t = normalizedKineticEnergy(vi)
+        t = self.normalizedKineticEnergy(vi)
         if t <= 1:
             return 0.
 
         # initialize needed variables
         r_0 = physical_constants['classical electron radius'][0]
         beta_t = vi / clight
-        bprime = I / self.emassEV
+        bprime = self.I / self.emassEV
         tprime = t * bprime
         # now add terms to sigma, one by one:
         mec2 = emass * clight**2
@@ -283,7 +283,7 @@ class MollerIonizationTarget(IonizationTarget):
         eps = tprime * mec2
         sigma = 1. / eps_min - 1. / (eps - eps_min)
         sigma += (eps - 2. * eps_min) / (2. * (mec2 + eps)**2)
-        sigma += mec2 * (mec2 + 2. * eps) / (eps * (mec2 + eps)**2) \
+        sigma += mec2 * (mec2 + 2. * eps) / (eps * (mec2 + eps)**2) * \
         math.log(eps_min / (eps - eps_min))
         sigma *= kappa
 
