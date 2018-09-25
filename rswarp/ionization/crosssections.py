@@ -43,14 +43,10 @@ class IonizationTarget:
         warp as vxi = uxi * gaminvi)
         Cross section sigma is given by Eq. 16 in Ref. [1]
         """
-        t = self.normalizedKineticEnergy(vi)
-        if t <= 1:
-            return 0.
-
         # initialize needed variables
         beta_t = vi / clight
-        bprime = I / self.emassEV
-        tprime = t * bprime
+        bprime = 0. # Moller should mean negligible binding energy
+        tprime = 1. / math.sqrt(1. - beta_t**2) - 1.
         sigma = 1. - 1. / t - math.log(t) / (t + 1.) * (1. + 2. * tprime) / (1. + tprime)**2
         sigma += bprime**2 / (1. + tprime)**2 * (t - 1.) / 2.
         sigma *= 4. * np.pi * self.a_0**2 * fine_structure**2 * N * (R / I) / (beta_t * beta_t)
@@ -211,7 +207,7 @@ class IonizationTarget:
 
 class H2IonizationTarget(IonizationTarget):
     """
-    Derived class using the cross section (Eq. 22 in Ref. [1]),
+    Derived class using the RBEB cross section (Eq. 22 in Ref. [1]),
     with parameters set for H2 (hydrogen gas)
     """
     I = 15.42593 # threshold ionization energy (in eV), from the NIST Standard Reference Database (via NIST Chemistry WebBook)
