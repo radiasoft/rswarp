@@ -11,10 +11,13 @@ from rswarp.utilities.file_utils import cleanupPrevious
 
 import rsoopic.h2crosssections as h2crosssections
 
-#from rsbeams.rsstats import stats6d
+#import matplotlib as mpl
+#mpl.use('Agg')
+#import matplotlib.pyplot as plt
 
-#import shutil
-#from shutil import os
+#import sys
+
+beam_radius = 1.e-2
 
 def test_ionization():
 
@@ -27,6 +30,7 @@ def test_ionization():
     beam_ke = 1.0e3 # beam kinetic energy, in eV
     beam_gamma = beam_ke/511.e3 + 1
     beam_beta = np.sqrt(1-1/beam_gamma**2)
+    #print 'beam_beta =', beam_beta; sys.exit(0)
     sw = 1
 
     beam = Species(type=Electron, name='e-', weight=sw)
@@ -84,8 +88,8 @@ def test_ionization():
     def generateDist(npart=ptcl_per_step, zemit=dz/5, dv_over_v=0):
         ptclTrans = createKV(
             npart=npart,
-            a=0.010,
-            b=0.010,
+            a=beam_radius,
+            b=beam_radius,
             emitx=4.* 1.e-6,
             emity=4.* 1.e-6
         )
@@ -171,24 +175,54 @@ def test_ionization():
     package("w3d")
     generate()
 
-    stept(10.0e-9) # Simulate 10 ns
+    Tsim = 10.0e-9 # Simulate 10 ns
+    stept(Tsim)
+
+    # Compare emitted electrons created in simulation (Nes) with analytic estimate (Ne)
+    v_b = clight * beam_beta # beam speed
+    sigma = h2crosssections.h2_ioniz_crosssection(v_b)
+    A_b = math.pi * beam_radius**2 # beam cross section
+    n_e = beam.ibeam / (jperev * A_b * v_b) # electron density inside beam
+    Ne = sigma * target_density * n_e * v_b * A_b
+    if Tsim > Lz / v_b: # beam reaches far side of simulation domain
+        Ne *= v_b * (Lz / v_b)**2 / 2. + Lz * (Tsim - Lz / v_b)
+    else:
+        Ne *= v_b * Tsim**2 / 2.
+    Ne = 0.5 * math.pi * sigma * target_density * n_e
+    Ne *= (beam_radius * v_b * Tsim)**2
+    Nes = emittedelec.getn()
+    eps_Ne = (Nes - Ne) / Nes
+    if __name__ == '__main__':
+        print ' ***', Nes, Ne, eps_Ne
+    assert(eps_Ne < 4.e-2) # tolerate relative error less than 4%
+
+    #plt.plot(emittedelec.getx(), emittedelec.gety(), '.')
+    #plt.savefig('beamXsection.png')
 
     # Check that number of emitted electrons is within expected range
-    print emittedelec.getn() # should be around 3650
+    if __name__ == '__main__':
+        print emittedelec.getn() # should be around 3650
     np.testing.assert_approx_equal(emittedelec.getn()-150, 3500, 1) # accept 3150 <= n < 4150
     # Check that mean and standard deviation is reasonable for all six phasespace coordinates
-    print np.mean(emittedelec.getx()), np.std(emittedelec.getx())
+    if __name__ == '__main__':
+        print np.mean(emittedelec.getx()), np.std(emittedelec.getx())
     np.testing.assert_approx_equal(np.std(emittedelec.getx()), 9.0e-3, 1)
-    print np.mean(emittedelec.gety()), np.std(emittedelec.gety())
+    if __name__ == '__main__':
+        print np.mean(emittedelec.gety()), np.std(emittedelec.gety())
     np.testing.assert_approx_equal(np.std(emittedelec.gety()), 9.0e-3, 1)
-    print np.mean(emittedelec.getz()), np.std(emittedelec.getz())
+    if __name__ == '__main__':
+        print np.mean(emittedelec.getz()), np.std(emittedelec.getz())
     np.testing.assert_approx_equal(np.std(emittedelec.getz()), 4.0e-2, 1)
-    print np.mean(emittedelec.getvx()), np.std(emittedelec.getvx())
+    if __name__ == '__main__':
+        print np.mean(emittedelec.getvx()), np.std(emittedelec.getvx())
     np.testing.assert_approx_equal(np.std(emittedelec.getvx()), 1.9e6, 2)
-    print np.mean(emittedelec.getvy()), np.std(emittedelec.getvy())
+    if __name__ == '__main__':
+        print np.mean(emittedelec.getvy()), np.std(emittedelec.getvy())
     np.testing.assert_approx_equal(np.std(emittedelec.getvy()), 1.9e6, 2)
-    print np.mean(emittedelec.getvz()), np.std(emittedelec.getvz())
+    if __name__ == '__main__':
+        print np.mean(emittedelec.getvz()), np.std(emittedelec.getvz())
     np.testing.assert_approx_equal(np.mean(emittedelec.getvz()), 5.0e5, 1)
     np.testing.assert_approx_equal(np.std(emittedelec.getvz()), 1.5e6, 2)
 
-test_ionization()
+if __name__ == '__main__':
+    test_ionization()
