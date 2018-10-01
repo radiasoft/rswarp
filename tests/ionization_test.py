@@ -10,6 +10,10 @@ from rswarp.utilities.beam_distributions import createKV
 from rswarp.utilities.file_utils import cleanupPrevious
 
 import rsoopic.h2crosssections as h2crosssections
+# Load module with new, relativistic cross section
+sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
+import crosssections as Xsect
+h2xs = Xsect.H2IonizationTarget()
 
 #import matplotlib as mpl
 #mpl.use('Agg')
@@ -142,11 +146,18 @@ def test_ionization():
         )
 
         # # e + H2 -> 2e + H2+
+        def xswrapper(vi):
+            sigarr = np.empty((vi.size))
+            for i in range(vi.size):
+                sigarr[i] = h2xs.getCrossSection(vi[i])
+            return sigarr
         ioniz.add(
             incident_species=beam,
             emitted_species=[h2plus, emittedelec],
-            cross_section=h2crosssections.h2_ioniz_crosssection,
-            # cross_section=lambda nnew, vi: 1e-20,
+            #cross_section=lambda nnew, vi: 1e-20,
+            #cross_section=h2crosssections.h2_ioniz_crosssection,
+            #cross_section=Xsect.IonizationTarget.getCrossSection,
+            cross_section=xswrapper,
             emitted_energy0=[0, h2crosssections.ejectedEnergy],
             # emitted_energy0=[0, lambda nnew, vi: 1./np.sqrt(1.-((vi/2.)/clight)**2) * emass*clight/jperev],
             emitted_energy_sigma=[0, 0],
@@ -180,7 +191,9 @@ def test_ionization():
 
     # Compare emitted electrons created in simulation (Nes) with analytic estimate (Ne)
     v_b = clight * beam_beta # beam speed
-    sigma = h2crosssections.h2_ioniz_crosssection(v_b)
+    #sigma = h2crosssections.h2_ioniz_crosssection(v_b)
+    # Calculate cross section using Kim RBEB model
+    sigma = h2xs.getCrossSection(v_b)
     A_b = math.pi * beam_radius**2 # beam cross section
     n_e = beam.ibeam / (jperev * A_b * v_b) # electron density inside beam
     Ne = sigma * target_density * n_e * v_b * A_b
