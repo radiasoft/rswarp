@@ -67,8 +67,8 @@ class IonizationEvent:
             self.charge = charge
 
     def __init__(self, trgN = 1, trgm = None, trgq = 0.):
-        self.target = Target(trgN, trgm, trgq)
-        self.projectile = Projectile(emass, echarge)
+        self.target = IonizationEvent.Target(trgN, trgm, trgq)
+        self.projectile = IonizationEvent.Projectile(emass, echarge)
 
     def setEps_min(self, val):
         self.eps_min = val
@@ -139,7 +139,7 @@ class H2IonizationEvent(IonizationEvent):
     with parameters set for H2 (hydrogen gas)
     """
     def __init__(self):
-        super(H2IonizationEvent, self).__init__(self)
+        IonizationEvent.__init__(self)
         self.useMollerApproximation = False
         self.target.N = 2 # number of electrons in target (H2)
         self.target.I = 15.42593 # threshold ionization energy (in eV), from the NIST Standard Reference Database (via NIST Chemistry WebBook)
@@ -182,12 +182,12 @@ class IonIonizationEvent(IonizationEvent):
     cross section for any incident ion.
     """
     def __init__(self, pm = pmass, pq = echarge, trgN = 1, trgm = None, trgq = 0.):
-        super(IonIonizationEvent, self).__init__(self)
+        IonizationEvent.__init__(self)
         self.projectile.mass = pm
         self.projectile.charge = pq
-        target.self.N = trgN
-        if trgm is not None: target.self.mass = trgm
-        if trgq != 0.: target.self.charge = trgq
+        self.target.N = trgN
+        if trgm is not None: self.target.mass = trgm
+        if trgq != 0.: self.target.charge = trgq
 
     def getCrossSection(self, vi):
         """
@@ -197,7 +197,7 @@ class IonIonizationEvent(IonizationEvent):
         # Scale up ion velocity to that of electron with same kinetic energy
         vi *= math.sqrt(self.projectile.mass / emass)
         # Get electron-impact ionization cross section from super-class method
-        sigma = super(IonIonizationEvent, self).getCrossSection(vi)
+        sigma = IonizationEvent.getCrossSection(vi)
         # Scale cross section with charge
         sigma *= (self.projectile.charge / echarge)**2
 
@@ -210,4 +210,4 @@ class IonIonizationEvent(IonizationEvent):
         """
         # Scale up ion velocity to that of electron with same kinetic energy
         vi *= math.sqrt(self.projectile.mass / emass)
-        return super(IonIonizationEvent, self).ejectedEnergy(vi, nnew)
+        return IonizationEvent.ejectedEnergy(vi, nnew)
