@@ -85,9 +85,10 @@ class IonizationEvent:
         r_0 = physical_constants['classical electron radius'][0]
         mec2 = emass * clight**2
         beta_t = vi / clight
-        kappa = 2. * math.pi * r_0**2 * mec2 / (beta_t * beta_t)
         eps_min_joule = self.eps_min * jperev
         eps = mec2 * (1. / math.sqrt(1. - beta_t**2) - 1.) # incident energy (in J)
+        if eps <= eps_min_joule: return 0.
+        kappa = 2. * math.pi * r_0**2 * mec2 / (beta_t * beta_t)
         # now add terms to sigma, one by one:
         sigma = 1. / eps_min_joule - 1. / (eps - eps_min_joule)
         sigma += (eps - 2. * eps_min_joule) / (2. * (mec2 + eps)**2)
@@ -191,23 +192,79 @@ class IonIonizationEvent(IonizationEvent):
 
     def getCrossSection(self, vi):
         """
-        Transform incident velocity vi using Rayzer rule, get electron
-        cross section from super class, and scale it for incident ion charge
+        Use the Rayzer rule, that is get cross section from super class
+        for electron with same velocity, and scale it for incident ion charge
         """
-        # Scale up ion velocity to that of electron with same kinetic energy
-        vi *= math.sqrt(self.projectile.mass / emass)
         # Get electron-impact ionization cross section from super-class method
-        sigma = IonizationEvent.getCrossSection(vi)
+        sigma = IonizationEvent.getCrossSection(self, vi)
         # Scale cross section with charge
         sigma *= (self.projectile.charge / echarge)**2
 
         return sigma
 
-    def ejectedEnergy(self, vi, nnew):
+    def generateAngle(self, nnew, emitted_energy, incident_energy):
         """
-        Transform incident velocity vi using Rayzer rule, then delegate to
-        super-class method
+        Reduce incident energy to that of an electron beam with same incident
+        velocity, then delegate to super-class method
         """
-        # Scale up ion velocity to that of electron with same kinetic energy
-        vi *= math.sqrt(self.projectile.mass / emass)
-        return IonizationEvent.ejectedEnergy(vi, nnew)
+        incident_energy *= emass / self.projectile.mass
+
+        return IonizationEvent.generateAngle(
+            self, nnew, emitted_energy, incident_energy)
+
+class RuddIonIonizationEvent(IonIonizationEvent):
+    """
+    Calculates cross sections for ion-impact ionization using the model proposed
+    by Rudd (Eqs. 31, 32 and 33 in Ref. [4])
+    """
+    u = physical_constants['unified atomic mass unit'][0]
+
+    # Target species handled by the Rudd model, with standard atomic weight,
+    # number of electrons and the four model parameters A, B, C and D, respectively
+    defined_targets = {
+        'H':    [ 1.008,  1, 0.28, 1.15, 0.44, 0.907],
+        'He':   [4.0026,  2, 0.49, 0.62, 0.13, 1.52],
+        'Ne':   [20.180, 10, 1.63, 0.73, 0.31, 1.14],
+        'Ar':   [39.948, 18, 3.85, 1.98, 1.89, 0.89],
+        'Kr':   [83.798, 36, 5.67, 5.50, 2.42, 0.65],
+        'Xe':   [131.29, 54, 7.33, 11.1, 4.12, 0.41],
+        'H2':   [ 2.016,  2, 0.71, 1.63, 0.51, 1.24],
+        'N2':   [28.014, 14, 3.82, 2.78, 1.80, 0.70],
+        'O2':   [31.998, 16, 4.77, 0.00, 1.76, 0.93],
+        'CO':   [28.010, 14, 3.67, 2.79, 2.08, 1.05],
+        'CO2':  [44.009, 22, 6.55, 0.00, 3.74, 1.16],
+        'NH3':  [17.031, 10, 4.01, 0.00, 1.73, 1.02],
+        'CH4':  [16.043, 10, 4.55, 2.07, 2.54, 1.08]}
+    def __init__(self, target_name = 'H2'):
+        IonizationEvent.__init__(self)
+        self.projectile.mass = self.defined_targets[target_name][0] * self.u
+        self.target.N = self.defined_targets[target_name][1]
+        self.target.name = target_name
+
+    def getCrossSection(self, vi):
+        """
+        Compute and return the total cross-section for electron impact ionization
+        (in units of m**2)
+        vi - incident electron velocity (in units of m/s, this is passed in from
+        warp as vxi = uxi * gaminvi)
+        Cross section sigma is given by Eqs. 31, 32 and 33 in Ref. [4]
+        """
+        t = h2crosssections.normalizedKineticEnergy(vi)
+        if t <= 1:
+            return 0.
+
+        # initialize needed variables
+        A = self.defined_targets[self.target.name][2]
+        B = self.defined_targets[self.target.name][3]
+        C = self.defined_targets[self.target.name][4]
+        D = self.defined_targets[self.target.name][5]
+        beta_t = vi / clight
+        mec2 = emass * clight**2
+        x = mec2 * (1. / math.sqrt(1. - beta_t**2) - 1.) / (jperev * self.R)
+        # now add terms to sigma, one by one:
+        sigma_L = C * math.pow(x, D)
+        sigma_H = (A * math.log(1. + x) + B) / x
+        sigma = 1. / (1. / sigma_L + 1. / sigma_H)
+        sigma *= 4. * math.pi * self.a_0**2
+
+        return sigma
