@@ -23,7 +23,7 @@ def test_cross_section_limits():
     sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
     import crosssections as Xsect
     # Calculate cross section using Kim RBEB model
-    h2 = Xsect.H2IonizationTarget()
+    h2 = Xsect.H2IonizationEvent()
     sigma = h2.getCrossSection(v_T)
     if __name__ == '__main__':
         print T, sigma
@@ -39,7 +39,7 @@ def test_cross_section_limits():
     assert(2.3e-23 < sigma and 2.5e-23 > sigma)
 
     # Calculate cross section using Moller model
-    moller = Xsect.IonizationTarget()
+    moller = Xsect.IonizationEvent()
     moller.setEps_min(1.2)
     sigma = moller.getCrossSection(v_T)
     if __name__ == '__main__':

@@ -13,7 +13,7 @@ import rsoopic.h2crosssections as h2crosssections
 # Load module with new, relativistic cross section
 sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
 import crosssections as Xsect
-h2xs = Xsect.H2IonizationTarget()
+h2xs = Xsect.H2IonizationEvent()
 
 #import matplotlib as mpl
 #mpl.use('Agg')
