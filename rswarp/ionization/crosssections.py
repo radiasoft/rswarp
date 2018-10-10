@@ -86,14 +86,14 @@ class IonizationEvent:
         mec2 = emass * clight**2
         beta_t = vi / clight
         eps_min_joule = self.eps_min * jperev
-        eps = mec2 * (1. / math.sqrt(1. - beta_t**2) - 1.) # incident energy (in J)
+        eps = mec2 * (1. / np.sqrt(1. - beta_t**2) - 1.) # incident energy (in J)
         if eps <= eps_min_joule: return 0.
         kappa = 2. * math.pi * r_0**2 * mec2 / (beta_t * beta_t)
         # now add terms to sigma, one by one:
         sigma = 1. / eps_min_joule - 1. / (eps - eps_min_joule)
         sigma += (eps - 2. * eps_min_joule) / (2. * (mec2 + eps)**2)
         sigma += mec2 * (mec2 + 2. * eps) / (eps * (mec2 + eps)**2) * \
-        math.log(eps_min_joule / (eps - eps_min_joule))
+        np.log(eps_min_joule / (eps - eps_min_joule))
         sigma *= kappa
         sigma *= self.target.N
 
@@ -128,8 +128,8 @@ class IonizationEvent:
             for i in range(nnew):
                 costheta = emitted_energy[i] * (incident_energy[i] + 2. * self.emassEV)
                 costheta /= incident_energy[i] * (emitted_energy[i] + 2. * self.emassEV)
-                costheta = math.sqrt(costheta)
-                theta[i] = math.acos(costheta)
+                costheta = np.sqrt(costheta)
+                theta[i] = np.acos(costheta)
             return theta
         else:
             return h2crosssections.generateAngle(nnew, emitted_energy, incident_energy)
@@ -155,10 +155,10 @@ class H2IonizationEvent(IonizationEvent):
         Cross section sigma is given by Eq. 22 in Ref. [1]
         """
         t = h2crosssections.normalizedKineticEnergy(vi)
-        if t <= 1:
-            return 0.
+        #if t <= 1:
+        #    return 0.
 
-        beta = lambda E: math.sqrt(1. - 1. / (1. + E / self.emassEV)**2)
+        beta = lambda E: np.sqrt(1. - 1. / (1. + E / self.emassEV)**2)
 
         # initialize needed variables
         beta_t = vi / clight
@@ -167,13 +167,13 @@ class H2IonizationEvent(IonizationEvent):
         bprime = self.target.I / self.emassEV
         tprime = t * bprime
         # now add terms to sigma, one by one:
-        sigma = math.log(beta_t**2 / (1. - beta_t**2)) - beta_t**2 - math.log(2. * bprime)
+        sigma = np.log(beta_t**2 / (1. - beta_t**2)) - beta_t**2 - np.log(2. * bprime)
         sigma *= .5 * (1. - 1. / (t * t))
-        sigma += 1. - 1. / t - math.log(t) / (t + 1.) * (1. + 2. * tprime) / (1. + .5 * tprime)**2
+        sigma += 1. - 1. / t - np.log(t) / (t + 1.) * (1. + 2. * tprime) / (1. + .5 * tprime)**2
         sigma += bprime**2 / (1. + .5 * tprime)**2 * (t - 1) / 2.
-        sigma *= 4. * np.pi * self.a_0**2 * fine_structure**4 * self.target.N / (beta_t**2 + beta_u**2 + beta_b**2) / (2. * bprime)
+        sigma *= 4. * math.pi * self.a_0**2 * fine_structure**4 * self.target.N / (beta_t**2 + beta_u**2 + beta_b**2) / (2. * bprime)
 
-        return sigma
+        return np.nan_to_num(sigma)
 
 class IonIonizationEvent(IonizationEvent):
     """
@@ -250,8 +250,8 @@ class RuddIonIonizationEvent(IonIonizationEvent):
         Cross section sigma is given by Eqs. 31, 32 and 33 in Ref. [4]
         """
         t = h2crosssections.normalizedKineticEnergy(vi)
-        if t <= 1:
-            return 0.
+        #if t <= 1:
+        #    return 0.
 
         # initialize needed variables
         A = self.defined_targets[self.target.name][2]
@@ -260,11 +260,11 @@ class RuddIonIonizationEvent(IonIonizationEvent):
         D = self.defined_targets[self.target.name][5]
         beta_t = vi / clight
         mec2 = emass * clight**2
-        x = mec2 * (1. / math.sqrt(1. - beta_t**2) - 1.) / (jperev * self.R)
+        x = mec2 * (1. / np.sqrt(1. - beta_t**2) - 1.) / (jperev * self.R)
         # now add terms to sigma, one by one:
-        sigma_L = C * math.pow(x, D)
-        sigma_H = (A * math.log(1. + x) + B) / x
+        sigma_L = C * np.power(x, D)
+        sigma_H = (A * np.log(1. + x) + B) / x
         sigma = 1. / (1. / sigma_L + 1. / sigma_H)
         sigma *= 4. * math.pi * self.a_0**2
 
-        return sigma
+        return np.nan_to_num(sigma)
