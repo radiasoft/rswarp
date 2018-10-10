@@ -87,7 +87,7 @@ class IonizationEvent:
         beta_t = vi / clight
         eps_min_joule = self.eps_min * jperev
         eps = mec2 * (1. / np.sqrt(1. - beta_t**2) - 1.) # incident energy (in J)
-        if eps <= eps_min_joule: return 0.
+        #if eps <= eps_min_joule: return 0.
         kappa = 2. * math.pi * r_0**2 * mec2 / (beta_t * beta_t)
         # now add terms to sigma, one by one:
         sigma = 1. / eps_min_joule - 1. / (eps - eps_min_joule)
@@ -97,7 +97,7 @@ class IonizationEvent:
         sigma *= kappa
         sigma *= self.target.N
 
-        return sigma
+        return np.nan_to_num(sigma)
 
     def ejectedEnergy(self, vi, nnew):
         """
@@ -155,8 +155,6 @@ class H2IonizationEvent(IonizationEvent):
         Cross section sigma is given by Eq. 22 in Ref. [1]
         """
         t = h2crosssections.normalizedKineticEnergy(vi)
-        #if t <= 1:
-        #    return 0.
 
         beta = lambda E: np.sqrt(1. - 1. / (1. + E / self.emassEV)**2)
 
@@ -250,8 +248,6 @@ class RuddIonIonizationEvent(IonIonizationEvent):
         Cross section sigma is given by Eqs. 31, 32 and 33 in Ref. [4]
         """
         t = h2crosssections.normalizedKineticEnergy(vi)
-        #if t <= 1:
-        #    return 0.
 
         # initialize needed variables
         A = self.defined_targets[self.target.name][2]
