@@ -147,10 +147,7 @@ def test_ionization():
 
         # # e + H2 -> 2e + H2+
         def xswrapper(vi):
-            sigarr = np.empty((vi.size))
-            for i in range(vi.size):
-                sigarr[i] = h2xs.getCrossSection(vi[i])
-            return sigarr
+            return h2xs.getCrossSection(vi)
         ioniz.add(
             incident_species=beam,
             emitted_species=[h2plus, emittedelec],
