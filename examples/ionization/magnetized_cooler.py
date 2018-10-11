@@ -5,9 +5,13 @@ import numpy as np
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.ionization import Ionization
-import rsoopic.h2crosssections as h2crosssections
 from rswarp.cathode.injectors import UserInjectors
 from rswarp.utilities.file_utils import cleanupPrevious
+
+import rsoopic.h2crosssections as h2crosssections
+import sys
+sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
+import crosssections as Xsect
 
 # Seed set for testing
 np.random.seed(123456)
@@ -171,11 +175,14 @@ if simulateIonization is True:
     )
 
     # add method used to add possible ionization events
-
+    h2xs = Xsect.H2IonizationEvent()
+    def xswrapper(vi):
+        return h2xs.getCrossSection(vi)
     ioniz.add(
         incident_species=beam,
         emitted_species=[h2plus, emittedelec],  # iterable of species created from ionization
-        cross_section=h2crosssections.h2_ioniz_crosssection,  # Cross section, can be float or function
+        #cross_section=h2crosssections.h2_ioniz_crosssection,  # Cross section, can be float or function
+        cross_section=xswrapper,
         emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
         # or set to 'thermal' to create ions with a thermal energy spread set by temperature
         emitted_energy_sigma=[0, 0],  # Energy spread of emitted species (gives width of gaussian distribution)

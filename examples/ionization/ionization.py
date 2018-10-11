@@ -8,9 +8,9 @@ from rswarp.utilities.ionization import Ionization
 from rswarp.utilities.beam_distributions import createKV
 from rswarp.utilities.file_utils import cleanupPrevious
 
-#import rsoopic.h2crosssections as h2crosssections
-sys.path.insert(1, '/home/vagrant/jupyter/rsoopic/rsoopic')
-import h2crosssections
+import rsoopic.h2crosssections as h2crosssections
+sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
+import crosssections as Xsect
 
 import shutil
 from shutil import os
@@ -147,11 +147,15 @@ if simulateIonization is True:
     )
 
     # # e + H2 -> 2e + H2+
+    h2xs = Xsect.H2IonizationEvent()
+    def xswrapper(vi):
+        return h2xs.getCrossSection(vi)
     ioniz.add(
         incident_species=beam,
         emitted_species=[h2plus, emittedelec],
-        cross_section=h2crosssections.h2_ioniz_crosssection,
+        #cross_section=h2crosssections.h2_ioniz_crosssection,
         # cross_section=lambda nnew, vi: 1e-20,
+        cross_section=xswrapper,
         emitted_energy0=[0, h2crosssections.ejectedEnergy],
         # emitted_energy0=[0, lambda nnew, vi: 1./np.sqrt(1.-((vi/2.)/clight)**2) * emass*clight/jperev],
         emitted_energy_sigma=[0, 0],
