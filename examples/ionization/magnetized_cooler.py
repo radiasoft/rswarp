@@ -317,4 +317,4 @@ wp.package("w3d")  # Use w3d solver/geometry package
 wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
 # Run PIC loop for x steps
-wp.step(3000)
+wp.step(10000)
