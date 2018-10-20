@@ -283,7 +283,7 @@ scraper = wp.ParticleScraper(conductors)
 # HDF5 Particle/Field diagnostic options
 
 if particle_diagnostic_switch:
-    particleperiod = 50  # Particle diagnostic write frequency
+    particleperiod = 1000  # Particle diagnostic write frequency
     particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=wp.top, w3d=wp.w3d,  # Should always be set
                                                # Include data from all existing species in write
                                                species={species.name: species for species in wp.listofallspecies},
@@ -294,7 +294,7 @@ if particle_diagnostic_switch:
     wp.installafterstep(particle_diagnostic_0.write)  # Write method is installed as an after-step action
 
 if field_diagnostic_switch:
-    fieldperiod = 100  # Field diagnostic write frequency
+    fieldperiod = 2000  # Field diagnostic write frequency
     efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=wp.top, w3d=wp.w3d,
                                                               comm_world=wp.comm_world,
                                                               period=fieldperiod)
@@ -317,4 +317,4 @@ wp.package("w3d")  # Use w3d solver/geometry package
 wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
 # Run PIC loop for x steps
-wp.step(3000)
+wp.step(10000)
