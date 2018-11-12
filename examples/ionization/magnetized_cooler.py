@@ -202,8 +202,9 @@ if simulateIonization is True:
 
 pipe_voltage = 0.0  # Set main pipe section to ground
 
+electrode_voltage = +2.3  # electrodes held at +2.3 relative to main pipe
 # Electrodes turned off for thermal ion distribution test
-electrode_voltage = +0.0  # electrodes held at +2.3 relative to main pipe
+#electrode_voltage = +0.0
 
 assert electrode_voltage < beam_ke, "Electrodes potential greater than beam KE."
 
@@ -283,7 +284,7 @@ scraper = wp.ParticleScraper(conductors)
 # HDF5 Particle/Field diagnostic options
 
 if particle_diagnostic_switch:
-    particleperiod = 5000  # Particle diagnostic write frequency
+    particleperiod = 1000  # Particle diagnostic write frequency
     particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=wp.top, w3d=wp.w3d,  # Should always be set
                                                # Include data from all existing species in write
                                                species={species.name: species for species in wp.listofallspecies},
@@ -294,7 +295,7 @@ if particle_diagnostic_switch:
     wp.installafterstep(particle_diagnostic_0.write)  # Write method is installed as an after-step action
 
 if field_diagnostic_switch:
-    fieldperiod = 5000  # Field diagnostic write frequency
+    fieldperiod = 1000  # Field diagnostic write frequency
     efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=wp.top, w3d=wp.w3d,
                                                               comm_world=wp.comm_world,
                                                               period=fieldperiod)
@@ -317,6 +318,6 @@ wp.package("w3d")  # Use w3d solver/geometry package
 wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
 # Run PIC loop for x steps
-wp.step(50000)
+wp.step(10000)
 
 wp.dump()
