@@ -13,8 +13,8 @@ import sys
 sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
 import crosssections as Xsect
 
-# Seed set for testing
-np.random.seed(123456)
+# Seed set for reproduction
+np.random.seed(967644)
 
 diagDir = 'diags/hdf5'
 diagFDir = ['diags/fields/magnetic', 'diags/fields/electric']
@@ -88,7 +88,7 @@ wp.top.pboundnz = wp.absorb
 wp.top.ibpush = 2
 
 dz = (wp.w3d.zmmax - wp.w3d.zmmin) / wp.w3d.nz  # Because warp doesn't set w3d.dz until after solver instantiated
-wp.top.dt = 0.5 * dz / (beam_beta * wp.clight)  # Timestep set to cell crossing time with some padding
+wp.top.dt = 0.75 * dz / (beam_beta * wp.clight)  # Timestep set to cell crossing time with some padding
 
 ####################################
 # Create Beam and Set its Parameters
@@ -151,11 +151,11 @@ else:
 
 if simulateIonization is True:
     # Particle species for emission products of an ionization event
-    h2plus = wp.Species(type=wp.Dihydrogen, charge_state=+1, name='H2+', weight=2)
-    emittedelec = wp.Species(type=wp.Electron, name='emitted e-', weight=2)
+    h2plus = wp.Species(type=wp.Dihydrogen, charge_state=+1, name='H2+', weight=1000)
+    emittedelec = wp.Species(type=wp.Electron, name='emitted e-', weight=1000)
 
     target_pressure = 0.4  # in Pa
-    target_temp = 273  # in K
+    target_temp = 273.0  # in K
     target_density = target_pressure / wp.boltzmann / target_temp  # in 1/m^3
 
     # Instantiate Ionization
@@ -183,10 +183,11 @@ if simulateIonization is True:
         emitted_species=[h2plus, emittedelec],  # iterable of species created from ionization
         #cross_section=h2crosssections.h2_ioniz_crosssection,  # Cross section, can be float or function
         cross_section=xswrapper,
-        emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
+        emitted_energy0=[0, h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
         # or set to 'thermal' to create ions with a thermal energy spread set by temperature
+        #emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
         emitted_energy_sigma=[0, 0],  # Energy spread of emitted species (gives width of gaussian distribution)
-        temperature=[target_temp, None],
+        #temperature=[target_temp, None],
         sampleEmittedAngle=h2crosssections.generateAngle,
         writeAngleDataDir=False,  # Write file recording statistics of angles
         writeAnglePeriod=1000,  # Period to write angle data, if used
@@ -201,11 +202,7 @@ if simulateIonization is True:
 # Create conductors that will represent electrodes placed inside vacuum vessel
 
 pipe_voltage = 0.0  # Set main pipe section to ground
-
-electrode_voltage = +2.3  # electrodes held at +2.3 relative to main pipe
-# Electrodes turned off for thermal ion distribution test
-#electrode_voltage = +0.0
-
+electrode_voltage = +2e3  # electrodes held at several kV relative to main pipe
 assert electrode_voltage < beam_ke, "Electrodes potential greater than beam KE."
 
 pipe_radius = pipe_radius
@@ -284,7 +281,7 @@ scraper = wp.ParticleScraper(conductors)
 # HDF5 Particle/Field diagnostic options
 
 if particle_diagnostic_switch:
-    particleperiod = 1000  # Particle diagnostic write frequency
+    particleperiod = 8000  # Particle diagnostic write frequency
     particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=wp.top, w3d=wp.w3d,  # Should always be set
                                                # Include data from all existing species in write
                                                species={species.name: species for species in wp.listofallspecies},
@@ -295,7 +292,7 @@ if particle_diagnostic_switch:
     wp.installafterstep(particle_diagnostic_0.write)  # Write method is installed as an after-step action
 
 if field_diagnostic_switch:
-    fieldperiod = 1000  # Field diagnostic write frequency
+    fieldperiod = 8000  # Field diagnostic write frequency
     efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=wp.top, w3d=wp.w3d,
                                                               comm_world=wp.comm_world,
                                                               period=fieldperiod)
@@ -318,6 +315,11 @@ wp.package("w3d")  # Use w3d solver/geometry package
 wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
 # Run PIC loop for x steps
-wp.step(10000)
+#wp.step(10000)
+for _ in range(48000):
+    print("IONS H2+: {}".format(h2plus.getx().shape))
+    print("IONS e-: {}".format(emittedelec.getx().shape))
+    print("BEAM e-: {}".format(beam.getx().shape))
+    wp.step(75)
 
 wp.dump()
