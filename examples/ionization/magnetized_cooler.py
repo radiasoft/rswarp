@@ -3,14 +3,17 @@ import warp as wp
 import numpy as np
 
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
+
+# Use more-up-to-date local rswarp
+import sys
+sys.path.insert(1, '/home/vagrant/jupyter/rswarp')
 from rswarp.diagnostics import FieldDiagnostic
-from rswarp.utilities.ionization import Ionization
 from rswarp.cathode.injectors import UserInjectors
 from rswarp.utilities.file_utils import cleanupPrevious
 
 import rsoopic.h2crosssections as h2crosssections
-import sys
 sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
+from ionization import Ionization
 import crosssections as Xsect
 
 # Seed set for reproduction
