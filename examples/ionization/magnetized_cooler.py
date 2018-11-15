@@ -194,10 +194,10 @@ if simulateIonization is True:
         emitted_species=[h2plus, emittedelec],  # iterable of species created from ionization
         #cross_section=h2crosssections.h2_ioniz_crosssection,  # Cross section, can be float or function
         cross_section=xswrapper,
-        emitted_energy0=[0, h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
+        #emitted_energy0=[0, h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
         # or set to 'thermal' to create ions with a thermal energy spread set by temperature
         emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
-        #emitted_energy_sigma=[0, 0],  # Energy spread of emitted species (gives width of gaussian distribution)
+        emitted_energy_sigma=[0, 0],  # Energy spread of emitted species (gives width of gaussian distribution)
         temperature=[target_temp, None],
         sampleEmittedAngle=h2crosssections.generateAngle,
         writeAngleDataDir=False,  # Write file recording statistics of angles
