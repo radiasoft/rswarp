@@ -1,8 +1,12 @@
 from __future__ import division
 import warp as wp
 import numpy as np
+import h5py as h5
+import os
 
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
+from warp.particles.singleparticle import TraceParticle
+from warp.particles.extpart import ZCrossingParticles
 
 # Use more-up-to-date local rswarp
 import sys
@@ -27,6 +31,10 @@ diagFDir = ['diags/fields/magnetic', 'diags/fields/electric']
 # to allow for rerunning the simulation
 if wp.comm_world.rank == 0:
     cleanupPrevious(diagDir, diagFDir)
+    try:
+        os.remove('./diags/crossing_record.h5')
+    except OSError:
+        pass
 
 ####################
 # General Parameters
@@ -188,9 +196,9 @@ if simulateIonization is True:
         cross_section=xswrapper,
         emitted_energy0=[0, h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
         # or set to 'thermal' to create ions with a thermal energy spread set by temperature
-        #emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
-        emitted_energy_sigma=[0, 0],  # Energy spread of emitted species (gives width of gaussian distribution)
-        #temperature=[target_temp, None],
+        emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
+        #emitted_energy_sigma=[0, 0],  # Energy spread of emitted species (gives width of gaussian distribution)
+        temperature=[target_temp, None],
         sampleEmittedAngle=h2crosssections.generateAngle,
         writeAngleDataDir=False,  # Write file recording statistics of angles
         writeAnglePeriod=1000,  # Period to write angle data, if used
@@ -308,21 +316,83 @@ if field_diagnostic_switch:
     #                                                           period=fieldperiod)
     # installafterstep(bfield_diagnostic_0.write)
 
+# Crossing Diagnostics
+zcross_l = ZCrossingParticles(zz=z_positions[1], laccumulate=1)
+zcross_r = ZCrossingParticles(zz=z_positions[4], laccumulate=1)
+
 
 ###########################
 # Generate and Run PIC Code
 ###########################
 
+electrons_tracked_t0 = wp.Species(type=wp.Electron)
+tracer_count = 50
+
 wp.derivqty()  # Set derived beam properties if any are required
 wp.package("w3d")  # Use w3d solver/geometry package
 wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
-# Run PIC loop for x steps
-#wp.step(10000)
-for _ in range(48000):
+for _ in range(7200):
+    if wp.top.it % 200000 == 0:
+        try:
+            np.save("trajectories_{}.npy".format(wp.top.it), electron_tracker_0.getsavedata())
+            electron_tracker_0.reset(clearhistory=1)
+        except:
+            pass
+        v_coords = np.ones([tracer_count, 3]) * beam_beta * wp.clight
+        v_coords[:, [0, 1]] = 0.0
+        x_vals = np.linspace(-beam_radius, beam_radius, tracer_count)
+        y_vals = np.zeros([tracer_count,])
+        z_vals = np.zeros(tracer_count) + 1e-3 
+        eptclArray = np.asarray([x_vals, v_coords[:,0], y_vals, v_coords[:,1], z_vals, v_coords[:,2]]).T
+        electron_tracker_0 = TraceParticle(js=electrons_tracked_t0.jslist[0],
+                                           x=eptclArray[:,0],
+                                           y=eptclArray[:,2],
+                                           z=eptclArray[:,4],
+                                           vx=np.zeros_like(eptclArray[:,0]),
+                                           vy=np.zeros_like(eptclArray[:,0]),
+                                           vz=eptclArray[:,5])
     print("IONS H2+: {}".format(h2plus.getx().shape))
     print("IONS e-: {}".format(emittedelec.getx().shape))
     print("BEAM e-: {}".format(beam.getx().shape))
-    wp.step(75)
+    print("TRACER e-: {}".format(electron_tracker_0.getx().shape))
+
+    wp.step(500)
+
+    vz_l_e = zcross_l.getvz(js=emittedelec.js)
+    vz_l_h = zcross_l.getvz(js=h2plus.js)
+    vz_r_e = zcross_r.getvz(js=emittedelec.js)
+    vz_r_h = zcross_r.getvz(js=h2plus.js)
+
+    if vz_l_e.size != 0 or vz_l_h.size != 0 or vz_r_e.size != 0 or vz_r_h.size != 0:
+        if wp.comm_world.rank == 0:
+            h5file =  h5.File(os.path.join('diags', 'crossing_record.h5'), 'a')
+#                 l_e_group = h5file.create_group('/left/e')
+            try:
+                l_group = h5file.create_group('left')
+                r_group = h5file.create_group('right')
+                l_e_group = l_group.create_group('e')
+                l_h_group = l_group.create_group('h')
+                r_e_group = r_group.create_group('e')
+                r_h_group = r_group.create_group('h')
+                l_e_group.attrs['position'] = zcross_l.zz
+                l_h_group.attrs['position'] = zcross_l.zz
+                r_e_group.attrs['position'] = zcross_r.zz
+                r_h_group.attrs['position'] = zcross_r.zz
+            except ValueError:
+                l_e_group = h5file['left/e']
+                l_h_group = h5file['left/h']
+                r_e_group = h5file['right/e']
+                r_h_group = h5file['right/h']
+
+            l_e_group.create_dataset('{}'.format(wp.top.it), data=vz_l_e)
+            l_h_group.create_dataset('{}'.format(wp.top.it), data=vz_l_h)
+            r_e_group.create_dataset('{}'.format(wp.top.it), data=vz_r_e)
+            r_h_group.create_dataset('{}'.format(wp.top.it), data=vz_r_h)
+
+            h5file.close()
+
+    zcross_l.clear()
+    zcross_r.clear()
 
 wp.dump()
