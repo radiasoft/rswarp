@@ -396,22 +396,22 @@ for _ in range(7200):
     zcross_r.clear()
 
 if wp.comm_world.rank == 0:
-    sample_times, curr_hist_i_r =
+    sample_times, curr_hist_i_r = \
     conductors[-1].get_current_history(
     js=h2plus.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
-    sample_times, curr_hist_e_r =
+    sample_times, curr_hist_e_r = \
     conductors[-1].get_current_history(
     js=emittedelec.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
-    sample_times, curr_hist_i_l =
+    sample_times, curr_hist_i_l = \
     conductors[0].get_current_history(
     js=h2plus.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
-    sample_times, curr_hist_e_l =
+    sample_times, curr_hist_e_l = \
     conductors[0].get_current_history(
     js=emittedelec.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
     with open('curr_hist.txt', 'w') as fch:
         n = len(curr_hist)
-        fch.write('{}\n'.format(n)
+        fch.write('{}\n'.format(n))
         for i in range(n):
-            fch.write('{0} {1} {2} {3} {4}\n'.format(sample_times[i], curr_hist_e_l[i], curr_hist_i_l[i]), curr_hist_e_r[i], curr_hist_i_r[i]))
+            fch.write('{0} {1} {2} {3} {4}\n'.format(sample_times[i], curr_hist_e_l[i], curr_hist_i_l[i], curr_hist_e_r[i], curr_hist_i_r[i]))
 
 wp.dump()
