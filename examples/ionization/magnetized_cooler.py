@@ -395,6 +395,8 @@ for _ in range(7200):
     zcross_l.clear()
     zcross_r.clear()
 
+    wp.dump()
+
 if wp.comm_world.rank == 0:
     sample_times, curr_hist_i_r = \
     conductors[-1].get_current_history(
@@ -413,5 +415,3 @@ if wp.comm_world.rank == 0:
         fch.write('{}\n'.format(n))
         for i in range(n):
             fch.write('{0} {1} {2} {3} {4}\n'.format(sample_times[i], curr_hist_e_l[i], curr_hist_i_l[i], curr_hist_e_r[i], curr_hist_i_r[i]))
-
-wp.dump()
