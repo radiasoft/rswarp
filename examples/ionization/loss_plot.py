@@ -12,7 +12,7 @@ ax1.set_title('particle end losses vs. time')
 ax1.set_xlabel('time step')
 ax1.set_ylabel('number of lost particles')
 
-f = h5.File('/home/vagrant/jupyter/runs/rswarp002/diags/crossing_record.h5', 'r')
+f = h5.File('/home/vagrant/jupyter/runs/rswarp003/diags/crossing_record.h5', 'r')
 #print list(f.keys())
 dset = f['left']['e']
 #dump_times = map(int, list(dset.keys()))
