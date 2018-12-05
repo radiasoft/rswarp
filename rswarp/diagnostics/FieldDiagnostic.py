@@ -72,13 +72,13 @@ class FieldDiagnostic(object):
             write_dir = self.write_dir
 
         if not os.path.lexists(write_dir):
-            if self.comm_world.rank == 0:
+            if self.lparallel == 0 or self.comm_world.rank == 0:
                 os.makedirs(write_dir)
 
         step = str(self.top.it)
         filename = '%s/data%s.h5' % (write_dir, step.zfill(5))
 
-        if self.comm_world.rank == 0:
+        if self.lparallel == 0 or self.comm_world.rank == 0:
             f = h5.File(filename, 'w')
 
             # for i, v in enumerate(self.mesh):
@@ -211,7 +211,7 @@ class ElectrostaticFields(FieldDiagnostic):
             # the potential, but it's the only way to shoehorn the data into
             # OpenPMD compliance right now.
             self.phi = self.phi[np.newaxis, :, :]
-        if self.comm_world.rank == 0:
+        if self.lparallel == 0 or self.comm_world.rank == 0:
             self.writeDataset(self.efield, prefix='%s%sE' % (self.basePath, self.meshPath))
             self.writeDataset(self.phi, prefix='%s%sphi' % (self.basePath, self.meshPath))
             self.file.close()
@@ -273,7 +273,7 @@ class MagnetostaticFields(FieldDiagnostic):
 
         self.gatherfields()
         self.gathervectorpotential()
-        if self.comm_world.rank == 0:
+        if self.lparallel == 0 or self.comm_world.rank == 0:
             self.writeDataset(self.bfield, prefix='%s%sB' % (self.basePath, self.meshPath))
             self.writeDataset(self.a, prefix='%s%svector_potential' % (self.basePath, self.meshPath))
 
