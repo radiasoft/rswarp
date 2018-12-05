@@ -332,7 +332,10 @@ wp.derivqty()  # Set derived beam properties if any are required
 wp.package("w3d")  # Use w3d solver/geometry package
 wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
-for _ in range(7200):
+#wp.restart('magnetized_cooler2200000_00015_00016.dump')
+wp.restart('magnetized_cooler2200000')
+
+for _ in range(4400, 7200):
     if wp.top.it % 200000 == 0:
         try:
             np.save("trajectories_{}.npy".format(wp.top.it), electron_tracker_0.getsavedata())
@@ -352,6 +355,8 @@ for _ in range(7200):
                                            vx=np.zeros_like(eptclArray[:,0]),
                                            vy=np.zeros_like(eptclArray[:,0]),
                                            vz=eptclArray[:,5])
+        wp.dump()
+
     print("IONS H2+: {}".format(h2plus.getx().shape))
     print("IONS e-: {}".format(emittedelec.getx().shape))
     print("BEAM e-: {}".format(beam.getx().shape))
@@ -394,8 +399,6 @@ for _ in range(7200):
 
     zcross_l.clear()
     zcross_r.clear()
-
-    wp.dump()
 
 if wp.comm_world.rank == 0:
     sample_times, curr_hist_i_r = \
