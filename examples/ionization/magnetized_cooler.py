@@ -283,11 +283,13 @@ for cond in conductors:
     wp.installconductor(cond)
 
 # Conductors set as scrapers will remove impacting macroparticles from the simulation
-scraper = wp.ParticleScraper(conductors)
+scraper = wp.ParticleScraper(conductors, lsavecondid=1)
 
 ######################
 # Particle Diagnostics
 ######################
+
+#wp.top.lsavelostparticles = True
 
 # HDF5 Particle/Field diagnostic options
 
@@ -332,75 +334,84 @@ wp.derivqty()  # Set derived beam properties if any are required
 wp.package("w3d")  # Use w3d solver/geometry package
 wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
-#wp.restart('magnetized_cooler2200000_00015_00016.dump')
-wp.restart('magnetized_cooler2200000')
+loss_hist = []
 
-for _ in range(4400, 7200):
-    if wp.top.it % 200000 == 0:
-        try:
-            np.save("trajectories_{}.npy".format(wp.top.it), electron_tracker_0.getsavedata())
-            electron_tracker_0.reset(clearhistory=1)
-        except:
-            pass
-        v_coords = np.ones([tracer_count, 3]) * beam_beta * wp.clight
-        v_coords[:, [0, 1]] = 0.0
-        x_vals = np.linspace(-beam_radius, beam_radius, tracer_count)
-        y_vals = np.zeros([tracer_count,])
-        z_vals = np.zeros(tracer_count) + 1e-3 
-        eptclArray = np.asarray([x_vals, v_coords[:,0], y_vals, v_coords[:,1], z_vals, v_coords[:,2]]).T
-        electron_tracker_0 = TraceParticle(js=electrons_tracked_t0.jslist[0],
-                                           x=eptclArray[:,0],
-                                           y=eptclArray[:,2],
-                                           z=eptclArray[:,4],
-                                           vx=np.zeros_like(eptclArray[:,0]),
-                                           vy=np.zeros_like(eptclArray[:,0]),
-                                           vz=eptclArray[:,5])
-        wp.dump()
+#wp.restart('magnetized_cooler001000')
 
-    print("IONS H2+: {}".format(h2plus.getx().shape))
-    print("IONS e-: {}".format(emittedelec.getx().shape))
-    print("BEAM e-: {}".format(beam.getx().shape))
-    print("TRACER e-: {}".format(electron_tracker_0.getx().shape))
+Nsteps = 3200000
 
-    wp.step(500)
+while wp.top.it < Nsteps:
+
+    wp.step(1000)
+
+#        try:
+#            np.save("trajectories_{}.npy".format(wp.top.it), electron_tracker_0.getsavedata())
+#            electron_tracker_0.reset(clearhistory=1)
+#        except:
+#            pass
+#        v_coords = np.ones([tracer_count, 3]) * beam_beta * wp.clight
+#        v_coords[:, [0, 1]] = 0.0
+#        x_vals = np.linspace(-beam_radius, beam_radius, tracer_count)
+#        y_vals = np.zeros([tracer_count,])
+#        z_vals = np.zeros(tracer_count) + 1e-3 
+#        eptclArray = np.asarray([x_vals, v_coords[:,0], y_vals, v_coords[:,1], z_vals, v_coords[:,2]]).T
+#        electron_tracker_0 = TraceParticle(js=electrons_tracked_t0.jslist[0],
+#                                           x=eptclArray[:,0],
+#                                           y=eptclArray[:,2],
+#                                           z=eptclArray[:,4],
+#                                           vx=np.zeros_like(eptclArray[:,0]),
+#                                           vy=np.zeros_like(eptclArray[:,0]),
+#                                           vz=eptclArray[:,5])
+
+#    print("IONS H2+: {}".format(h2plus.getx().shape))
+#    print("IONS e-: {}".format(emittedelec.getx().shape))
+#    print("BEAM e-: {}".format(beam.getx().shape))
+#    print("TRACER e-: {}".format(electron_tracker_0.getx().shape))
+
+#    wp.step(100)
 
     vz_l_e = zcross_l.getvz(js=emittedelec.js)
     vz_l_h = zcross_l.getvz(js=h2plus.js)
     vz_r_e = zcross_r.getvz(js=emittedelec.js)
     vz_r_h = zcross_r.getvz(js=h2plus.js)
 
-    if vz_l_e.size != 0 or vz_l_h.size != 0 or vz_r_e.size != 0 or vz_r_h.size != 0:
-        if wp.comm_world.rank == 0:
-            h5file =  h5.File(os.path.join('diags', 'crossing_record.h5'), 'a')
-#                 l_e_group = h5file.create_group('/left/e')
-            try:
-                l_group = h5file.create_group('left')
-                r_group = h5file.create_group('right')
-                l_e_group = l_group.create_group('e')
-                l_h_group = l_group.create_group('h')
-                r_e_group = r_group.create_group('e')
-                r_h_group = r_group.create_group('h')
-                l_e_group.attrs['position'] = zcross_l.zz
-                l_h_group.attrs['position'] = zcross_l.zz
-                r_e_group.attrs['position'] = zcross_r.zz
-                r_h_group.attrs['position'] = zcross_r.zz
-            except ValueError:
-                l_e_group = h5file['left/e']
-                l_h_group = h5file['left/h']
-                r_e_group = h5file['right/e']
-                r_h_group = h5file['right/h']
+    loss_hist.append([wp.top.it, vz_l_e.size, vz_l_h.size, vz_r_e.size, vz_r_h.size])
 
-            l_e_group.create_dataset('{}'.format(wp.top.it), data=vz_l_e)
-            l_h_group.create_dataset('{}'.format(wp.top.it), data=vz_l_h)
-            r_e_group.create_dataset('{}'.format(wp.top.it), data=vz_r_e)
-            r_h_group.create_dataset('{}'.format(wp.top.it), data=vz_r_h)
+#    if vz_l_e.size != 0 or vz_l_h.size != 0 or vz_r_e.size != 0 or vz_r_h.size != 0:
+#        if wp.comm_world.rank == 0:
+#            h5file =  h5.File(os.path.join('diags', 'crossing_record.h5'), 'a')
+#            try:
+#                l_group = h5file.create_group('left')
+#                r_group = h5file.create_group('right')
+#                l_e_group = l_group.create_group('e')
+#                l_h_group = l_group.create_group('h')
+#                r_e_group = r_group.create_group('e')
+#                r_h_group = r_group.create_group('h')
+#                l_e_group.attrs['position'] = zcross_l.zz
+#                l_h_group.attrs['position'] = zcross_l.zz
+#                r_e_group.attrs['position'] = zcross_r.zz
+#                r_h_group.attrs['position'] = zcross_r.zz
+#            except ValueError:
+#                l_e_group = h5file['left/e']
+#                l_h_group = h5file['left/h']
+#                r_e_group = h5file['right/e']
+#                r_h_group = h5file['right/h']
 
-            h5file.close()
+#            l_e_group.create_dataset('{}'.format(wp.top.it), data=vz_l_e)
+#            l_h_group.create_dataset('{}'.format(wp.top.it), data=vz_l_h)
+#            r_e_group.create_dataset('{}'.format(wp.top.it), data=vz_r_e)
+#            r_h_group.create_dataset('{}'.format(wp.top.it), data=vz_r_h)
+
+#            h5file.close()
 
     zcross_l.clear()
     zcross_r.clear()
 
-if wp.comm_world.rank == 0:
+    if wp.top.it % 100000 == 0:
+        wp.dump()
+
+if wp.comm_world.rank == 0 and wp.top.it == Nsteps:
+    print 'iteration = ', wp.top.it
     sample_times, curr_hist_i_r = \
     conductors[-1].get_current_history(
     js=h2plus.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
@@ -414,7 +425,15 @@ if wp.comm_world.rank == 0:
     conductors[0].get_current_history(
     js=emittedelec.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
     with open('curr_hist.txt', 'w') as fch:
-        n = len(curr_hist)
+        n = len(curr_hist_e_l)
         fch.write('{}\n'.format(n))
         for i in range(n):
             fch.write('{0} {1} {2} {3} {4}\n'.format(sample_times[i], curr_hist_e_l[i], curr_hist_i_l[i], curr_hist_e_r[i], curr_hist_i_r[i]))
+    with open('loss_hist.txt', 'w') as flh:
+        n = len(loss_hist)
+        flh.write('{}\n'.format(n))
+        for i in range(n):
+            flh.write('{0} {1} {2} {3} {4}\n'.format(loss_hist[i][0], loss_hist[i][1], loss_hist[i][2], loss_hist[i][3], loss_hist[i][4]))
+
+if wp.comm_world.rank == 0:
+    print 'final global iteration = ', wp.top.it
