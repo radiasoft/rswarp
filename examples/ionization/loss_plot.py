@@ -1,9 +1,7 @@
-import h5py as h5
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.constants import c, physical_constants, m_e, e
 
 loss_plot, ax1 = plt.subplots(1, 1, figsize=(8, 4))
 # exlicitly make loss_plot the active figure:
@@ -12,48 +10,23 @@ ax1.set_title('particle end losses vs. time')
 ax1.set_xlabel('time step')
 ax1.set_ylabel('number of lost particles')
 
-f = h5.File('./diags/crossing_record.h5', 'r')
-#print list(f.keys())
-dset = f['left']['e']
-#dump_times = map(int, list(dset.keys()))
-dump_times = [int(i) for i in list(dset.keys())]
-dump_times.sort()
-#print dump_times
-number_of_lost = []
-for n in dump_times:
-    number_of_lost.append(dset[str(n)].size)
+with open('loss_hist.txt', 'r') as flh:
+    columns = flh.readline().strip().split()
+    nhist = int(columns[0])
+    data = np.empty((5, nhist))
+    # Read data
+    for n in range(nhist):
+        columns = flh.readline().strip().split()
+        for i in range(5):
+            data[i, n] = int(columns[i])
 
-ax1.plot(dump_times, number_of_lost, 'r', label = 'electrons left')
+ax1.plot(data[0, :], data[1, :], 'r', label = 'electrons left')
+ax1.plot(data[0, :], data[2, :], 'b', label = 'ions left')
+ax1.plot(data[0, :], data[3, :], 'm', label = 'electrons right')
+ax1.plot(data[0, :], data[4, :], 'g', label = 'ions right')
 
-dset = f['left']['h']
-i = 0
-for n in dump_times:
-    number_of_lost[i] = dset[str(n)].size
-    i += 1
-ax1.plot(dump_times, number_of_lost, 'b', label = 'ions left')
-
-dset = f['right']['e']
-i = 0
-for n in dump_times:
-    number_of_lost[i] = dset[str(n)].size
-    i += 1
-ax1.plot(dump_times, number_of_lost, 'm', label = 'electrons right')
-
-dset = f['right']['h']
-i = 0
-for n in dump_times:
-    number_of_lost[i] = dset[str(n)].size
-    i += 1
-ax1.plot(dump_times, number_of_lost, 'g', label = 'ions right')
-
-loss_plot.legend(prop = {'size': 10}, loc = 'upper right')
+loss_plot.legend(prop = {'size': 10}, loc = 'lower right')
 loss_plot.tight_layout()
 loss_plot.savefig('loss_plot.png')
 #plt.show()
 plt.close()
-
-f.close()
-
-#f = h5py.File('diags/hdf5/data00003000.h5', 'r')
-#x = f['data/3000/particles/emitted e-/position/x'][:] * 1.0e2
-#x = f['data/3000/particles/H2+/position/x'][:]

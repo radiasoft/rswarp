@@ -29,12 +29,12 @@ diagFDir = ['diags/fields/magnetic', 'diags/fields/electric']
 # Cleanup command if directories already exist
 # Warp's HDF5 diagnostics will not overwrite existing files. This command cleans the diagnostic directory
 # to allow for rerunning the simulation
-if wp.comm_world.rank == 0:
-    cleanupPrevious(diagDir, diagFDir)
-    try:
-        os.remove('./diags/crossing_record.h5')
-    except OSError:
-        pass
+#if wp.comm_world.rank == 0:
+#    cleanupPrevious(diagDir, diagFDir)
+#    try:
+#        os.remove('./diags/crossing_record.h5')
+#    except OSError:
+#        pass
 
 ####################
 # General Parameters
@@ -65,7 +65,7 @@ cathode_temperature = 0.25  # eV
 # Beam
 beam_beta = 0.990813945176
 beam_ke = wp.emass / wp.jperev * wp.clight**2 * (1. / np.sqrt(1-beam_beta**2) - 1.)  # eV
-print '*** beam_ke, beam_gamma =', beam_ke,  1. / np.sqrt(1-beam_beta**2)
+#print '*** beam_ke, beam_gamma =', beam_ke,  1. / np.sqrt(1-beam_beta**2)
 beam_current = 10e-3  # A
 beam_radius = 0.01  # m
 
@@ -283,7 +283,8 @@ for cond in conductors:
     wp.installconductor(cond)
 
 # Conductors set as scrapers will remove impacting macroparticles from the simulation
-scraper = wp.ParticleScraper(conductors, lsavecondid=1)
+#scraper = wp.ParticleScraper(conductors, lsavecondid=1)
+scraper = wp.ParticleScraper(conductors)
 
 ######################
 # Particle Diagnostics
@@ -336,9 +337,11 @@ wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
 loss_hist = []
 
-#wp.restart('magnetized_cooler001000')
+#wp.restart('magnetized_cooler3200000')
 
-Nsteps = 3200000
+Nsteps = 5000000
+#particle_diagnostic_switch = False
+#field_diagnostic_switch = False
 
 while wp.top.it < Nsteps:
 
@@ -411,7 +414,7 @@ while wp.top.it < Nsteps:
         wp.dump()
 
 if wp.comm_world.rank == 0 and wp.top.it == Nsteps:
-    print 'iteration = ', wp.top.it
+    #print 'iteration = ', wp.top.it
     sample_times, curr_hist_i_r = \
     conductors[-1].get_current_history(
     js=h2plus.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
@@ -435,5 +438,5 @@ if wp.comm_world.rank == 0 and wp.top.it == Nsteps:
         for i in range(n):
             flh.write('{0} {1} {2} {3} {4}\n'.format(loss_hist[i][0], loss_hist[i][1], loss_hist[i][2], loss_hist[i][3], loss_hist[i][4]))
 
-if wp.comm_world.rank == 0:
-    print 'final global iteration = ', wp.top.it
+#if wp.comm_world.rank == 0:
+#    print 'final global iteration = ', wp.top.it
