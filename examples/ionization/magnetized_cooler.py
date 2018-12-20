@@ -216,30 +216,15 @@ pipe_voltage = 0.0  # Set main pipe section to ground
 electrode_voltage = +2e3  # electrodes held at several kV relative to main pipe
 assert electrode_voltage < beam_ke, "Electrodes potential greater than beam KE."
 
-pipe_radius = pipe_radius
-electrode_length = 0.25
-electrode_gap = 0.1
-pipe_length = cooler_length - 2 * electrode_length - 2 * electrode_gap
-
-z_positions = [0.0]
-z_positions.append(z_positions[-1] + electrode_length)
-z_positions.append(z_positions[-1] + electrode_gap)
-z_positions.append(z_positions[-1] + pipe_length)
-z_positions.append(z_positions[-1] + electrode_gap)
-z_positions.append(z_positions[-1] + electrode_length)
-
 conductors = []
 
-entrance_electrode = wp.ZCylinderOut(voltage=electrode_voltage, radius=pipe_radius,
-                                     zlower=z_positions[0], zupper=z_positions[1])
+entrance_electrode = wp.ZPlane(z0=0., zsign=1., voltage=electrode_voltage)
 conductors.append(entrance_electrode)
 
-beam_pipe = wp.ZCylinderOut(voltage=pipe_voltage, radius=pipe_radius,
-                            zlower=z_positions[2], zupper=z_positions[3])
+beam_pipe = wp.ZCylinderOut(voltage=pipe_voltage, radius=pipe_radius, zlower=0., zupper=cooler_length)
 conductors.append(beam_pipe)
 
-exit_electrode = wp.ZCylinderOut(voltage=electrode_voltage, radius=pipe_radius,
-                                 zlower=z_positions[4], zupper=z_positions[5])
+exit_electrode = wp.ZPlane(z0=cooler_length, zsign=-1., voltage=electrode_voltage)
 conductors.append(exit_electrode)
 
 ##############################
@@ -295,7 +280,7 @@ scraper = wp.ParticleScraper(conductors)
 # HDF5 Particle/Field diagnostic options
 
 if particle_diagnostic_switch:
-    particleperiod = 8000  # Particle diagnostic write frequency
+    particleperiod = 1000000  # Particle diagnostic write frequency
     particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=wp.top, w3d=wp.w3d,  # Should always be set
                                                # Include data from all existing species in write
                                                species={species.name: species for species in wp.listofallspecies},
@@ -306,7 +291,7 @@ if particle_diagnostic_switch:
     wp.installafterstep(particle_diagnostic_0.write)  # Write method is installed as an after-step action
 
 if field_diagnostic_switch:
-    fieldperiod = 8000  # Field diagnostic write frequency
+    fieldperiod = 100000  # Field diagnostic write frequency
     efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=wp.top, w3d=wp.w3d,
                                                               comm_world=wp.comm_world,
                                                               period=fieldperiod)
@@ -320,20 +305,20 @@ if field_diagnostic_switch:
     # installafterstep(bfield_diagnostic_0.write)
 
 # Crossing Diagnostics
-zcross_l = ZCrossingParticles(zz=z_positions[1], laccumulate=1)
-zcross_r = ZCrossingParticles(zz=z_positions[4], laccumulate=1)
+zcross_l = ZCrossingParticles(zz=dz, laccumulate=1)
+zcross_r = ZCrossingParticles(zz=cooler_length-dz, laccumulate=1)
 
 
 ###########################
 # Generate and Run PIC Code
 ###########################
 
-electrons_tracked_t0 = wp.Species(type=wp.Electron)
-tracer_count = 50
+#electrons_tracked_t0 = wp.Species(type=wp.Electron)
+#tracer_count = 50
 
-wp.derivqty()  # Set derived beam properties if any are required
-wp.package("w3d")  # Use w3d solver/geometry package
-wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
+wp.derivqty() # Set derived beam properties if any are required
+wp.package("w3d") # Use w3d solver/geometry package
+wp.generate() # Allocate arrays, generate mesh, perform initial field solve
 
 loss_hist = []
 
@@ -410,28 +395,28 @@ while wp.top.it < Nsteps:
     zcross_l.clear()
     zcross_r.clear()
 
-    if wp.top.it % 100000 == 0:
+    if wp.top.it % 1000000 == 0:
         wp.dump()
 
 if wp.comm_world.rank == 0 and wp.top.it == Nsteps:
     #print 'iteration = ', wp.top.it
-    sample_times, curr_hist_i_r = \
-    conductors[-1].get_current_history(
-    js=h2plus.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
-    sample_times, curr_hist_e_r = \
-    conductors[-1].get_current_history(
-    js=emittedelec.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
-    sample_times, curr_hist_i_l = \
-    conductors[0].get_current_history(
-    js=h2plus.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
-    sample_times, curr_hist_e_l = \
-    conductors[0].get_current_history(
-    js=emittedelec.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
-    with open('curr_hist.txt', 'w') as fch:
-        n = len(curr_hist_e_l)
-        fch.write('{}\n'.format(n))
-        for i in range(n):
-            fch.write('{0} {1} {2} {3} {4}\n'.format(sample_times[i], curr_hist_e_l[i], curr_hist_i_l[i], curr_hist_e_r[i], curr_hist_i_r[i]))
+    #sample_times, curr_hist_i_r = \
+    #conductors[-1].get_current_history(
+    #js=h2plus.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
+    #sample_times, curr_hist_e_r = \
+    #conductors[-1].get_current_history(
+    #js=emittedelec.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
+    #sample_times, curr_hist_i_l = \
+    #conductors[0].get_current_history(
+    #js=h2plus.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
+    #sample_times, curr_hist_e_l = \
+    #conductors[0].get_current_history(
+    #js=emittedelec.js,l_lost=1,l_emit=0,l_image=0,tmin=None,tmax=None,nt=100)
+    #with open('curr_hist.txt', 'w') as fch:
+        #n = len(curr_hist_e_l)
+        #fch.write('{}\n'.format(n))
+        #for i in range(n):
+            #fch.write('{0} {1} {2} {3} {4}\n'.format(sample_times[i], curr_hist_e_l[i], curr_hist_i_l[i], curr_hist_e_r[i], curr_hist_i_r[i]))
     with open('loss_hist.txt', 'w') as flh:
         n = len(loss_hist)
         flh.write('{}\n'.format(n))
