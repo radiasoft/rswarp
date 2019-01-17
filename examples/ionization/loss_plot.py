@@ -25,7 +25,10 @@ ax1.plot(data[0, :], data[2, :], 'b', label = 'ions left')
 ax1.plot(data[0, :], data[3, :], 'm', label = 'electrons right')
 ax1.plot(data[0, :], data[4, :], 'g', label = 'ions right')
 
-loss_plot.legend(prop = {'size': 10}, loc = 'lower right')
+ax1.legend(prop = {'size': 10}, loc = 'center')
+ax1.grid(True)
+
+#loss_plot.legend(prop = {'size': 10}, loc = 'upper left')
 loss_plot.tight_layout()
 loss_plot.savefig('loss_plot.png')
 #plt.show()
