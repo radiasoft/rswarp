@@ -23,7 +23,7 @@ tot_e_dens_z = np.empty((Nz))
 density_plot, ax = plt.subplots(1, 2, figsize=(12, 6))
 # exlicitly make density_plot the active figure:
 plt.figure(density_plot.number)
-plt.suptitle('Particle densitites after ' + str(Nt) + ' time steps with drain electrodes at +20 V')
+plt.suptitle('Particle densities after ' + str(Nt) + ' time steps with drain electrodes at +20 V')
 #plt.subplots_adjust(hspace=0.4)
 
 f = h5py.File('diags/hdf5/data0' + str(Nt) + '.h5', 'r')
