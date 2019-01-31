@@ -38,7 +38,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
          rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance, rho_load,
          run_id, channel_width=100e-9,
          injection_type=2, magnetic_field=0.0, random_seed=True, install_grid=True, max_wall_time=1e9,
-         particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
+         particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False,
+         input_tol=0.03):
     """
     Run a simulation of a gridded TEC.
     Args:
@@ -169,9 +170,11 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     collector_voltage = phi_em - phi_coll
 
     # Emitted species
+    top.ssnpid = nextpid()
+    
     background_beam = Species(type=Electron, name='background')
     measurement_beam = Species(type=Electron, name='measurement')
-
+    
     # Emitter area and position
     SOURCE_RADIUS_1 = 0.5 * channel_width  # a0 parameter - X plane
     SOURCE_RADIUS_2 = 0.5 * channel_width  # b0 parameter - Y plane
@@ -316,12 +319,12 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # Particle/Field diagnostic options
     if particle_diagnostic_switch:
-        particleperiod = 250  # TEMP
+        particleperiod = 150  # TEMP
         particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=top, w3d=w3d,
                                                    species={species.name: species
-                                                            for species in listofallspecies},
-                                                            # if species.name == 'measurement'}, # TEMP
+                                                            for species in listofallspecies if species.name == 'measurement'}, # TEMP
                                                    comm_world=comm_world, lparallel_output=False,
+                                                   particle_data=["position", "momentum", "weighting", "id"],
                                                    write_dir=diagDir[:-5])
         installafterstep(particle_diagnostic_0.write)
 
@@ -329,7 +332,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         fieldperiod = 1000
         efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=top, w3d=w3d,
                                                                   comm_world=comm_world,
-                                                                  period=fieldperiod)
+                                                                  period=fieldperiod,
+                                                                  write_dir=diagFDir)
         installafterstep(efield_diagnostic_0.write)
 
     # Set externally derived parameters for efficiency calculation
@@ -501,7 +505,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     background_beam.rnpinject = PTCL_PER_STEP
 
     initial_population = measurement_beam.npsim[0]
-    measurement_tol = 0.03
+    measurement_tol = input_tol  # 0.03
     # if particle_diagnostic_switch:
     #     particle_diagnostic_0.period = ss_check_interval
     while measurement_beam.npsim[0] > measurement_tol * initial_population:
