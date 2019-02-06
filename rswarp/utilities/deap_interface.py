@@ -9,9 +9,10 @@ from rswarp.run_files.tec.tec_utilities import write_parameter_file
 
 
 class JobRunner(object):
-    def __init__(self, server, username):
+    def __init__(self, server, username, key_filename=None):
         self.server = server
         self.username = username
+        self.key_filename = key_filename
 
         # Directory containing batch file, Warp input file, and COMPLETE flag file
         # Set when job started by `self.project_directory`
@@ -23,17 +24,17 @@ class JobRunner(object):
         # SLURM ID for current job being executed
         self.jobid = []
         # establish canonical client for instance use
-        self.client = self.establish_ssh_client(self.server, self.username)
+        self.client = self.establish_ssh_client(self.server, self.username, key_filename)
         # if needed sftp will be opened
         self.sftp_client = None
 
     @staticmethod
-    def establish_ssh_client(server, username):
+    def establish_ssh_client(server, username, key_filename):
         try:
             client = paramiko.SSHClient()
 
             client.load_system_host_keys()
-            client.connect(hostname=server, username=username)
+            client.connect(hostname=server, username=username, key_filename=key_filename)
         except IOError, e:
             print "Failed to connect to server on: {}@{}\n".format(username, server)
             return e
