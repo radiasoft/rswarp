@@ -27,6 +27,7 @@ class JobRunner(object):
         self.client = self.establish_ssh_client(self.server, self.username, key_filename)
         # if needed sftp will be opened
         self.sftp_client = None
+        self.job_flag = None
 
     @staticmethod
     def establish_ssh_client(server, username, key_filename):
@@ -57,7 +58,7 @@ class JobRunner(object):
     def refresh_ssh_client(self):
         if not self.client.get_transport() or self.client.get_transport().is_active() != True:
             print "Reopening SSH Client"
-            self.client = self.establish_ssh_client(self.server, self.username)
+            self.client = self.establish_ssh_client(self.server, self.username, self.key_filename)
 
             return self.client
         else:
@@ -67,6 +68,8 @@ class JobRunner(object):
     def upload_file(self, remote_directory, upload_file, debug=False):
         """
         Upload a file or series of files to a single, remote directory via sftp over an ssh client.
+        If len(remote_directory) < len(upload_file) the last directory in the list will be copied to
+        equalize the length.
         Args:
             remote_directory: Directory path relative to server entry.
                               Will attempt to make directory if it is not found.
@@ -79,6 +82,9 @@ class JobRunner(object):
             remote_directory = [remote_directory, ]
         if type(upload_file) != list:
             upload_file = [upload_file, ]
+        if len(remote_directory) < len(upload_file):
+            remote_directory.extend([remote_directory[-1]] * (len(upload_file) - len(remote_directory)))
+
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
 
@@ -116,12 +122,29 @@ class JobRunner(object):
 
         return 0
 
-    def start_job(self, path, job_name):
+    def start_job(self, job_name, path):
+        """
+        Start job(s) on NERSC. Will issue sbatch command for each batch file name in `job_name`.
+        Individual paths for each job name can be provided in path or just a single directory if they are all in the
+        same location.
+
+        Args:
+            job_name: (list or str) Name of each batch file to start.
+            path: (list or str) Relative path(s) from home (or absolute path) to batch files.
+
+
+        Returns:
+            List of job id numbers for successfully started jobs
+
+        """
         if type(path) != list:
             path = [path, ]
         if type(job_name) != list:
             job_name = [job_name, ]
+        if len(path) < len(job_name):
+            path.extend([path[-1]] * (len(job_name) - len(path)))
         # Make sure we have an SSH connection
+        print(job_name, path)
         self.refresh_ssh_client()
 
         for p, j in zip(path, job_name):
@@ -161,26 +184,34 @@ class JobRunner(object):
             return -1
         if output_directory:
             self.output_directory = output_directory
+        if type(self.output_directory) != list:
+            self.output_directory = [self.output_directory, ]
+        if len(self.output_directory) < len(self.jobid):
+            self.output_directory.extend([self.output_directory[-1]] * (len(self.jobid) - len(self.output_directory)))
         if job_flag:
             self.job_flag = job_flag
+        if type(self.job_flag) != list:
+            self.job_flag = [self.job_flag, ]
+        if len(self.job_flag) < len(self.jobid):
+            self.job_flag.extend([self.job_flag[-1]] * (len(self.jobid) - len(self.job_flag)))
+
+        print(self.output_directory, self.jobid, self.job_flag)
 
         self.refresh_ssh_client()
 
         status = []
-        for d, j, f in zip(self.output_directory, self.jobid, job_flag):
+        for d, j, f in zip(self.output_directory, self.jobid, self.job_flag):
             # Status file deposited one level up from diagnostic files
             check_file = os.path.join(os.path.split(d)[0], 'COMPLETE')
-            print check_file
-            # Make sure we have an SSH connection
 
             stdin, stdout_file, stderr_file = self.client.exec_command('cat {}'.format(check_file))
             out_file = stdout_file.read()
             err_file = stderr_file.read()
-            print 'm1'
+
             stdin, stdout_job, stderr_job = self.client.exec_command('squeue --job {} -o %r'.format(j))
             out_job = stdout_job.read()
             err_job = stderr_job.read()
-            print 'm2'
+
             if err_file and out_job:
                 # Job not complete but still active
                 print "{}: Job for run_id {} active but not complete".format(ctime(), f)
