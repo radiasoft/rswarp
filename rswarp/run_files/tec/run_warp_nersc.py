@@ -4,7 +4,7 @@ Setting up test for efficiency calculation.
 
 import sys
 # Path for use on jupyter.radiasoft
-sys.path.append('$HOME/github/rswarp/rswarp/run_files/tec/')
+sys.path.append('/global/homes/h/hallcc/github/rswarp/rswarp/run_files/tec/')
 
 try:
     from gridded_tec_3d import main
