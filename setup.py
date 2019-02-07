@@ -24,4 +24,5 @@ setup(
         'Programming Language :: Python',
         'Topic :: Utilities',
     ],
+    scripts=['rswarp/run_files/tec/run_warp.py', 'rswarp/run_files/tec/run_warp_nersc.py']
 )
