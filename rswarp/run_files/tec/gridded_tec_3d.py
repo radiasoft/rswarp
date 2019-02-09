@@ -451,11 +451,12 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     if check_count == ss_max_checks:
         early_abort = -1
         crossing_measurements = 0
-
-    # Start Steady State Operation
-    print(" Steady State Reached.\nStarting efficiency "
-          "recording for {} crossing times.\nThis will be {} steps".format(crossing_measurements,
-                                                                           steps_per_crossing * crossing_measurements))
+        print("Failed to reach steady state. Aborting simulation.")
+    else:
+        # Start Steady State Operation
+        print(" Steady State Reached.\nStarting efficiency "
+              "recording for {} crossing times.\nThis will be {} steps".format(crossing_measurements,
+                                                                               steps_per_crossing * crossing_measurements))
 
     # particle_diagnostic_0.period = steps_per_crossing #TEMP commented out
     # Switch to measurement beam species
