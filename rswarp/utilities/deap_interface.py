@@ -14,11 +14,11 @@ class JobRunner(object):
         self.username = username
         self.key_filename = key_filename
 
-        # Directory containing batch file, Warp input file, and COMPLETE flag file
+        # Remote Directory containing batch file, Warp input file, and COMPLETE flag file
         # Set when job started by `self.project_directory`
-        self.project_directory = []
+        self._project_directory = []
 
-        # Directory containing any output from simulation
+        # Remote directory containing any output from simulation
         self.output_directory = []
 
         # SLURM ID for current job being executed
@@ -28,6 +28,26 @@ class JobRunner(object):
         # if needed sftp will be opened
         self.sftp_client = None
         self.job_flag = None
+
+    @property
+    def project_directory(self):
+        return self._project_directory
+    @project_directory.setter
+    def project_directory(self, directory):
+        if type(directory) != list and type(directory) != tuple:
+            self._project_directory = [directory, ]
+        else:
+            self._project_directory = directory
+
+    @property
+    def output_directory(self):
+        return self._project_directory
+    @output_directory.setter
+    def output_directory(self, directory):
+        if type(directory) != list and type(directory) != tuple:
+            self._project_directory = [directory, ]
+        else:
+            self._project_directory = directory
 
     @staticmethod
     def establish_ssh_client(server, username, key_filename):
