@@ -8,9 +8,19 @@ from re import findall
 from itertools import izip_longest
 from rswarp.run_files.tec.tec_utilities import write_parameter_file
 
+# TODO: Put in a graceful stop if connection can't be made. Should record time.
 
 class JobRunner(object):
-    def __init__(self, server, username, key_filename=None):
+    status_code = {'pending': 0,
+                   'running': -1,
+                   'completed': -2,
+                   'timeout': -3,
+                   'cancelled': -4,
+                   'cancelled+': -4,
+                   'failure': -5  # Not a NERSC Term. Internal designation for unknown error.
+                   }
+
+    def __init__(self, server, username, key_filename=None, array_tasks=0):
         self.server = server
         self.username = username
         self.key_filename = key_filename
@@ -195,60 +205,46 @@ class JobRunner(object):
 
         return self.job_ids
 
-    def check_job_status(self, output_directory=None, job_flag=None):
-        if len(self.jobid) == 0:
-            print "No job known"
-            return -1
-        if output_directory:
-            self.output_directory = output_directory
-        if type(self.output_directory) != list:
-            self.output_directory = [self.output_directory, ]
-        if len(self.output_directory) < len(self.jobid):
-            self.output_directory.extend([self.output_directory[-1]] * (len(self.jobid) - len(self.output_directory)))
-        if job_flag:
-            self.job_flag = job_flag
-        if type(self.job_flag) != list:
-            self.job_flag = [self.job_flag, ]
-        if len(self.job_flag) < len(self.jobid):
-            self.job_flag.extend([self.job_flag[-1]] * (len(self.jobid) - len(self.job_flag)))
+    def get_job_state(self, jobid, verbose=False):
+        """
+        Monitor a job on NERSC with ID of jobid.
+        Job status codes can be found in `job_status` attribute.
+        Args:
+            jobid: (int) ID number of job provided by SLURM on NERSC
 
-        print(self.output_directory, self.jobid, self.job_flag)
+        Returns:
+            (int, dict): Returns integer job status code from `job_status` and dictionary of job details.
+        """
+        sacct_data = {}
 
         self.refresh_ssh_client()
+        stdin, stdout, stderr = self.client.exec_command('sacct -j {}'.format(jobid))
+        stdout, stderr = stdout.read(), stderr.read()
 
-        status = []
-        for d, j, f in zip(self.output_directory, self.jobid, self.job_flag):
-            # Status file deposited one level up from diagnostic files
-            check_file = os.path.join(os.path.split(d)[0], 'COMPLETE')
+        # Catch no job yet
+        if len(stdout.splitlines()) < 3:
+            if verbose:
+                print('Job: {} not found'.format(jobid))
+            return self.status_code['failure'], None
 
-            stdin, stdout_file, stderr_file = self.client.exec_command('cat {}'.format(check_file))
-            out_file = stdout_file.read()
-            err_file = stderr_file.read()
+        labels = stdout.splitlines()[0].split()
+        data = None
+        for ln in stdout.splitlines():
+            if ln.find('{} '.format(jobid)) == 0:
+                data = ln.split()
+                break
+        # If data format is bad catch here
+        if not data:
+            print('sacct output not valid')
+            return self.status_code['failure'], None
 
-            stdin, stdout_job, stderr_job = self.client.exec_command('squeue --job {} -o %r'.format(j))
-            out_job = stdout_job.read()
-            err_job = stderr_job.read()
+        for datum, label in zip(data, labels):
+            sacct_data[label] = datum
 
-            if err_file and out_job:
-                # Job not complete but still active
-                print "{}: Job for run_id {} active but not complete".format(ctime(), f)
-                status.append(1)
-            elif err_file and err_job:
-                # Fatal error
-                print "{}: Error on status and file for run_id {}".format(ctime(), f)
-                status.append(-1)
-            elif out_file:
-                matches = findall('\d+', out_file)
-                if str(f) in matches:
-                    # Complete
-                    print "{}: Job {}, running run_id {}, complete ".format(ctime(), j, f)
-                    status.append(0)
-                else:
-                    # Fatal error
-                    print "Unknown fatal error for run_id {}".format(f)
-                    status.append(-1)
+        if verbose:
+            print(sacct_data['State'].lower(), sacct_data)
 
-        return status
+        return self.status_code[sacct_data['State'].lower()], sacct_data
 
     def monitor_job(self, timer, output_directory, local_directory, match_string=None, sleep_start=600):
         if type(output_directory) != list:
