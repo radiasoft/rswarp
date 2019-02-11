@@ -246,39 +246,56 @@ class JobRunner(object):
 
         return self.status_code[sacct_data['State'].lower()], sacct_data
 
-    def monitor_job(self, timer, output_directory, local_directory, match_string=None, sleep_start=600):
-        if type(output_directory) != list:
-            self.output_directory = [output_directory, ]
-        if type(local_directory) != list:
-            self.local_directory = [local_directory, ]
+    def monitor_jobs(self, timer=24 * 60 * 60, sleep_start=1 * 5 * 60, interval=1 * 1 * 60, verbose=False):
+        # if array, then monitor parent id since task ids are not created until runtime
+        parent_status = []
+        array_task = False
+        if self.job_ids[0].find('_') > -1:
+            array_task = True
+            parent_status, _ = self.get_job_state(self.job_ids[0][:-2])
+            parent_status = [parent_status]
 
-        sleep(sleep_start)
-        timer -= sleep_start
-        status = self.check_job_status()
-        for s, d in zip(status, self.output_directory):  # TODO: The retrieve_fitness method will need to be updated and use outputdirectory
-            if s == 0:
-                self.retrieve_fitness(local_directory, match_string=match_string)
-                # remove entry from all lists
-                # self.output_directory, self.job_flag, self.job_id
-            elif status == -1:
-                return -1
+        self.job_status = [0] * len(self.job_ids)
+        self._full_status = [None] * len(self.job_ids)
+        if verbose:
+            print("Monitoring {} jobs".format(len(self.job_status)))
+            print("Monitoring will begin in {} minutes and occur every {} minutes \nfor {} hours".format(
+                sleep_start / 60., interval / 60., timer / 3600.))
 
-        interval = 300
-        while timer > 0:
+        # Allow interval sleep call at start of while to prevent waiting when finished
+        try:
+            sleep(sleep_start - interval)
+            timer -= sleep_start - interval
+        except IOError:
+            pass
+        if verbose:
+            print("Starting monitoring at {}".format(ctime()))
+
+        while np.any(np.array(self.job_status + parent_status) > -2) and timer > 0:
             sleep(interval)
-
-            status = self.check_job_status()
-            if status == 0:
-                self.retrieve_fitness(local_directory, match_string=match_string)
-                return 0
-            elif status == -1:
-                return -1
-
             timer -= interval
+            if verbose:
+                print("Checking job status at {}".format(ctime()))
+            for i, jobid in enumerate(self.job_ids):
+                status_code, full_status = self.get_job_state(jobid)
+                self.job_status[i] = status_code
+                self._full_status[i] = full_status
 
-        return -1
+            # Update parent status, do not record in id lists
+            if array_task:
+                parent_status, _ = self.get_job_state(self.job_ids[0][:-2])
+                parent_status = [parent_status]
 
-    def retrieve_fitness(self, local_directory, match_string=None):
+            if verbose > 1:
+                print("Job status:")
+                for jobid, job in zip(self.job_ids, self.job_status):
+                    print("{}: {}".format(jobid, job))
+
+
+
+
+
+    def download_files(self, local_directory, match_string=None):
         # TODO: stop grabbing folders
 
         if os.path.isdir(local_directory):
