@@ -14,6 +14,7 @@ class JobRunner(object):
         self.server = server
         self.username = username
         self.key_filename = key_filename
+        self.array_tasks = array_tasks
 
         # Remote Directory containing batch file, Warp input file, and COMPLETE flag file
         # Set when job started by `self.project_directory`
@@ -22,8 +23,11 @@ class JobRunner(object):
         # Remote directory containing any output from simulation
         self.output_directory = []
 
-        # SLURM ID for current job being executed
-        self.jobid = []
+        # SLURM IDs for current job being executed
+        self.job_ids = []
+        self.job_status = []
+        self._full_status = []
+
         # establish canonical client for instance use
         self.client = self.establish_ssh_client(self.server, self.username, key_filename)
         # if needed sftp will be opened
@@ -135,11 +139,14 @@ class JobRunner(object):
 
         return 0
 
-    def start_job(self, job_name, path):
+    def start_job(self, job_name):
         """
         Start job(s) on NERSC. Will issue sbatch command for each batch file name in `job_name`.
         Individual paths for each job name can be provided in path or just a single directory if they are all in the
         same location.
+
+        If job batch file sets up an array job the only the single job_name need be provided. Runner will automatically
+        monitor each array task if the array_task attribute is set.
 
         Args:
             job_name: (list or str) Name of each batch file to start.
@@ -150,46 +157,43 @@ class JobRunner(object):
             List of job id numbers for successfully started jobs
 
         """
-        if type(path) != list:
-            path = [path, ]
+
         if type(job_name) != list:
             job_name = [job_name, ]
-        if len(path) < len(job_name):
-            path.extend([path[-1]] * (len(job_name) - len(path)))
+
         # Make sure we have an SSH connection
-        print(job_name, path)
         self.refresh_ssh_client()
 
-        for p, j in zip(path, job_name):
+        for p, j in izip_longest(self.project_directory, job_name, fillvalue=self.project_directory[-1]):
             print 'Starting batch file: {} in directory {}'.format(j, p)
 
             # Check for path existence
             stdin, stdout, stderr = self.client.exec_command('ls {}'.format(p))
             out = stdout.read()
-            err = stderr.read()
-            if err:
-                print 'Could not find directory: {}'.format(p)
-                print err, out
-                return err
-            else:
-                assert j in out, "Cannot find {}\n Run will not start".format(j)
+            err = stderr.read()  # Harmless module load errors make using stderr unreliable
+
+            assert j in out, "Cannot find {}\n Run will not start".format(j)
 
             stdin, stdout, stderr = self.client.exec_command('cd {}; sbatch {}'.format(p, j))
 
             out = stdout.read()
             err = stderr.read()
 
-            if err:
-                return err
-            elif out:
+            if out:
                 # return JobID
                 status = out.split()
-                self.jobid.append(status[-1])
+                self.job_ids.append(status[-1])
+            elif err:
+                print(err)
+                return err
 
-                # Set launch director
-                self.project_directory.append(p)
+        if self.array_tasks:
+            assert len(self.job_ids) == 1, "Array job must return only 1 ID number"
+            for i in range(self.array_tasks):
+                self.job_ids.append(str(self.job_ids[0] + '_' + str(i)))
+            self.job_ids.pop(0)
 
-        return self.jobid
+        return self.job_ids
 
     def check_job_status(self, output_directory=None, job_flag=None):
         if len(self.jobid) == 0:
@@ -363,9 +367,14 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
         run_tail = batch_format['batch_tail']
         with open(os.path.join(directory, filename), 'w') as f:
             f.write(run_header.format(id=i, **batch_format['batch_instructions']))
+
+            if array_job:
+                i = '$SLURM_ARRAY_TASK_ID'
+
             f.writelines(run_strings.format(gen=generation, id=i, **batch_format['batch_instructions']))
             f.write(run_tail.format(gen=generation, id=i, **batch_format['batch_instructions']))
 
+    return runfile_list
 
 def save_generation(filename, population, generation, labels=None, overwrite_generation=False):
     # If attributes are not labled then label with an id number
