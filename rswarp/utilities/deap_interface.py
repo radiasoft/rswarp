@@ -5,6 +5,7 @@ import paramiko
 import yaml
 from time import sleep, ctime
 from re import findall
+from itertools import izip_longest
 from rswarp.run_files.tec.tec_utilities import write_parameter_file
 
 
@@ -85,7 +86,7 @@ class JobRunner(object):
             print "SSH Client is live"
             return self.client
 
-    def upload_file(self, remote_directory, upload_file, debug=False):
+    def upload_file(self, remote_directory, upload_files, debug=False):
         """
         Upload a file or series of files to a single, remote directory via sftp over an ssh client.
         If len(remote_directory) < len(upload_file) the last directory in the list will be copied to
@@ -93,17 +94,15 @@ class JobRunner(object):
         Args:
             remote_directory: Directory path relative to server entry.
                               Will attempt to make directory if it is not found.
-            upload_file: Relative path to file(s) to be uploaded to the remote directory.
+            upload_files: Relative path to file(s) to be uploaded to the remote directory.
 
         Returns:
             None
         """
-        if type(remote_directory) != list:
-            remote_directory = [remote_directory, ]
-        if type(upload_file) != list:
-            upload_file = [upload_file, ]
-        if len(remote_directory) < len(upload_file):
-            remote_directory.extend([remote_directory[-1]] * (len(upload_file) - len(remote_directory)))
+
+        self.project_directory = remote_directory
+        if type(upload_files) != list and type(upload_files) != tuple:
+            upload_files = [upload_files, ]
 
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
@@ -111,25 +110,19 @@ class JobRunner(object):
         # Use existing client to run SFTP connection
         sftp_client = self.establish_sftp_client(self.client)
         home_directory = sftp_client.getcwd()
-        for dir, ufile in zip(remote_directory, upload_file):
+        for directory, ufile in izip_longest(self.project_directory, upload_files, fillvalue=self.project_directory[-1]):
             # Make new directory to upload file to, if required
             # Move to new directory
             try:
-                sftp_client.chdir(dir)
+                sftp_client.chdir(directory)
             except IOError:
                 try:
-                    sftp_client.mkdir(dir)
+                    sftp_client.mkdir(directory)
                 except IOError as e:
                     print("Failed to create directory")
                     return e
 
-                sftp_client.chdir(dir)
-
-            # Guarantee upload_file is iterable
-            try:
-                upload_file[0]
-            except IndexError:
-                upload_file = [upload_file, ]
+                sftp_client.chdir(directory)
 
             sftp_client.put(ufile, os.path.split(ufile)[-1])
             # Back to home before next file uploaded
