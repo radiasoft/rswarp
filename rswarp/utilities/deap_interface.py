@@ -354,6 +354,7 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
     Returns: None
 
     """
+    runfile_list = []
     directory = 'generation_{}'.format(generation)
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -373,11 +374,24 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
     else:
         raise TypeError("batch_format must be a file name or dictionary")
 
-    for i in range(len(population)):
+    # handle formatting for array jobs
+    if batch_format['batch_header'].find('#SBATCH --array=') != -1:
+        batch_format['batch_instructions']['array'] = '0-{}'.format(len(population) - 1)
+        array_job = True
+        batch_files = 1
+    else:
+        array_job = False
+        batch_files = len(population)
+
+    for i in range(batch_files):
+        if array_job:
+            i = 'array'
         filename = batch_format['batch_instructions']['file_base_name'] + '_{}'.format(i)
         run_header = batch_format['batch_header']
         run_strings = batch_format['batch_srun']
         run_tail = batch_format['batch_tail']
+
+        runfile_list.append(filename)
         with open(os.path.join(directory, filename), 'w') as f:
             f.write(run_header.format(id=i, **batch_format['batch_instructions']))
 
