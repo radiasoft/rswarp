@@ -29,6 +29,8 @@ class Conductor(object):
         self.pids = self._get_pids()
         self.thresshold = 30  # how many particles need to be lost to generate a colormap
 
+        self.debug = True
+
         if w3d.solvergeom == w3d.XZgeom or w3d.solvergeom == w3d.RZgeom:
             self.axis = [0, 2, 0, 2]
             self.domain = [w3d.xmmin, w3d.zmmin, w3d.xmmax, w3d.zmmax]
@@ -56,7 +58,7 @@ class Conductor(object):
                 kernel = gaussian_kde(scraped_parts)
                 # Use surface point number as part of the normalization to prevent small surfaces returning outsized
                 # results from the KDE
-                s = kernel(mesh).T  # * mesh.size
+                s = kernel(mesh).T * pids.size / mesh.size
         else:
             s = np.ones_like(mesh[0, :]) * -1.0
 
@@ -83,9 +85,9 @@ class BoxPlot(Conductor):
             yield pof[0]
 
     def generate_faces(self):
-
+        if self.debug:
+            total_pid = 0
         for bound, axis, pids in zip(self.cbounds, self.axis, self.get_particles()):
-
 
             xn = 1 + 5 * np.abs(self.cbounds[(axis + 1) % 3] - self.cbounds[(axis + 1) % 3 + 3]) \
                 // self.cell_size[(axis + 1) % 3]
@@ -101,13 +103,17 @@ class BoxPlot(Conductor):
             x, y, z = [x, y, z][(2 * axis + 2) % 3], \
                       [x, y, z][(2 * axis + 3) % 3], \
                       [x, y, z][(2 * axis + 1) % 3]
-            print("BOX:")
-            print("Bounds x:", np.min(x), np.max(x))
-            print("Bounds y:", np.min(y), np.max(y))
-            print("Bounds z:", np.min(z), np.max(z))
-            print("Particle count:", pids.size)
-            print()
+            if self.debug:
+                print("BOX:")
+                print("Bounds x:", np.min(x), np.max(x))
+                print("Bounds y:", np.min(y), np.max(y))
+                print("Bounds z:", np.min(z), np.max(z))
+                print("Particle count:", pids.size)
+                print()
+                total_pid += pids.size
             s = self._color_mesh(mesh=np.vstack([x.ravel(), y.ravel(), z.ravel()]), particle_subset=pids).reshape(x.shape)
+            if self.debug:
+                print("print total:", self.pids.size, total_pid)
 
             yield x, y, z, s
 
@@ -126,14 +132,16 @@ class Plane(Conductor):
                                np.linspace(self.cbounds[(axis + 2) % 3],
                                            self.cbounds[(axis + 2) % 3 + 3], yn))
             z = np.ones_like(x) * self.center[0]
+            if self.debug:
+                print("cells for plane", x.shape, y.shape)
             s = self._color_mesh(mesh=np.vstack([x.ravel(), y.ravel(), z.ravel()]), particle_subset=None).reshape(x.shape)
-
-            print("PLANE:")
-            print("Bounds x:", np.min(x), np.max(x))
-            print("Bounds y:", np.min(y), np.max(y))
-            print("Bounds z:", np.min(z), np.max(z))
-            print("Particle count:", self.pids.size)
-            print()
+            if self.debug:
+                print("PLANE:")
+                print("Bounds x:", np.min(x), np.max(x))
+                print("Bounds y:", np.min(y), np.max(y))
+                print("Bounds z:", np.min(z), np.max(z))
+                print("Particle count:", self.pids.size)
+                print()
 
             yield x, y, z, s
 
@@ -169,6 +177,10 @@ class SpherePlot(Conductor):
         self.radius = conductor.radius
 
     def generate_faces(self):
+        if self.debug:
+            print("Sphere center:", self.center)
+            print("Particle Count:", self.pids)
+            print()
         # TODO: Sphere has a fixed number of points right now. Everything else scales with the solver mesh spacing.
         dphi = np.linspace(0, 2 * np.pi, 250)
         dtheta = np.linspace(-np.pi, np.pi, 250)
@@ -187,6 +199,8 @@ class UnstructuredPlot(Conductor):
         super(UnstructuredPlot, self).__init__(top, w3d, conductor, interpolation=interpolation)
 
     def _isinside(self):
+        if self.debug:
+            print("Starting Unstructured Construction")
         x = np.linspace(self.w3d.xmmin, self.w3d.xmmax, self.w3d.nx)
         y = np.linspace(self.w3d.ymmin, self.w3d.ymmax, self.w3d.ny)
         z = np.linspace(self.w3d.zmmin, self.w3d.zmmax, self.w3d.nz)
@@ -198,21 +212,31 @@ class UnstructuredPlot(Conductor):
         transitions = np.ones(X.shape + (3,))
 
         if self.w3d.nx == self.w3d.ny and self.w3d.ny == self.w3d.nz:
+            if self.debug:
+                print("single loop set")
             for ii in range(self.w3d.nx):
                 for jj in range(self.w3d.nz):
                     transitions[:, ii, jj, 0] = self._find_edge(dat_isin[:, ii, jj])
                     transitions[ii, :, jj, 1] = self._find_edge(dat_isin[ii, :, jj])
                     transitions[ii, jj, :, 2] = self._find_edge(dat_isin[ii, jj, :])
         else:
+            if self.debug:
+                print("triple loop set")
             for ii in range(self.w3d.nx):
                 for jj in range(self.w3d.ny):
                     transitions[ii, jj, :, 2] = self._find_edge(dat_isin[ii, jj, :])
+            if self.debug:
+                print("first loop")
             for ii in range(self.w3d.ny):
                 for jj in range(self.w3d.nz):
                     transitions[:, ii, jj, 0] = self._find_edge(dat_isin[:, ii, jj])
+            if self.debug:
+                print("second loop")
             for ii in range(self.w3d.nx):
                 for jj in range(self.w3d.nz):
                     transitions[ii, :, jj, 1] = self._find_edge(dat_isin[ii, :, jj])
+            if self.debug:
+                print("third loop")
 
         intersections = np.logical_or.reduce(1 - transitions, axis=3).astype('int')
 
@@ -223,9 +247,7 @@ class UnstructuredPlot(Conductor):
             mY.append(Y[i, j, k])
             mZ.append(Z[i, j, k])
 
-        s = self._color_mesh(mesh=np.hstack([mX, mY, mZ]), particle_subset=None)
-
-        return mX, mY, mZ
+        return np.array(mX), np.array(mY), np.array(mZ)
 
     def _find_edge(self, points):
         # going to assume just 1s and 0s
@@ -236,6 +258,16 @@ class UnstructuredPlot(Conductor):
             if points[i - 1] == 0 and points[i + 1] == 0:
                 new_ar[i] = 1
         return new_ar
+
+    def generate_faces(self):
+        if self.debug:
+            print("Particles on Unstructured:", self.pids.size)
+        x, y, z = self._isinside()
+        if self.debug:
+            print("cells for unstructured", x.shape, y.shape)
+        s = self._color_mesh(mesh=np.vstack([x.ravel(), y.ravel(), z.ravel()]), particle_subset=None)
+
+        yield x, y, z, s
 
 
 conductor_type = {XPlane: XPlanePlot,
