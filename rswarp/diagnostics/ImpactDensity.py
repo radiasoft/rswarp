@@ -14,37 +14,30 @@ from scipy.constants import e
 
 class PlotDensity(object):
 
-    """Plots density of scraped particles on conducting objects.
-
-    """
+    """Plots density of scraped particles on conducting objects."""
 
     def __init__(self, ax, ax_colorbar, scraper, top, w3d, interpolation='kde'):
         """
-        Plots density of scraped particles on conducting objects.
+        Plots density of scraped particles on conducting objects. For 2D plotting matplotlib is used. Plotting
+        in 3D requires use of Mayavi to render plots.
 
-        Can evaluate density on each surface of a Box or ZPlane separately and produce shaded density plots.
-        To run automatically: call an initialized PlotDensity object.
+        Supported 2D conductor shapes: XPlane, YPlane, Box
+        Supported 3D conductor shapes: XPlane, YPlane, ZPlane, Box, Sphere, Unstructured
 
 
-        Warning: Only Box and ZPlane are supported at this time. Other conductor shapes will not be evaluated correctly.
-                Only for 2D XZ simulations at this time.
 
         Args:
             ax: Matplotlib axes object for surface density plots.
             ax_colorbar: Matplotlib axes object for colorbar.
-            scraper: Warp ParticleScraper object. Only used to acquire conductor positions and dimensions.
+            scraper: Warp ParticleScraper object that conductors are registered to.
             top: Warp top object.
             w3d: Warp w3d object.
 
         Useful attributes:
-            ax: Matplotilb axes object for density plots
-            ax_colorbar: Matplotlib axes object for colorbar
+            ax: Matplotilb axes object for density plots. May be None for 3D plots.
+            ax_colorbar: Matplotlib axes object for colorbar. May be None for 3D plots.
             scraper: Warp ParticleScraper object
-            zplost: Array of z-positions of lost particles. Defaults to top.zplost.
-            xplost: Array of x-positions of lost particles. Defaults to top.xplost.
-            dz, dx: z and x widths used to gate on particles collected by conductor side.
-                Defaults to w3d.dz and w3d.dx
-            scale: Set scale of x and z units. Defaults to 1e6 (units of microns).
+            scale: Set scale of x and z units. Defaults to 1e9 (units of nm).
             cmap: matplotlib.cm colormap. Defaults to coolwarm.
             normalization: matplotlib.colors normalization function. Defaults to Normalize (linear normalization).
         """
@@ -71,9 +64,13 @@ class PlotDensity(object):
                 self.conductors[cond.condid] = conductor_type[type(cond)](top, w3d, cond,
                                                                           interpolation=self.interpolation)
             except KeyError:
-                print("{} not currently implemented. Falling back to Unstructured method.".format(type(cond)))
-                self.conductors[cond.condid] = conductor_type['Unstructured'](top, w3d, cond,
-                                                                          interpolation=self.interpolation)
+                try:
+                    self.conductors[cond.condid] = conductor_type['Unstructured'](top, w3d, cond,
+                                                                              interpolation=self.interpolation)
+                    print("{} not currently implemented. Falling back to Unstructured method.".format(type(cond)))
+                except KeyError:
+                    print("{} not available")
+
         self.dx = w3d.dx
         self.dz = w3d.dz
         self.scale = [1e9, 1e9, 1e9]
@@ -124,7 +121,7 @@ class PlotDensity(object):
             for face in cond.generate_faces_3d():
                 x, y, z, s = face[0] * self.scale[0], face[1] * self.scale[1], \
                              face[2] * self.scale[2], face[3] * e / self.time * 1e-4
-                print("m/m by face", np.min(s), np.max(s))
+
                 if 0 <= np.min(s) < minS:  # -1 value indicates no particle anywhere on face
                     minS = np.min(s)
                 if np.max(s) > maxS:
@@ -136,14 +133,13 @@ class PlotDensity(object):
                     contour_plots.append(mlab.pipeline.surface(mesh, colormap='viridis'))
                 else:
                     if np.min(s) < 0.0:
-                        contour_plots.append(mlab.mesh(x, y, z, color=(0, 0, 0), colormap='coolwarm'))
+                        contour_plots.append(mlab.mesh(x, y, z, color=(0, 0, 0), colormap='viridis'))
                     else:
-                        contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='coolwarm'))
+                        contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='viridis'))
 
         for cp in contour_plots:
-            print(minS, maxS)
             cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
 
         mlab.draw()
-        mlab.colorbar(object=contour_plots[1], orientation='vertical')
+        mlab.colorbar(object=contour_plots[0], orientation='vertical')
         mlab.show()

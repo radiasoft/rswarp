@@ -28,7 +28,7 @@ class Conductor(object):
         self.thresshold = 30  # how many particles need to be lost to generate a colormap
         self.points_2d = 1000  # Scatter points per line segment in 2d plots
 
-        self.debug = True
+        self.debug = False
 
         if w3d.solvergeom == w3d.XZgeom or w3d.solvergeom == w3d.RZgeom:
             self.axis = [0, 2, 0, 2]
@@ -57,9 +57,9 @@ class Conductor(object):
         if scraped_parts.shape[1] > self.thresshold:
             if self.interpolation == 'kde':
                 kernel = gaussian_kde(scraped_parts)
-                # Use surface point number as part of the normalization to prevent small surfaces returning outsized
-                # results from the KDE
-                s = kernel(mesh).T * pids.size / mesh.size
+                # TODO: Fix normalization of points produced by KDE
+                # Using badly estimated volume to try and roughly normalize right now
+                s = kernel(mesh).T / pids.size * np.abs(np.prod(np.max(scraped_parts, axis=1) - np.min(scraped_parts, axis=1))) #/ mesh.size
         else:
             s = np.ones_like(mesh[0, :]) * -1.0
 
@@ -217,7 +217,7 @@ class SpherePlot(Conductor):
     def generate_faces_3d(self):
         if self.debug:
             print("Sphere center:", self.center)
-            print("Particle Count:", self.pids)
+            print("Particle Count:", self.pids.size)
             print()
         # TODO: Sphere has a fixed number of points right now. Everything else scales with the solver mesh spacing.
         dphi = np.linspace(0, 2 * np.pi, 250)
@@ -233,6 +233,9 @@ class SpherePlot(Conductor):
 
 
 class UnstructuredPlot(Conductor):
+    """
+    Can represent any convex shaped conductor in Warp.
+    """
     def __init__(self, top, w3d, conductor, interpolation='kde'):
         super(UnstructuredPlot, self).__init__(top, w3d, conductor, interpolation=interpolation)
 
