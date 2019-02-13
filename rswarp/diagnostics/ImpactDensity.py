@@ -3,7 +3,7 @@ from matplotlib.colorbar import ColorbarBase
 try:
     from mayavi import mlab
 except ImportError:
-    print("MayaVi not found. 3D plotting not enabled.")
+    print("Mayavi not found. 3D plotting not enabled.")
 from sys import maxint
 from scipy.interpolate import interp1d
 from ConductorTemplates import conductor_type
@@ -65,11 +65,15 @@ class PlotDensity(object):
             try:
                 self.conductors[cond.condid] = conductor_type[type(cond)](top, w3d, cond,
                                                                           interpolation=self.interpolation)
+                self.gated_ids[cond.condid] = conductor_type[type(cond)](top, w3d, cond,
+                                                                          interpolation=self.interpolation)
             except KeyError:
-                print("{} not currently implemented.".format(type(cond)))
+                print("{} not currently implemented. Falling back to Unstructured method.".format(type(cond)))
+                self.conductors[cond.condid] = conductor_type['Unstructured'](top, w3d, cond,
+                                                                          interpolation=self.interpolation)
         self.dx = w3d.dx
         self.dz = w3d.dz
-        self.scale = [1e9, 1e9, 1e8]
+        self.scale = [1e9, 1e9, 1e9]
         # categorize the number lost to avoid padded values at end of array
         self.numlost = top.npslost[0]
         assert self.numlost > 1, "No particles lost in simulation. Nothing to plot."
@@ -243,7 +247,7 @@ class PlotDensity(object):
 
         ColorbarBase(self.ax_colorbar, cmap=self.cmap, norm=self.cmap_normalization)
 
-    def generate_plots_3d(self):
+    def generate_plots_2d(self):
         minS, maxS = maxint, 0
         contour_plots = []
         for cond in self.conductors.itervalues():
@@ -262,7 +266,32 @@ class PlotDensity(object):
                 else:
                     contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='viridis'))
 
+    def generate_plots_3d(self):
+        minS, maxS = maxint, 0
+        contour_plots = []
+        for cond in self.conductors.itervalues():
+
+            for face in cond.generate_faces():
+                x, y, z, s = face[0] * self.scale[0], face[1] * self.scale[1], \
+                             face[2] * self.scale[2], face[3] * e / self.time * 1e-4
+                print("m/m by face", np.min(s), np.max(s))
+                if 0 <= np.min(s) < minS:  # -1 value indicates no particle anywhere on face
+                    minS = np.min(s)
+                if np.max(s) > maxS:
+                    maxS = np.max(s)
+
+                if isinstance(cond, conductor_type['Unstructured']):
+                    pts = mlab.points3d(x, y, z, s, scale_mode='none', scale_factor=0.002)
+                    mesh = mlab.pipeline.delaunay3d(pts)
+                    contour_plots.append(mlab.pipeline.surface(mesh, colormap='viridis'))
+                else:
+                    if np.min(s) < 0.0:
+                        contour_plots.append(mlab.mesh(x, y, z, color=(0, 0, 0), colormap='viridis'))
+                    else:
+                        contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='viridis'))
+
         for cp in contour_plots:
+            print(minS, maxS)
             cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
 
         mlab.draw()
