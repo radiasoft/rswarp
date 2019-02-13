@@ -7,7 +7,7 @@ except ImportError:
     print("Mayavi not found. 3D plotting not enabled.")
 
 from sys import maxint
-from ConductorTemplates import conductor_type
+from ConductorTemplates import conductor_type_2d, conductor_type_3d
 import numpy as np
 from scipy.constants import e
 
@@ -61,6 +61,11 @@ class PlotDensity(object):
 
         self.gated_ids = {}
         self.conductors = {}  # will replace gated_ids
+
+        if w3d.solvergeom == w3d.XYZgeom:
+            conductor_type = conductor_type_3d
+        else:
+            conductor_type = conductor_type_2d
         for cond in scraper.conductors:
             try:
                 self.conductors[cond.condid] = conductor_type[type(cond)](top, w3d, cond,
@@ -125,7 +130,7 @@ class PlotDensity(object):
                 if np.max(s) > maxS:
                     maxS = np.max(s)
 
-                if isinstance(cond, conductor_type['Unstructured']):
+                if isinstance(cond, conductor_type_3d['Unstructured']):
                     pts = mlab.points3d(x, y, z, s, scale_mode='none', scale_factor=0.002)
                     mesh = mlab.pipeline.delaunay3d(pts)
                     contour_plots.append(mlab.pipeline.surface(mesh, colormap='viridis'))

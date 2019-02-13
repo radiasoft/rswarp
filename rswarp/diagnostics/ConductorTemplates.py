@@ -307,7 +307,11 @@ class UnstructuredPlot(Conductor):
         yield x, y, z, s
 
 
-conductor_type = {XPlane: XPlanePlot,
+conductor_type_2d = {XPlane: XPlanePlot,
+                  ZPlane: ZPlanePlot,
+                  Box: BoxPlot}
+
+conductor_type_3d = {XPlane: XPlanePlot,
                   YPlane: YPlanePlot,
                   ZPlane: ZPlanePlot,
                   Box: BoxPlot,
