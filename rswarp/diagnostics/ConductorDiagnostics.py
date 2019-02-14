@@ -13,7 +13,7 @@ def analyze_scraped_particles(top, particles, solver):
         solver: Electrostatic solver object.
 
     Returns:
-        [step, particles deposited on step]
+        [step, particles deposited on step, timestep, species index]
     """
     cond_ids = []
     cond_objs = []
@@ -23,7 +23,7 @@ def analyze_scraped_particles(top, particles, solver):
         cond_ids.append(cond[0].condid)
 
     for i, ids in enumerate(cond_ids):
-        lost[ids] = np.copy(cond_objs[i].lostparticles_data[:, 0:2])
+        lost[ids] = np.copy(cond_objs[i].lostparticles_data[:, 0:4])
         lost[ids][:, 0] = np.ndarray.astype(np.round(lost[ids][:, 0] / top.dt), 'int')
         lost[ids][:, 1] = np.round(-1. * lost[ids][:, 1] / particles.sw / e)
 

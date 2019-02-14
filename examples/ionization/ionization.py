@@ -9,6 +9,8 @@ from rswarp.utilities.beam_distributions import createKV
 from rswarp.utilities.file_utils import cleanupPrevious
 
 import rsoopic.h2crosssections as h2crosssections
+sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
+import crosssections as Xsect
 
 import shutil
 from shutil import os
@@ -24,7 +26,7 @@ beam_gamma = beam_ke/511e3 + 1
 beam_beta = np.sqrt(1-1/beam_gamma**2)
 sw = 1
 
-diagDir = ("diags%.3fkeV" % (beam_ke/1e3))
+diagDir = ("diags-%.3fkeV" % (beam_ke/1e3))
 
 beam = Species(type=Electron, name='e-', weight=sw)
 # These two species represent the emitted particles
@@ -69,6 +71,7 @@ top.pboundxy = absorb
 Lz = (w3d.zmmax - w3d.zmmin)
 dz =  Lz / w3d.nz
 top.dt = 0.1e-9
+#import sys; from scipy.constants import c; print beam_beta, beam_beta * c * top.dt, '<', dz, '?'; sys.exit(0)
 ptcl_per_step = int(beam.ibeam * top.dt / echarge / sw)  # number of particles to inject on each step
 
 top.ibpush = 1  # 0:off, 1:fast, 2:accurate
@@ -144,19 +147,23 @@ if simulateIonization is True:
     )
 
     # # e + H2 -> 2e + H2+
+    h2xs = Xsect.H2IonizationEvent()
+    def xswrapper(vi):
+        return h2xs.getCrossSection(vi)
     ioniz.add(
         incident_species=beam,
         emitted_species=[h2plus, emittedelec],
-        cross_section=h2crosssections.h2_ioniz_crosssection,
+        #cross_section=h2crosssections.h2_ioniz_crosssection,
         # cross_section=lambda nnew, vi: 1e-20,
+        cross_section=xswrapper,
         emitted_energy0=[0, h2crosssections.ejectedEnergy],
         # emitted_energy0=[0, lambda nnew, vi: 1./np.sqrt(1.-((vi/2.)/clight)**2) * emass*clight/jperev],
         emitted_energy_sigma=[0, 0],
         # sampleEmittedAngle=lambda nnew, emitted_energy, incident_energy: np.random.uniform(0, 2*np.pi, size=nnew),
         sampleEmittedAngle=h2crosssections.generateAngle,
         # sampleIncidentAngle=lambda nnew, emitted_energy, incident_energy, emitted_theta: np.random.uniform(0, 2*np.pi, size=nnew),
-        writeAngleDataDir=False,
-        writeAnglePeriod=10,
+        writeAngleDataDir=diagDir,
+        writeAnglePeriod=1,
         l_remove_incident=False,
         l_remove_target=False,
         ndens=target_density

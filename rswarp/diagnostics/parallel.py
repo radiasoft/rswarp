@@ -1,4 +1,5 @@
 import numpy as np
+import h5py as h5
 """
 Utilities for parallel Warp operation.
 """
@@ -66,3 +67,56 @@ def save_lost_particles(top, comm_world, fsave=None):
             yplost_all = np.hstack(yplost_all)
             zplost_all = np.hstack(zplost_all)
             np.save(fsave, [xplost_all, yplost_all, zplost_all])
+
+
+def save_pidlost(top, comm_world, species, fsave=None):
+    # TODO: Test for if species is iterable
+    """
+    Function for saving lost (scraped) particles coordinate data. Only useful for when Warp is operating in parallel.
+    Data is saved in (x,y,z) columns in numpy.save binary file format.
+    Due to Warp's dynamic array system data may contain empty coordinates as float 0's.
+
+    Args:
+        top: top object from Warp
+        comm_world: comm_world object used by Warp
+        fsave: path for save file.
+            If not given defaults to 'lost_particles_step_$(step_number).npy' in the local directory.
+
+    Returns:
+
+    """
+    if not fsave:
+        fsave = 'pidlost_step_{}.h5'.format(top.it)
+
+    particle_data = {}
+    for sp in species:
+        particle_data[sp.name] = sp
+
+    # Prepare head to receive particles arrays from all valid ranks
+    if comm_world.rank == 0:
+        received_data = {}
+        for sp in particle_data:
+            received_data[sp] = []
+        for rank in range(1, comm_world.size):
+            for sp in particle_data:
+                received_data[sp].append(comm_world.recv(source=rank, tag=particle_data[sp].js))
+
+    # All ranks that have valid data send to head
+    if comm_world.rank != 0:
+        for sp in particle_data:
+            comm_world.send(particle_data[sp].pidlost[()], dest=0, tag=particle_data[sp].js)
+
+    # Process data on head and save
+    if comm_world.rank == 0:
+        for sp in received_data:
+            received_data[sp].append(particle_data[sp].pidlost[()])
+
+            # Copy over non-empty arrays
+            received_data[sp] = [ar for ar in received_data[sp] if ar.shape[0] != 0]
+            if len(received_data[sp]) > 0:
+                received_data[sp] = np.row_stack(received_data[sp])
+                ff = h5.File(fsave, 'w')
+                ff.create_dataset(sp, data=received_data[sp])
+                ff.close()
+            else:
+                print("`save_pidlost`, Step {}: No particles lost".format(top.it))

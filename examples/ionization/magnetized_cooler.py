@@ -1,25 +1,40 @@
 from __future__ import division
 import warp as wp
 import numpy as np
+import h5py as h5
+import os
 
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
+from warp.particles.singleparticle import TraceParticle
+from warp.particles.extpart import ZCrossingParticles
+
+# Use more-up-to-date local rswarp
+import sys
+sys.path.insert(1, '/home/vagrant/jupyter/rswarp')
 from rswarp.diagnostics import FieldDiagnostic
-from rswarp.utilities.ionization import Ionization
 from rswarp.cathode.injectors import UserInjectors
 from rswarp.utilities.file_utils import cleanupPrevious
-import rsoopic.h2crosssections as h2crosssections
 
-# Seed set for testing
-np.random.seed(123456)
+import rsoopic.h2crosssections as h2crosssections
+sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
+from ionization import Ionization
+import crosssections as Xsect
+
+# Seed set for reproduction
+np.random.seed(967644)
 
 diagDir = 'diags/hdf5'
 diagFDir = ['diags/fields/magnetic', 'diags/fields/electric']
 
 # Cleanup command if directories already exist
 # Warp's HDF5 diagnostics will not overwrite existing files. This command cleans the diagnostic directory
-# to allow for rerunning the simulation
-if wp.comm_world.rank == 0:
-    cleanupPrevious(diagDir, diagFDir)
+# to allow for rerunning the simulationhttps://www.nytimes.com/2001/09/09/nyregion/is-the-field-getting-too-crowded.html
+#if wp.comm_world.rank == 0:
+#    cleanupPrevious(diagDir, diagFDir)
+#    try:
+#        os.remove('./diags/crossing_record.h5')
+#    except OSError:
+#        pass
 
 ####################
 # General Parameters
@@ -50,6 +65,7 @@ cathode_temperature = 0.25  # eV
 # Beam
 beam_beta = 0.990813945176
 beam_ke = wp.emass / wp.jperev * wp.clight**2 * (1. / np.sqrt(1-beam_beta**2) - 1.)  # eV
+#print '*** beam_ke, beam_gamma =', beam_ke,  1. / np.sqrt(1-beam_beta**2)
 beam_current = 10e-3  # A
 beam_radius = 0.01  # m
 
@@ -83,7 +99,7 @@ wp.top.pboundnz = wp.absorb
 wp.top.ibpush = 2
 
 dz = (wp.w3d.zmmax - wp.w3d.zmmin) / wp.w3d.nz  # Because warp doesn't set w3d.dz until after solver instantiated
-wp.top.dt = 0.5 * dz / (beam_beta * wp.clight)  # Timestep set to cell crossing time with some padding
+wp.top.dt = 0.75 * dz / (beam_beta * wp.clight)  # Timestep set to cell crossing time with some padding
 
 ####################################
 # Create Beam and Set its Parameters
@@ -146,11 +162,11 @@ else:
 
 if simulateIonization is True:
     # Particle species for emission products of an ionization event
-    h2plus = wp.Species(type=wp.Dihydrogen, charge_state=+1, name='H2+', weight=2)
-    emittedelec = wp.Species(type=wp.Electron, name='emitted e-', weight=2)
+    h2plus = wp.Species(type=wp.Dihydrogen, charge_state=+1, name='H2+', weight=1000)
+    emittedelec = wp.Species(type=wp.Electron, name='emitted e-', weight=1000)
 
     target_pressure = 0.4  # in Pa
-    target_temp = 273  # in K
+    target_temp = 273.0  # in K
     target_density = target_pressure / wp.boltzmann / target_temp  # in 1/m^3
 
     # Instantiate Ionization
@@ -170,13 +186,17 @@ if simulateIonization is True:
     )
 
     # add method used to add possible ionization events
-
+    h2xs = Xsect.H2IonizationEvent()
+    def xswrapper(vi):
+        return h2xs.getCrossSection(vi)
     ioniz.add(
         incident_species=beam,
         emitted_species=[h2plus, emittedelec],  # iterable of species created from ionization
-        cross_section=h2crosssections.h2_ioniz_crosssection,  # Cross section, can be float or function
-        emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
+        #cross_section=h2crosssections.h2_ioniz_crosssection,  # Cross section, can be float or function
+        cross_section=xswrapper,
+        #emitted_energy0=[0, h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
         # or set to 'thermal' to create ions with a thermal energy spread set by temperature
+        emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
         emitted_energy_sigma=[0, 0],  # Energy spread of emitted species (gives width of gaussian distribution)
         temperature=[target_temp, None],
         sampleEmittedAngle=h2crosssections.generateAngle,
@@ -193,10 +213,7 @@ if simulateIonization is True:
 # Create conductors that will represent electrodes placed inside vacuum vessel
 
 pipe_voltage = 0.0  # Set main pipe section to ground
-
-# Electrodes turned off for thermal ion distribution test
-electrode_voltage = +0.0  # electrodes held at +2.3 relative to main pipe
-
+electrode_voltage = +2e3  # electrodes held at several kV relative to main pipe
 assert electrode_voltage < beam_ke, "Electrodes potential greater than beam KE."
 
 pipe_radius = pipe_radius
@@ -213,17 +230,24 @@ z_positions.append(z_positions[-1] + electrode_length)
 
 conductors = []
 
+bottom_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=electrode_voltage, zcent=.5*dz)
+conductors.append(bottom_cap)
+
 entrance_electrode = wp.ZCylinderOut(voltage=electrode_voltage, radius=pipe_radius,
                                      zlower=z_positions[0], zupper=z_positions[1])
-conductors.append(entrance_electrode)
+#conductors.append(entrance_electrode)
 
-beam_pipe = wp.ZCylinderOut(voltage=pipe_voltage, radius=pipe_radius,
-                            zlower=z_positions[2], zupper=z_positions[3])
+beam_pipe = wp.ZCylinderOut(voltage=pipe_voltage, radius=pipe_radius, zlower=0.0, zupper=cooler_length)
+#                            zlower=z_positions[2], zupper=z_positions[3])
 conductors.append(beam_pipe)
 
+#exit_electrode = wp.ZPlane(z0=cooler_length, zsign=-1., voltage=electrode_voltage)
 exit_electrode = wp.ZCylinderOut(voltage=electrode_voltage, radius=pipe_radius,
                                  zlower=z_positions[4], zupper=z_positions[5])
-conductors.append(exit_electrode)
+#conductors.append(exit_electrode)
+
+top_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=electrode_voltage, zcent=cooler_length-.5*dz)
+conductors.append(top_cap)
 
 ##############################
 # Install Ideal Solenoid Field
@@ -265,17 +289,23 @@ if space_charge:
 for cond in conductors:
     wp.installconductor(cond)
 
+#print 'BCs: ', solverE.bounds
+#sys.exit(0)
+
 # Conductors set as scrapers will remove impacting macroparticles from the simulation
+#scraper = wp.ParticleScraper(conductors, lsavecondid=1)
 scraper = wp.ParticleScraper(conductors)
 
 ######################
 # Particle Diagnostics
 ######################
 
+#wp.top.lsavelostparticles = True
+
 # HDF5 Particle/Field diagnostic options
 
 if particle_diagnostic_switch:
-    particleperiod = 50  # Particle diagnostic write frequency
+    particleperiod = 1000000  # Particle diagnostic write frequency
     particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=wp.top, w3d=wp.w3d,  # Should always be set
                                                # Include data from all existing species in write
                                                species={species.name: species for species in wp.listofallspecies},
@@ -286,7 +316,7 @@ if particle_diagnostic_switch:
     wp.installafterstep(particle_diagnostic_0.write)  # Write method is installed as an after-step action
 
 if field_diagnostic_switch:
-    fieldperiod = 100  # Field diagnostic write frequency
+    fieldperiod = 100000  # Field diagnostic write frequency
     efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=wp.top, w3d=wp.w3d,
                                                               comm_world=wp.comm_world,
                                                               period=fieldperiod)
@@ -299,14 +329,103 @@ if field_diagnostic_switch:
     #                                                           period=fieldperiod)
     # installafterstep(bfield_diagnostic_0.write)
 
+# Crossing Diagnostics
+#zcross_l = ZCrossingParticles(zz=z_positions[1], laccumulate=1)
+#zcross_r = ZCrossingParticles(zz=z_positions[4], laccumulate=1)
+zcross_l = ZCrossingParticles(zz=2.*dz, laccumulate=1)
+zcross_r = ZCrossingParticles(zz=cooler_length-2.*dz, laccumulate=1)
+
 
 ###########################
 # Generate and Run PIC Code
 ###########################
 
+#electrons_tracked_t0 = wp.Species(type=wp.Electron)
+#tracer_count = 50
+
 wp.derivqty()  # Set derived beam properties if any are required
 wp.package("w3d")  # Use w3d solver/geometry package
 wp.generate()  # Allocate arrays, generate mesh, perform initial field solve
 
-# Run PIC loop for x steps
-wp.step(3000)
+loss_hist = []
+
+#wp.restart('magnetized_cooler3200000')
+
+Nsteps = 5000000
+#particle_diagnostic_switch = False
+#field_diagnostic_switch = False
+
+while wp.top.it < Nsteps:
+
+    wp.step(1000)
+
+#        try:
+#            np.save("trajectories_{}.npy".format(wp.top.it), electron_tracker_0.getsavedata())
+#            electron_tracker_0.reset(clearhistory=1)
+#        except:
+#            pass
+#        v_coords = np.ones([tracer_count, 3]) * beam_beta * wp.clight
+#        v_coords[:, [0, 1]] = 0.0
+#        x_vals = np.linspace(-beam_radius, beam_radius, tracer_count)
+#        y_vals = np.zeros([tracer_count,])
+#        z_vals = np.zeros(tracer_count) + 1e-3 
+#        eptclArray = np.asarray([x_vals, v_coords[:,0], y_vals, v_coords[:,1], z_vals, v_coords[:,2]]).T
+#        electron_tracker_0 = TraceParticle(js=electrons_tracked_t0.jslist[0],
+#                                           x=eptclArray[:,0],
+#                                           y=eptclArray[:,2],
+#                                           z=eptclArray[:,4],
+#                                           vx=np.zeros_like(eptclArray[:,0]),
+#                                           vy=np.zeros_like(eptclArray[:,0]),
+#                                           vz=eptclArray[:,5])
+
+#    print("IONS H2+: {}".format(h2plus.getx().shape))
+#    print("IONS e-: {}".format(emittedelec.getx().shape))
+#    print("BEAM e-: {}".format(beam.getx().shape))
+#    print("TRACER e-: {}".format(electron_tracker_0.getx().shape))
+
+#    wp.step(100)
+
+    vz_l_e = zcross_l.getvz(js=emittedelec.js)
+    vz_l_h = zcross_l.getvz(js=h2plus.js)
+    vz_r_e = zcross_r.getvz(js=emittedelec.js)
+    vz_r_h = zcross_r.getvz(js=h2plus.js)
+
+    loss_hist.append([wp.top.it, vz_l_e.size, vz_l_h.size, vz_r_e.size, vz_r_h.size])
+
+#    if vz_l_e.size != 0 or vz_l_h.size != 0 or vz_r_e.size != 0 or vz_r_h.size != 0:
+#        if wp.comm_world.rank == 0:
+#            h5file =  h5.File(os.path.join('diags', 'crossing_record.h5'), 'a')
+#            try:
+#                l_group = h5file.create_group('left')
+#                r_group = h5file.create_group('right')
+#                l_e_group = l_group.create_group('e')
+#                l_h_group = l_group.create_group('h')
+#                r_e_group = r_group.create_group('e')
+#                r_h_group = r_group.create_group('h')
+#                l_e_group.attrs['position'] = zcross_l.zz
+#                l_h_group.attrs['position'] = zcross_l.zz
+#                r_e_group.attrs['position'] = zcross_r.zz
+#                r_h_group.attrs['position'] = zcross_r.zz
+#            except ValueError:
+#                l_e_group = h5file['left/e']
+#                l_h_group = h5file['left/h']
+#                r_e_group = h5file['right/e']
+#                r_h_group = h5file['right/h']
+
+#            l_e_group.create_dataset('{}'.format(wp.top.it), data=vz_l_e)
+#            l_h_group.create_dataset('{}'.format(wp.top.it), data=vz_l_h)
+#            r_e_group.create_dataset('{}'.format(wp.top.it), data=vz_r_e)
+#            r_h_group.create_dataset('{}'.format(wp.top.it), data=vz_r_h)
+
+#            h5file.close()
+
+    zcross_l.clear()
+    zcross_r.clear()
+
+    if wp.top.it % 100000 == 0 and wp.comm_world.rank == 0:
+        with open('loss_hist.txt', 'w') as flh:
+            n = len(loss_hist)
+            flh.write('{}\n'.format(n))
+            for i in range(n):
+                flh.write('{0} {1} {2} {3} {4}\n'.format(loss_hist[i][0], loss_hist[i][1], loss_hist[i][2], loss_hist[i][3], loss_hist[i][4]))
+    #    wp.dump()
