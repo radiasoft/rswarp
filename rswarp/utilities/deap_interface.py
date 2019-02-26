@@ -3,6 +3,7 @@ import h5py as h5
 import numpy as np
 import paramiko
 import yaml
+import stat
 from time import sleep, ctime
 from re import findall
 from itertools import izip_longest
@@ -31,7 +32,7 @@ class JobRunner(object):
         self._project_directory = []
 
         # Remote directory containing any output from simulation
-        self.output_directory = []
+        self._output_directory = []
 
         # SLURM IDs for current job being executed
         self.job_ids = []
@@ -56,13 +57,13 @@ class JobRunner(object):
 
     @property
     def output_directory(self):
-        return self._project_directory
+        return self._output_directory
     @output_directory.setter
     def output_directory(self, directory):
         if type(directory) != list and type(directory) != tuple:
-            self._project_directory = [directory, ]
+            self._output_directory = [directory, ]
         else:
-            self._project_directory = directory
+            self._output_directory = directory
 
     @staticmethod
     def establish_ssh_client(server, username, key_filename):
@@ -291,12 +292,18 @@ class JobRunner(object):
                 for jobid, job in zip(self.job_ids, self.job_status):
                     print("{}: {}".format(jobid, job))
 
+    def download_files(self, local_directory, remote_directory, match_string=None):
+        """
+        Download all files in a given remote directory.
+        Args:
+            local_directory (str): Local directory where all downloaded files will be placed.
+            May be relative or absolute.
+            remote_directory (str or list): Absolute path to the remote directories to download files from.
+            match_string (str): If given only files that contain the string will be downloaded.
 
+        Returns:
 
-
-
-    def download_files(self, local_directory, match_string=None):
-        # TODO: stop grabbing folders
+        """
 
         if os.path.isdir(local_directory):
             pass
@@ -305,6 +312,8 @@ class JobRunner(object):
                 os.makedirs(local_directory)
             except OSError as e:
                 raise e
+
+        self.output_directory = remote_directory
 
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
@@ -320,10 +329,13 @@ class JobRunner(object):
                 print("Failed to retrieve from directory {}".format(output_directory))
                 continue
 
-            for fil in sftp_client.listdir():
-                # If a match_string is given only retrieve files containing match_string
+            for fil in sftp_client.listdir_attr():
+                if stat.S_ISDIR(fil.st_mode):
+                    # Skip if this is a directory
+                    continue
+
                 if match_string:
-                    if match_string in fil:
+                    if match_string in fil.filename:
                         pass
                     else:
                         continue
@@ -332,9 +344,9 @@ class JobRunner(object):
 
                 # Retrieve the next file
                 try:
-                    sftp_client.get(fil, os.path.join(local_directory, fil))
+                    sftp_client.get(fil.filename, os.path.join(local_directory, fil.filename))
                 except IOError as e:
-                    print "File retrieval failed for: {}".format(fil)
+                    print "File retrieval failed for: {}".format(fil.filename)
                     print "Error returned:\n {}".format(e)
                     pass
 
