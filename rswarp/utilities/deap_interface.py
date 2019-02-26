@@ -10,7 +10,9 @@ from itertools import izip_longest
 from rswarp.run_files.tec.tec_utilities import write_parameter_file
 
 # TODO: Put in a graceful stop if connection can't be made. Should record time.
-
+# TODO: Running a new command after the connection has been idle sometimes has resulted in  error:
+#   "No handlers could be found for logger "paramiko.transport"" adding a log file may resolve this, but the log file
+#    is just a static name right now.
 class JobRunner(object):
     status_code = {'pending': 0,
                    'running': -1,
@@ -67,6 +69,7 @@ class JobRunner(object):
 
     @staticmethod
     def establish_ssh_client(server, username, key_filename):
+        paramiko.util.log_to_file('test.log')
         try:
             client = paramiko.SSHClient()
 
@@ -363,9 +366,10 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
         simulation_parameters: Dictionary with additional parameters that must be supplied at the simulation start
         batch_format: YAML template file or appropriate dictionary
 
-    Returns: None
+    Returns: (list, list) A list of all batch files and a list of all YAML design configuration files
 
     """
+    batchfile_list = []
     runfile_list = []
     directory = 'generation_{}'.format(generation)
     if not os.path.exists(directory):
@@ -373,9 +377,10 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
     # Create .yaml files
     for i, individual in enumerate(population):
         individual = dict(individual, **simulation_parameters)
-        individual['run_id'] = i
+        individual['run_id'] = '{}-{}'.format(generation, i)
 
-        filepath = os.path.join(directory, 'tec_design_{}-{}.yaml'.format(generation, individual['run_id']))
+        filepath = os.path.join(directory, 'tec_design_{}.yaml'.format(individual['run_id']))
+        runfile_list.append(filepath)
         write_parameter_file(individual, filepath)
 
     # create associated batch files
@@ -400,20 +405,23 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
             i = 'array'
         filename = batch_format['batch_instructions']['file_base_name'] + '_{}'.format(i)
         run_header = batch_format['batch_header']
+        run_pre = batch_format['batch_pre_command']
         run_strings = batch_format['batch_srun']
-        run_tail = batch_format['batch_tail']
+        run_tail = batch_format['batch_post_command']
 
-        runfile_list.append(filename)
+        batchfile_list.append(os.path.join(directory, filename))
         with open(os.path.join(directory, filename), 'w') as f:
             f.write(run_header.format(id=i, **batch_format['batch_instructions']))
 
             if array_job:
                 i = '$SLURM_ARRAY_TASK_ID'
 
+            f.write(run_pre.format(gen=generation, id=i, **batch_format['batch_instructions']))
             f.writelines(run_strings.format(gen=generation, id=i, **batch_format['batch_instructions']))
             f.write(run_tail.format(gen=generation, id=i, **batch_format['batch_instructions']))
 
-    return runfile_list
+    return batchfile_list, runfile_list
+
 
 def save_generation(filename, population, generation, labels=None, overwrite_generation=False):
     # If attributes are not labled then label with an id number
