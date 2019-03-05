@@ -102,14 +102,16 @@ class JobRunner(object):
             print "Failed to connect to establish sftp connection.\n"
             return e
 
-    def refresh_ssh_client(self):
+    def refresh_ssh_client(self, verbose=False):
         if not self.client.get_transport() or self.client.get_transport().is_active() != True:
-            print "Reopening SSH Client"
+            if verbose:
+                print "Reopening SSH Client"
             self.client = self.establish_ssh_client(self.server, self.username, self.key_filename)
 
             return self.client
         else:
-            print "SSH Client is live"
+            if verbose:
+                print "SSH Client is live"
             return self.client
 
     def upload_file(self, remote_directory, upload_files, debug=False):
