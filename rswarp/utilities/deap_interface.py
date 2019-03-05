@@ -13,6 +13,8 @@ from rswarp.run_files.tec.tec_utilities import write_parameter_file
 # TODO: Running a new command after the connection has been idle sometimes has resulted in  error:
 #   "No handlers could be found for logger "paramiko.transport"" adding a log file may resolve this, but the log file
 #    is just a static name right now.
+
+
 class JobRunner(object):
     status_code = {'pending': 0,
                    'running': -1,
@@ -20,7 +22,13 @@ class JobRunner(object):
                    'timeout': -3,
                    'cancelled': -4,
                    'cancelled+': -4,
-                   'failure': -5  # Not a NERSC Term. Internal designation for unknown error.
+                   'failure': -5,  # Not a NERSC Term. Internal designation for unknown error.
+                   0: 'pending',
+                   -1: 'running',
+                   -2: 'completed',
+                   -3: 'timeout',
+                   -4: 'cancelled',
+                   -5: 'unkown failure/array pending'  # Not a NERSC Term. Internal designation for unknown error.
                    }
 
     def __init__(self, server, username, key_filename=None, array_tasks=0):
@@ -179,6 +187,7 @@ class JobRunner(object):
         self.refresh_ssh_client()
 
         for p, j in izip_longest(self.project_directory, job_name, fillvalue=self.project_directory[-1]):
+            j = os.path.split(j)[-1]
             print 'Starting batch file: {} in directory {}'.format(j, p)
 
             # Check for path existence
@@ -234,7 +243,7 @@ class JobRunner(object):
         labels = stdout.splitlines()[0].split()
         data = None
         for ln in stdout.splitlines():
-            if ln.find('{} '.format(jobid)) == 0:
+            if ln.find('{}'.format(jobid)) == 0:
                 data = ln.split()
                 break
         # If data format is bad catch here
@@ -289,13 +298,14 @@ class JobRunner(object):
             if array_task:
                 parent_status, _ = self.get_job_state(self.job_ids[0][:-2])
                 parent_status = [parent_status]
+                print(parent_status[0])
 
             if verbose > 1:
                 print("Job status:")
                 for jobid, job in zip(self.job_ids, self.job_status):
-                    print("{}: {}".format(jobid, job))
+                    print("{}: {}".format(jobid, self.status_code[job]))
 
-    def download_files(self, local_directory, remote_directory, match_string=None):
+    def download_files(self, local_directory, remote_directory=None, match_string=None):
         """
         Download all files in a given remote directory.
         Args:
@@ -316,7 +326,8 @@ class JobRunner(object):
             except OSError as e:
                 raise e
 
-        self.output_directory = remote_directory
+        if remote_directory:
+            self.output_directory = remote_directory
 
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
@@ -324,7 +335,11 @@ class JobRunner(object):
         # Use existing client to run SFTP connection
         sftp_client = self.establish_sftp_client(self.client)
 
-        for output_directory in self.output_directory:
+        for output_directory, status in zip(self.output_directory, self.job_status):
+
+            if status != -2:
+                print("Job was not complete. No files downloaded from {}".format(output_directory))
+                continue
             # Move to output directory
             try:
                 sftp_client.chdir(output_directory)
@@ -393,7 +408,8 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
 
     # handle formatting for array jobs
     if batch_format['batch_header'].find('#SBATCH --array=') != -1:
-        batch_format['batch_instructions']['array'] = '0-{}'.format(len(population) - 1)
+        batch_format['batch_instructions']['array'] = '0-{}%{}'.format(len(population) - 1,
+                                                                       batch_format['batch_instructions']['array_simultaneous'])
         array_job = True
         batch_files = 1
     else:
@@ -484,7 +500,7 @@ def return_efficiency(generation, population, directory):
     files = os.listdir(directory)
     for i, individual in enumerate(population):
         if "efficiency_id{}-{}.h5".format(generation, i) not in files:
-            efficiency.append(0.0)
+            efficiency.append('nan')
             continue
         else:
             f = os.path.join(directory, "efficiency_id{}-{}.h5".format(generation, i))
