@@ -515,11 +515,17 @@ def return_efficiency(generation, population, directory):
                 if data['efficiency'].attrs[attr] < 0.0:
                     penalty += data['efficiency'].attrs[attr]
 
+            # TODO: reassess this penalty factor compared to FMU penalty method
             penalty = 1.0 + abs(penalty / total_power)
             # print penalty, data['efficiency'].attrs['eta'], abs(data['efficiency'].attrs['eta']) * -penalty, \
             #     data['efficiency'].attrs['P_load'] > data['efficiency'].attrs['P_gate'], i
             efficiency.append(abs(data['efficiency'].attrs['eta']) * -penalty)
             data.close()
+
+    min_eff = np.array(efficiency).min()
+    for i in range(len(population)):
+        if population[i] == 'nan':
+            population[i] = min_eff
 
     return efficiency
 
