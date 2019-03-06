@@ -5,8 +5,15 @@ from copy import deepcopy
 import warnings
 
 class LineSegment:
-    """
-    class to manage line segment instance
+    """Class that manages line segment instance.
+
+    To use:
+    >>> ls = LineSegment([[0., 0., 0.], [1., 0., 0.]])
+    >>> ls.point(0)
+    array([0., 0., 0.])
+    >>> ls.points()
+    array([[0., 0., 0.],
+           [1., 0., 0.]])
     """
     def __init__(self, points):
         if np.asarray(points).shape != (2,3):
@@ -22,8 +29,11 @@ class LineSegment:
 # end of class LineSegment
 
 class Ray:
-    """
-    class to manage ray instance
+    """Class that manages ray instance.
+    
+    To use:
+    >>> ls = LineSegment([[0., 0., 0.], [1., 0., 0.]])
+    >>> ray = Ray(ls)
     """
     def __init__(self, lineseg):
         if not isinstance(lineseg, LineSegment):
@@ -34,8 +44,18 @@ class Ray:
 # end of class Ray
 
 class Triangle:
-    """
-    class to manage triangle instance
+    """Class that manages triangle instance.
+    
+    To use:
+    >>> tri = Triangle([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]])
+    >>> tri.vertex(0)
+    array([0., 0., 0.])
+    >>> tri.vertices()
+    array([[0., 0., 0.],
+           [1., 0., 0.],
+           [0., 1., 0.]])
+    >>> tri.normal()
+    array([0., 0., 1.])
     """
 
     def __init__(self, vertices):
@@ -46,6 +66,7 @@ class Triangle:
 
         self._normal = np.cross(self._vertices[1] - self._vertices[0],
                                 self._vertices[2] - self._vertices[0])
+
         self._normal /= np.linalg.norm(self._normal)
 
     def vertex(self, idx = 0):
@@ -60,21 +81,40 @@ class Triangle:
 # end of class Triangle
 
 class STLconductor(Assembly):
-    """
-    Conductor defined in a STL file.
-    Input: filename - STL file
-           voltage=0. - conductor voltage
-           xcent=0., ycent=0., zcent=0. - not necessarily needed for defining STLconductor, but required by Assembly
-           precision_decimal=4 - precision (in the format of scientific expression) kept for vertices read from stl file
-           normalization_factor=None - normalize coordinates of mesh by normalization_factor to reduce round-off errors
-           fuzz=None - (small) fuzzy number
-           disp="none", "auto", or (delta_x, delta_y, delta_z) - move the conductor by this small amount of displacement for purpose of effectively finding intercepts
-           condid="next" - conductor id, must be integer, or can be 'next' in which case a unique ID is chosen
+    """Conductor defined by a STL file.
+
+    To use:
+
+      To define a conductor read from the stl file "some_mesh.stl" with fixed voltage V:
+      >>> c = STLconductor("some_mesh.stl", voltage=V)
+
+      Normalization of the stl mesh by the PIC cell size (dx) is recommended for robustly finding stl-mesh/PIC-cell intersections:
+      >>> c = STLconductor("some_mesh.stl", voltage=V, normalization_factor=dx)
+      
+      To install the defined conductor for Warp:
+      >>> installconductor(c)
     """
     def __init__(self, filename, voltage=0.,
                        xcent=0., ycent=0., zcent=0.,
                        raytri_scheme="watertight", precision_decimal=None, normalization_factor=None, fuzz=1e-14,
                        disp="none", verbose="off", condid="next", **kw):
+        """Initialize a stl conductor.
+
+        Args:
+          filename: File that defines the mesh in the stl format.
+          xcent, ycent, zcent: Coordinate of conductor center (unncessary for STLconductor, but legacy of Warp code).
+          raytri_scheme: Scheme to calculate ray-triangle intercepts. Legal options are "watertight" (default) or "moller".
+          precision_decimal: Numeric precision is kept to this value in decimal for data read from stl file.
+          normalization_factor: Normalize data read from stl file by this value.
+          fuzz: Small number for truncation.
+          disp: Displacement made to the stl mesh, used for effectively finding intercepts under some tricky situations.
+            Available options are "none" (default), "auto", or (delta_x, delta_y, delta_z)
+          verbose: If "on", detailed information on processing conductor defined by stl file will be printed out.
+          condid: Conductor id. Must be a positive integer, or "next". If "next", condid will be automatically determined.
+
+        Returns:
+
+        """
         usenewconductorgeneration()
         kwlist = []
         Assembly.__init__(self, voltage, xcent, ycent, zcent, condid, kwlist,
@@ -137,10 +177,16 @@ class STLconductor(Assembly):
     # end of __init__ function
 
     def getextent(self):
-        """
-        return the extent of a stl conductor
+        """Return the extent of the defined conductor.
+
         The extent is considered to be the minimum rectangle box
-        that just encloses the conductor used in  Grid.getdatanew for gridintercepts calculation
+        that just encloses the conductor used in Grid.getdatanew for gridintercepts calculation.
+
+        Args:
+          None
+
+        Returns:
+          ConductorExtent: An instance that has information of conductor's extent defined by Warp.
         """
         return ConductorExtent([self._surface_boxlo[0], self._surface_boxlo[1], self._surface_boxlo[2]],
                                [self._surface_boxhi[0], self._surface_boxhi[1], self._surface_boxhi[2]],
@@ -157,15 +203,18 @@ class STLconductor(Assembly):
     # end of conductorf function
 
     def conductord(self, xcent, ycent, zcent, n, x, y, z, distance):
-        """
-        Input: x - a list of x-coordinates
-               y - a list of y-coordinates
-               z - a list of z-coordinates
-               (requirement: x, y and z must have the same length)
-        Output: distance - returned list of distance
-                           (points outside conductor have positive values,
-                            points inside have negative values)
-        (Note: other parameters are not used, but kept here to be compatible with warp)
+        """Compute the distance to the conductor.
+
+        Args:
+          xcent, ycent, zcent: Coordinate of conductor center (unncessary for STLconductor, but legacy of Warp code) 
+          x: A list of x-coordinates
+          y: A list of y-coordinates
+          z: A list of z-coordinates
+          (x, y and z must have the same length)
+          distance: A list to store the computed distance
+
+        Returns:
+          distance: A list. Points outside conductor have positive values, and those inside have negative values.
         """
         nx = len(x)
         if nx != len(y) or nx != len(z):
@@ -181,34 +230,33 @@ class STLconductor(Assembly):
     # end of conductord function
 
     def intercept(self, xx, yy, zz, vx, vy, vz):
-        """
-        calculates the location were particles with the given velocities
-        most recently intersected the conductor
-        Input : xx, yy, zz - a list of x, y, and z coordinates of particles' positions
-                vx, vy, vz - a list of x, y, and z components of particles' velocities
-        Output : ??
-        """
+        """Compute the location were particles with the given velocities."""
         raise Exception("STLconductor intercept not yet implemented")
 
     # end of intercept function
 
     def conductorfnew(self, xcent, ycent, zcent, intercepts, fuzz):
-        """
-        interface of generating x, y, z intercepts
-        Input: intercepts - Fortran data structure ConductorInterceptType
-                            for storing intercepts relevant info
-                fuzz - fuzzy number (required by Warp, but not used in STLconductor.
-                                     STLconductor uses its own fuzz self._fuzz)
-        Output: intercepts - ready to be used by "conductordelfromintercepts"
+        """Generate x, y, z intercepts.
+        
+        Warning: STLconductor caches xi, yi, and zi to save computational time
+        by assuming that CAD conductors, once installed, never change during a simulation.
+        Warp code recomputes intercepts for the MG field solver every PIC step.
+        This is inefficient but tolerable for Warp's built-in geometries.
+        However, computing intercepts for CAD conductors is very time consuming,
+        and recomputing these intercepts every PIC step is unacceptable.
+
+        Args:
+          xcent, ycent, zcent: Coordinate of conductor center (unncessary for STLconductor, but legacy of Warp code) 
+          intercepts: Fortran data structure ConductorInterceptType to store computed intercepts used by Warp.
+          fuzz: fuzzy number. Required by Warp, but not used in STLconductor.
+
+        Returns:
+          xi: xintercepts having the structure of xi[0:nxicpt, ny, nz]
+          yi: yintercepts having the structure of yi[0:nyicpt, nx, nz]
+          zi: zintercepts having the structure of zi[0:nzicpt, nx, ny]
+          (xi, yi, and zi are not used by Warp, but only used for users' own purpose.)
         """
 
-        # Warning: STLconductor caches xi, yi, and zi to save computational time
-        # by assuming that CAD conductors, once installed, never change
-        # during a simulation.
-        # Warp code recomputes intercepts for the MG field solver every PIC step.
-        # This is inefficient but tolerable for Warp's built-in geometries.
-        # However, computing intercepts for CAD conductors is very time consuming,
-        # and recomputing these intercepts every PIC step is unacceptable.
         mglevel = intercepts.mglevel
         if mglevel == 0:
             self._dx0 = np.array([intercepts.dx, intercepts.dy, intercepts.dz])
@@ -267,13 +315,19 @@ class STLconductor(Assembly):
 
 
     def _conductorfnew_impl(self, intercepts):
-        """
-        actual function that calculates and returns x, y, z intercepts
-        Input: intercepts - Fortran data structure ConductorInterceptType
-                            for storing intercepts relevant info
-        Output: xi[0:nxicpt, ny, nz] - xintercepts
-                yi[0:nyicpt, nx, nz] - yintercepts
-                zi[0:nzicpt, nx, ny] - zintercepts
+        """Function that does the actual compuation of intercepts.
+        
+        conductorfnew is the public interface and calls this private member function
+        to do the actual computation.
+
+        Args:
+          intercepts: Fortran data structure ConductorInterceptType to store computed intercepts used by Warp.
+
+        Returns:
+          xi: xintercepts having the structure of xi[0:nxicpt, ny, nz]
+          yi: yintercepts having the structure of yi[0:nyicpt, nx, nz]
+          zi: zintercepts having the structure of zi[0:nzicpt, nx, ny]
+          (xi, yi, and zi are not used by Warp, but only used for users' own purpose.)
         """
 
         # number of mesh nodes of simulation box
@@ -419,9 +473,7 @@ class STLconductor(Assembly):
     # end of _conductorfnew_impl function
 
     def _intersect3D_lineseg_triangle(self, lineseg, triangle):
-        """
-        find intersection of a line segment with a triangle
-        """
+        """Find intersection of a line segment with a triangle."""
         ray = Ray(lineseg)
         t = self._intersect3D_ray_triangle(ray, triangle)
         if t is None or t > 1.0:
@@ -431,14 +483,14 @@ class STLconductor(Assembly):
     # end of _intersect3D_lineseg_triangle function
 
     def _intersect3D_ray_triangle_moller(self, ray, triangle):
+        """Find ray-triangle intersection by Moller-Trumbore's scheme.
+
+        See [Tomas Moller and Ben Trumbore, "Fast, Minimum Storage Ray-Triangle Intersection".
+        Jounal of Graphics Tools. 2: 21-28. doi:10.1080/10867651.1997.10487468].
+        Current python implementation is based on the c code publicly available through
+        http://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/raytri/
+        Performance analysis can also be found.
         """
-        Moller-Trumbore's ray-triangle intersection finding scheme
-        """
-        # See [Tomas Moller and Ben Trumbore, "Fast, Minimum Storage Ray-Triangle Intersection".
-        # Jounal of Graphics Tools. 2: 21-28. doi:10.1080/10867651.1997.10487468].
-        # Current python implementation is based on the c code publicly available through
-        # http://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/raytri/
-        # Performance analysis can also be found.
 
         rorig = ray.orig
         rdir = ray.dir
@@ -474,13 +526,13 @@ class STLconductor(Assembly):
     # end of _intersect3D_ray_triangle_moller function
 
     def _intersect3D_ray_triangle_watertight(self, ray, triangle):
+        """ Find ray-triangle intersection by Watertight scheme.
+
+        See [Sven Woop, Carsten Benthin and Ingo Wald, "Watertight Ray/Triangle Intersection".
+        Jounal of Computer Graphics Techniques. Vol.2, No.1: 65-82 (2013). http://jcgt.org/published/0002/01/05/].
+        Another helpful discussion on this algorithm can also be found in
+        https://www.allthingsphi.com/blog/2016/12/18/watertight-ray-triangle-intersection.html.
         """
-        Watertight ray-triangle intersection finding scheme
-        """
-        # See [Sven Woop, Carsten Benthin and Ingo Wald, "Watertight Ray/Triangle Intersection".
-        # Jounal of Computer Graphics Techniques. Vol.2, No.1: 65-82 (2013). http://jcgt.org/published/0002/01/05/].
-        # Another helpful discussion on this algorithm can also be found in
-        # https://www.allthingsphi.com/blog/2016/12/18/watertight-ray-triangle-intersection.html.
 
         rorig = ray.orig
         rdir = ray.dir
@@ -542,10 +594,12 @@ class STLconductor(Assembly):
     # end of _intersect3D_ray_triangle_watertight function
 
     def _gen_intercepts(self, imp, rmin, rmax, ncells, coord, dx, boxlo, boxhi, vertices):
-        """
-        generate the x-, y-, or z-intercepts based on vertices.
-        If successful, the generated intercepts will be passed
-        to "produce" intercepts array ready for use by warp
+        """Generate the x-, y-, or z-intercepts based on vertices.
+
+        This function should check whether the intercepts generated is legal or not.
+        For example, an obvious illegal situation is that the number of intercepts along one PIC mesh line is odd.
+        (More criteria may be included in the future.)
+        If the intercepts is legal, they will be passed to "produce" intercepts array ready for use by warp.
         """
         m = ncells[imp[1]]; n = ncells[imp[2]]
         ax1 = coord[imp[1]]; ax2 = coord[imp[2]]
@@ -583,10 +637,7 @@ class STLconductor(Assembly):
     # end of _gen_intercepts function
 
     def _produce_intercepts(self, intercepts):
-        """
-        produce the intercepts array ready for use by warp
-        the returned array is column major in favor of Fortran.
-        """
+        """Produce the intercepts array ready for use by warp. The returned array is column major in favor of Fortran."""
 
         if intercepts == -1: return None, False
 
