@@ -31,10 +31,11 @@ class JobRunner(object):
                    -5: 'unkown failure/array pending'  # Not a NERSC Term. Internal designation for unknown error.
                    }
 
-    def __init__(self, server, username, key_filename=None, array_tasks=None):
+    def __init__(self, server, username, key_filename=None, host_keys=None, array_tasks=None):
         self.server = server
         self.username = username
         self.key_filename = key_filename
+        self.host_keys = host_keys
         self.array_tasks = array_tasks
 
         # Remote Directory containing batch file, Warp input file, and COMPLETE flag file
@@ -50,7 +51,7 @@ class JobRunner(object):
         self._full_status = []
 
         # establish canonical client for instance use
-        self.client = self.establish_ssh_client(self.server, self.username, key_filename)
+        self.client = self.establish_ssh_client(self.server, self.username, key_filename, host_keys=self.host_keys)
         # if needed sftp will be opened
         self.sftp_client = None
         self.job_flag = None
@@ -76,12 +77,12 @@ class JobRunner(object):
             self._output_directory = directory
 
     @staticmethod
-    def establish_ssh_client(server, username, key_filename):
+    def establish_ssh_client(server, username, key_filename, host_keys=None):
         paramiko.util.log_to_file('test.log')
         try:
             client = paramiko.SSHClient()
 
-            client.load_system_host_keys()
+            client.load_system_host_keys(filename=host_keys)
             client.connect(hostname=server, username=username, key_filename=key_filename)
         except IOError, e:
             print "Failed to connect to server on: {}@{}\n".format(username, server)
@@ -112,7 +113,8 @@ class JobRunner(object):
         if not self.client.get_transport() or self.client.get_transport().is_active() != True:
             if verbose:
                 print "Reopening SSH Client"
-            self.client = self.establish_ssh_client(self.server, self.username, self.key_filename)
+            self.client = self.establish_ssh_client(self.server, self.username, self.key_filename,
+                                                    host_keys=self.host_keys)
 
             return self.client
         else:

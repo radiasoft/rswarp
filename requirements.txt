@@ -1,3 +1,6 @@
 pykern
 matplotlib
 h5py
+numpy
+paramiko
+pyyaml
