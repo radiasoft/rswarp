@@ -4,7 +4,7 @@ import numpy as np
 import paramiko
 import yaml
 import stat
-from time import sleep, ctime
+from time import sleep, ctime, time
 from re import findall
 from itertools import izip_longest
 from rswarp.run_files.tec.tec_utilities import write_parameter_file
@@ -31,7 +31,7 @@ class JobRunner(object):
                    -5: 'unkown failure/array pending'  # Not a NERSC Term. Internal designation for unknown error.
                    }
 
-    def __init__(self, server, username, key_filename=None, array_tasks=0):
+    def __init__(self, server, username, key_filename=None, array_tasks=None):
         self.server = server
         self.username = username
         self.key_filename = key_filename
@@ -103,6 +103,12 @@ class JobRunner(object):
             return e
 
     def refresh_ssh_client(self, verbose=False):
+        # Experiment to deal with refresh not working
+        # seems like a second call fixes the problem so we'll run the checks without observing output one time
+        self.client.get_transport()
+        self.client.get_transport().is_active()
+
+        # Actual check for live client
         if not self.client.get_transport() or self.client.get_transport().is_active() != True:
             if verbose:
                 print "Reopening SSH Client"
@@ -214,7 +220,7 @@ class JobRunner(object):
 
         if self.array_tasks:
             assert len(self.job_ids) == 1, "Array job must return only 1 ID number"
-            for i in range(self.array_tasks):
+            for i in self.array_tasks:
                 self.job_ids.append(str(self.job_ids[0] + '_' + str(i)))
             self.job_ids.pop(0)
 
@@ -388,17 +394,26 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
     """
     batchfile_list = []
     runfile_list = []
+    unevaluated = []
     directory = 'generation_{}'.format(generation)
     if not os.path.exists(directory):
         os.makedirs(directory)
     # Create .yaml files
     for i, individual in enumerate(population):
+        if individual.fitness.valid:
+            # If the individual already has a fitness assigned then do nothing
+            continue
+        unevaluated.append(i)
+
         individual = dict(individual, **simulation_parameters)
         individual['run_id'] = '{}-{}'.format(generation, i)
 
         filepath = os.path.join(directory, 'tec_design_{}.yaml'.format(individual['run_id']))
         runfile_list.append(filepath)
         write_parameter_file(individual, filepath)
+
+    if len(unevaluated) == 0:
+        return None, None, None
 
     # create associated batch files
     if type(batch_format) == dict:
@@ -409,9 +424,9 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
         raise TypeError("batch_format must be a file name or dictionary")
 
     # handle formatting for array jobs
+    formatter = parse_numerical_list(unevaluated)
     if batch_format['batch_header'].find('#SBATCH --array=') != -1:
-        batch_format['batch_instructions']['array'] = '0-{}%{}'.format(len(population) - 1,
-                                                                       batch_format['batch_instructions']['array_simultaneous'])
+        batch_format['batch_instructions']['array'] = formatter + '%{}'.format(batch_format['batch_instructions']['array_simultaneous'])
         array_job = True
         batch_files = 1
     else:
@@ -438,7 +453,18 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
             f.writelines(run_strings.format(gen=generation, id=i, **batch_format['batch_instructions']))
             f.write(run_tail.format(gen=generation, id=i, **batch_format['batch_instructions']))
 
-    return batchfile_list, runfile_list
+    return batchfile_list, runfile_list, unevaluated
+
+
+def parse_numerical_list(input):
+    # If a continuous range is present return start-end
+    # else return comma separated list
+
+    for i in range(1, len(input)):
+        if input[i] != input[i - 1] + 1:
+            return ','.join([str(x) for x in input])
+
+    return '{}-{}'.format(input[0], input[-1])
 
 
 def save_generation(filename, population, generation, labels=None, overwrite_generation=False):
@@ -502,30 +528,22 @@ def return_efficiency(generation, population, directory):
     files = os.listdir(directory)
     for i, individual in enumerate(population):
         if "efficiency_id{}-{}.h5".format(generation, i) not in files:
-            efficiency.append('nan')
+            efficiency.append(np.nan)
             continue
         else:
             f = os.path.join(directory, "efficiency_id{}-{}.h5".format(generation, i))
             data = h5.File(f, 'r')
 
-            penalty = 0
-            total_power = 0.0
-            for attr in ['P_ew', 'P_r', 'P_ec', 'P_load', 'P_gate']:
-                total_power += abs(data['efficiency'].attrs[attr])
-                if data['efficiency'].attrs[attr] < 0.0:
-                    penalty += data['efficiency'].attrs[attr]
+            if data.attrs['complete'] == 0 or data.attrs['complete'] == 3:
+                efficiency.append(data['efficiency'].attrs['eta'])
+            else:
+                efficiency.append(np.nan)
 
-            # TODO: reassess this penalty factor compared to FMU penalty method
-            penalty = 1.0 + abs(penalty / total_power)
-            # print penalty, data['efficiency'].attrs['eta'], abs(data['efficiency'].attrs['eta']) * -penalty, \
-            #     data['efficiency'].attrs['P_load'] > data['efficiency'].attrs['P_gate'], i
-            efficiency.append(abs(data['efficiency'].attrs['eta']) * -penalty)
             data.close()
 
-    min_eff = np.array(efficiency).min()
-    for i in range(len(population)):
-        if population[i] == 'nan':
-            population[i] = min_eff
+    # Runs that do no complete
+    min_eff = np.nanmin(np.array(efficiency))
+    efficiency = np.isnan(efficiency) * min_eff + np.nan_to_num(efficiency)
 
     return efficiency
 
