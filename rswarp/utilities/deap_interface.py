@@ -308,7 +308,7 @@ class JobRunner(object):
             if array_task:
                 parent_status, _ = self.get_job_state(self.job_ids[0][:-2])
                 parent_status = [parent_status]
-                print(parent_status[0])
+                print("Parent {} status: {}".format(self.job_ids[0][:-2], self.status_code[parent_status[0]]))
 
             if verbose > 1:
                 print("Job status:")
@@ -528,7 +528,7 @@ def return_efficiency(generation, population, directory):
     """
     efficiency = []
     files = os.listdir(directory)
-    for i, individual in enumerate(population):
+    for i in population:
         if "efficiency_id{}-{}.h5".format(generation, i) not in files:
             efficiency.append(np.nan)
             continue
@@ -544,6 +544,8 @@ def return_efficiency(generation, population, directory):
             data.close()
 
     # Runs that do no complete
+    # TODO: Doing this here is making it so that the floor efficiency can jump even though nothing has improved
+    # that much since only a subset are run each time.
     min_eff = np.nanmin(np.array(efficiency))
     efficiency = np.isnan(efficiency) * min_eff + np.nan_to_num(efficiency)
 
