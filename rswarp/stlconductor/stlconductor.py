@@ -96,7 +96,7 @@ class STLconductor(Assembly):
     """
     def __init__(self, filename, voltage=0.,
                        xcent=0., ycent=0., zcent=0.,
-                       raytri_scheme="watertight", precision_decimal=None, normalization_factor=None, fuzz=1e-14,
+                       raytri_scheme="watertight", precision_decimal=None, normalization_factor=None, fuzz=1e-12,
                        disp="none", verbose="off", condid="next", **kw):
         """Initialize a stl conductor.
 
@@ -171,6 +171,64 @@ class STLconductor(Assembly):
 
             self.surface = pymesh.form_mesh(vertices, self.surface.faces)
 
+        # select actual conductord
+        # precompute and cache necessary attributes
+        try:
+            # check if "pymesh.signed_distance_to_mesh" is available or not
+            # if so, build conductord based on this fast query function
+            # if not, build conductord based on the combination of
+            # "pymesh.compute_winding_number" and "pymesh.distance_to_mesh"
+            pymesh.signed_distance_to_mesh
+            self._conductord = self._conductord_signed
+
+            # initialize BVHengine
+            # bvh.load_mesh creating AABB tree is expensive for large mesh
+            # so bvh is cached here, and can be passed to and directly used by
+            # pymesh.signed_distance_to_mesh function later
+            self._bvh = pymesh.BVH("igl", self.surface.dim)
+            self._bvh.load_mesh(self.surface)
+
+            # face_normals, vertex_normals, edge_normals and edge_map are necessary for signed_distance_to_mesh query
+            # caching them can improve the performance for successive queries
+            # but adding these attributes to surface is optional here
+            # if the surface or mesh instance does not have these necessary attributes,
+            # they will be added automatically when "pymesh.signed_disntace_to_mesh" is called
+
+            # compute and cache face_normals used for pymesh.signed_distance_to_mesh queries
+            face_normals = pymesh.face_normals(self.surface.vertices, self.surface.faces)
+            self.surface.add_attribute("face_normals")
+            self.surface.add_attribute("face_normals_shape")
+            self.surface.set_attribute("face_normals", face_normals)
+            self.surface.set_attribute("face_normals_shape", np.array(face_normals.shape))
+
+            # compute and cache vertex_normals used for pymesh.signed_distance_to_mesh queries
+            vertex_normals = pymesh.vertex_normals(self.surface.vertices, self.surface.faces, face_normals)
+            self.surface.add_attribute("vertex_normals")
+            self.surface.add_attribute("vertex_normals_shape")
+            self.surface.set_attribute("vertex_normals", vertex_normals)
+            self.surface.set_attribute("vertex_normals_shape", np.array(vertex_normals.shape))
+
+            # compute and cache edge_normals and edge_map used for pymesh.signed_distance_to_mesh queries
+            edge_normals, _, edge_map = pymesh.edge_normals(self.surface.vertices, self.surface.faces, face_normals)
+            self.surface.add_attribute("edge_normals")
+            self.surface.add_attribute("edge_map")
+            self.surface.add_attribute("edge_normals_shape")
+            self.surface.add_attribute("edge_map_shape")
+            self.surface.set_attribute("edge_normals", edge_normals)
+            self.surface.set_attribute("edge_map", edge_map)
+            self.surface.set_attribute("edge_normals_shape", np.array(edge_normals.shape))
+            self.surface.set_attribute("edge_map_shape", np.array(edge_map.shape))
+        except AttributeError:
+            # signed_distance_to_mesh is not available in pymesh installed
+            self._conductord = self._conductord_winding_squared
+
+            # initialize BVHengine
+            # bvh.load_mesh creating AABB tree is expensive for large mesh
+            # so bvh is cached here, and can be passed to and directly used by
+            # pymesh.distance_to_mesh function later
+            self._bvh = pymesh.BVH("auto", self.surface.dim)
+            self._bvh.load_mesh(self.surface)
+
         self._surface_boxlo = np.amin(self.surface.vertices, axis=0)
         self._surface_boxhi = np.amax(self.surface.vertices, axis=0)
 
@@ -221,13 +279,60 @@ class STLconductor(Assembly):
             raise Exception("input lists of coordinates must have same length")
 
         pts = np.array([x, y, z]).transpose()
+
+        self._conductord(pts, distance)
+
+    # end of conductord function
+
+    def _conductord_winding_squared(self, pts, distance):
+        """Compute and returned the signed distances between particles and mesh.
+
+        
+        The distances are computed via the functions of winding number and squared distance provided by PyMesh.
+        PyMesh's distance_to_mesh function needs to compute BVH engine every time it is called.
+        The PyMesh library has been modified so distance_to_mesh can take BVH engine as an argument
+        to avoid this time consuming step called every time.
+
+        Args:
+          pts: numpy.ndarray of Nx3 storing the positions of particles for query. 
+          distance: A list to store the computed distance
+
+        Return:
+          distance: A list. Points outside conductor have positive values, and those inside have negative values.
+        """
         winding_number = pymesh.compute_winding_number(self.surface, pts)
         winding_number[np.abs(winding_number) < self._winding_fuzz] = 0.0
         pts_inside = winding_number > 0.
-        distance[:] = np.sqrt(pymesh.distance_to_mesh(self.surface, pts)[0])
+
+        try:
+            distance[:], _, _ = pymesh.distance_to_mesh(self.surface, pts, bvh=self._bvh)
+        except TypeError:
+            distance[:], _, _ = pymesh.distance_to_mesh(self.surface, pts)
+
+        distance[:] = np.sqrt(distance)
         distance[pts_inside] *= -1
 
-    # end of conductord function
+    # end of _conductord_winding_squared function
+
+    def _conductord_signed(self, pts, distance):
+        """Compute and returned the signed distances between particles and mesh.
+
+        
+        The distances are computed via the signed_disntace_to_mesh function.
+        This is based on IGL library's igl::signed_distance_pseudonormal,
+        and provided by our modified PyMesh library.
+
+        Args:
+          pts: numpy.ndarray of Nx3 storing the positions of particles for query. 
+          distance: A list to store the computed distance
+
+        Return:
+          distance: A list. Points outside conductor have positive values, and those inside have negative values.
+        """
+        
+        distance[:], _, _, _ = pymesh.signed_distance_to_mesh(self.surface, pts, bvh=self._bvh)
+
+    # end of _conductord_signed function
 
     def intercept(self, xx, yy, zz, vx, vy, vz):
         """Compute the location were particles with the given velocities."""
