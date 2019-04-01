@@ -98,7 +98,7 @@ class PlotDensity(object):
     def generate_plots_2d(self):
         scatter_plots = []
         for cond in self.conductors.itervalues():
-            face_data = self.generate_plot_data_for_face_2d(cond)
+            face_data = self.generate_plot_data_for_faces_2d(cond)
             for (x, z, s) in face_data:
                 if np.min(s) < 0.0:
                     scatter_plots.append(self.ax.scatter(z, x, c=s, s=1, linewidths=0, zorder=50))
@@ -106,7 +106,7 @@ class PlotDensity(object):
                     scatter_plots.append(self.ax.scatter(z, x, c=s, cmap=self.cmap, s=1, linewidths=0, zorder=50))
         ColorbarBase(self.ax_colorbar, cmap=self.cmap, norm=self.cmap_normalization)
 
-    def generate_plot_data_for_face_2d(self, cond):
+    def generate_plot_data_for_faces_2d(self, cond):
         minS, maxS = maxint, 0
         data = []
         for face in cond.generate_faces_2d():
@@ -127,7 +127,7 @@ class PlotDensity(object):
         contour_plots = []
         for cond in self.conductors.itervalues():
 
-            face_data = self.generate_plot_data_for_face_3d(cond)
+            face_data = self.generate_plot_data_for_faces_3d(cond)
             for (x, y, z, s ) in face_data:
                 if isinstance(cond, conductor_type_3d['Unstructured']):
                     pts = mlab.points3d(x, y, z, s, scale_mode='none', scale_factor=0.002)
@@ -146,7 +146,7 @@ class PlotDensity(object):
         mlab.colorbar(object=contour_plots[0], orientation='vertical')
         mlab.show()
 
-    def generate_plot_data_for_face_3d(self, cond):
+    def generate_plot_data_for_faces_3d(self, cond):
         minS, maxS = maxint, 0
         data = []
         for face in cond.generate_faces_3d():
