@@ -123,11 +123,11 @@ def test(
         gap_distance,
         rho_load,
         run_id,
-        injection_type,
-        random_seed,
-        install_grid,
-        max_wall_time,
-        particle_diagnostic_switch,
-        field_diagnostic_switch,
-        lost_diagnostic_switch,
+        injection_type=injection_type,
+        random_seed=random_seed,
+        install_grid=install_grid,
+        max_wall_time=max_wall_time,
+        particle_diagnostic_switch=particle_diagnostic_switch,
+        field_diagnostic_switch=field_diagnostic_switch,
+        lost_diagnostic_switch=lost_diagnostic_switch
     )
