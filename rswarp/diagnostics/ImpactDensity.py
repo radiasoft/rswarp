@@ -92,8 +92,6 @@ class PlotDensity(object):
         else:
             self.normalization = Normalize
             self.dy = w3d.dy
-            #self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
-            #self.clf = mlab.clf()
 
     def generate_plots_2d(self):
         scatter_plots = []
@@ -123,6 +121,9 @@ class PlotDensity(object):
         return data
 
     def generate_plots_3d(self):
+        self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
+        self.clf = mlab.clf()
+
         minS, maxS = maxint, 0
         contour_plots = []
         for cond in self.conductors.itervalues():
