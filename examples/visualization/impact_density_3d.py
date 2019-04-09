@@ -57,8 +57,7 @@ b = Box(xsize=0.3, ysize=0.3, zsize=0.3, xcent=0.35, ycent=0.35, zcent=0.55, vol
 k = Cone(r_zmin = 0.05, r_zmax =0.1, length=0.3, theta=-np.pi / 2., phi=0., xcent=0.0, 
     ycent=0.0, zcent=0.4, voltage=+5.0)
 
-#installed_conductors = [c, b, k,]
-installed_conductors = [b,]
+installed_conductors = [c, b, k,]
 
 E = MultiGrid3D()
 registersolver(E)
