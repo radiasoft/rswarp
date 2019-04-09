@@ -4,7 +4,7 @@ u"""rswarp setup script
 :copyright: Copyright (c) 2016 RadiaSoft LLC.  All Rights Reserved.
 :license: http://www.apache.org/licenses/LICENSE-2.0.html
 """
-from setuptools import setup
+from pykern.pksetup import setup
 
 setup(
     name='rswarp',
@@ -24,5 +24,4 @@ setup(
         'Programming Language :: Python',
         'Topic :: Utilities',
     ],
-    scripts=['rswarp/run_files/tec/run_warp.py', 'rswarp/run_files/tec/run_warp_nersc.py']
 )

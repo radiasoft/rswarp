@@ -56,10 +56,11 @@ class Conductor(object):
 
         if scraped_parts.shape[1] > self.thresshold:
             if self.interpolation == 'kde':
-                kernel = gaussian_kde(scraped_parts)
-                # TODO: Fix normalization of points produced by KDE
-                # Using badly estimated volume to try and roughly normalize right now
-                s = kernel(mesh).T / pids.size * np.abs(np.prod(np.max(scraped_parts, axis=1) - np.min(scraped_parts, axis=1))) #/ mesh.size
+                # Bandwidth based on Scott's rule with empirically determinted factor of 1/3 to reduce smoothing
+                bandwdith = scraped_parts.shape[1]**(-1. / (scraped_parts.shape[0] + 4)) / 3.0
+                kernel = gaussian_kde(scraped_parts, bw_method=bandwdith)
+                # Remove gaussian normalization factor
+                s = kernel(mesh).T * kernel._norm_factor
         else:
             s = np.ones_like(mesh[0, :]) * -1.0
 

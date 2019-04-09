@@ -3,12 +3,17 @@ import h5py as h5
 import numpy as np
 import paramiko
 import yaml
-from time import sleep, ctime
+import stat
+from time import sleep, ctime, time
 from re import findall
 from itertools import izip_longest
 from rswarp.run_files.tec.tec_utilities import write_parameter_file
 
 # TODO: Put in a graceful stop if connection can't be made. Should record time.
+# TODO: Running a new command after the connection has been idle sometimes has resulted in  error:
+#   "No handlers could be found for logger "paramiko.transport"" adding a log file may resolve this, but the log file
+#    is just a static name right now.
+
 
 class JobRunner(object):
     status_code = {'pending': 0,
@@ -17,13 +22,20 @@ class JobRunner(object):
                    'timeout': -3,
                    'cancelled': -4,
                    'cancelled+': -4,
-                   'failure': -5  # Not a NERSC Term. Internal designation for unknown error.
+                   'failure': -5,  # Not a NERSC Term. Internal designation for unknown error.
+                   0: 'pending',
+                   -1: 'running',
+                   -2: 'completed',
+                   -3: 'timeout',
+                   -4: 'cancelled',
+                   -5: 'unkown failure/array pending'  # Not a NERSC Term. Internal designation for unknown error.
                    }
 
-    def __init__(self, server, username, key_filename=None, array_tasks=0):
+    def __init__(self, server, username, key_filename=None, host_keys=None, array_tasks=None):
         self.server = server
         self.username = username
         self.key_filename = key_filename
+        self.host_keys = host_keys
         self.array_tasks = array_tasks
 
         # Remote Directory containing batch file, Warp input file, and COMPLETE flag file
@@ -31,7 +43,7 @@ class JobRunner(object):
         self._project_directory = []
 
         # Remote directory containing any output from simulation
-        self.output_directory = []
+        self._output_directory = []
 
         # SLURM IDs for current job being executed
         self.job_ids = []
@@ -39,7 +51,7 @@ class JobRunner(object):
         self._full_status = []
 
         # establish canonical client for instance use
-        self.client = self.establish_ssh_client(self.server, self.username, key_filename)
+        self.client = self.establish_ssh_client(self.server, self.username, key_filename, host_keys=self.host_keys)
         # if needed sftp will be opened
         self.sftp_client = None
         self.job_flag = None
@@ -56,20 +68,21 @@ class JobRunner(object):
 
     @property
     def output_directory(self):
-        return self._project_directory
+        return self._output_directory
     @output_directory.setter
     def output_directory(self, directory):
         if type(directory) != list and type(directory) != tuple:
-            self._project_directory = [directory, ]
+            self._output_directory = [directory, ]
         else:
-            self._project_directory = directory
+            self._output_directory = directory
 
     @staticmethod
-    def establish_ssh_client(server, username, key_filename):
+    def establish_ssh_client(server, username, key_filename, host_keys=None):
+        paramiko.util.log_to_file('test.log')
         try:
             client = paramiko.SSHClient()
 
-            client.load_system_host_keys()
+            client.load_system_host_keys(filename=host_keys)
             client.connect(hostname=server, username=username, key_filename=key_filename)
         except IOError, e:
             print "Failed to connect to server on: {}@{}\n".format(username, server)
@@ -90,14 +103,23 @@ class JobRunner(object):
             print "Failed to connect to establish sftp connection.\n"
             return e
 
-    def refresh_ssh_client(self):
+    def refresh_ssh_client(self, verbose=False):
+        # Experiment to deal with refresh not working
+        # seems like a second call fixes the problem so we'll run the checks without observing output one time
+        self.client.get_transport()
+        self.client.get_transport().is_active()
+
+        # Actual check for live client
         if not self.client.get_transport() or self.client.get_transport().is_active() != True:
-            print "Reopening SSH Client"
-            self.client = self.establish_ssh_client(self.server, self.username, self.key_filename)
+            if verbose:
+                print "Reopening SSH Client"
+            self.client = self.establish_ssh_client(self.server, self.username, self.key_filename,
+                                                    host_keys=self.host_keys)
 
             return self.client
         else:
-            print "SSH Client is live"
+            if verbose:
+                print "SSH Client is live"
             return self.client
 
     def upload_file(self, remote_directory, upload_files, debug=False):
@@ -175,6 +197,7 @@ class JobRunner(object):
         self.refresh_ssh_client()
 
         for p, j in izip_longest(self.project_directory, job_name, fillvalue=self.project_directory[-1]):
+            j = os.path.split(j)[-1]
             print 'Starting batch file: {} in directory {}'.format(j, p)
 
             # Check for path existence
@@ -199,7 +222,7 @@ class JobRunner(object):
 
         if self.array_tasks:
             assert len(self.job_ids) == 1, "Array job must return only 1 ID number"
-            for i in range(self.array_tasks):
+            for i in self.array_tasks:
                 self.job_ids.append(str(self.job_ids[0] + '_' + str(i)))
             self.job_ids.pop(0)
 
@@ -230,7 +253,7 @@ class JobRunner(object):
         labels = stdout.splitlines()[0].split()
         data = None
         for ln in stdout.splitlines():
-            if ln.find('{} '.format(jobid)) == 0:
+            if ln.find('{}'.format(jobid)) == 0:
                 data = ln.split()
                 break
         # If data format is bad catch here
@@ -285,18 +308,25 @@ class JobRunner(object):
             if array_task:
                 parent_status, _ = self.get_job_state(self.job_ids[0][:-2])
                 parent_status = [parent_status]
+                print("Parent {} status: {}".format(self.job_ids[0][:-2], self.status_code[parent_status[0]]))
 
             if verbose > 1:
                 print("Job status:")
                 for jobid, job in zip(self.job_ids, self.job_status):
-                    print("{}: {}".format(jobid, job))
+                    print("{}: {}".format(jobid, self.status_code[job]))
 
+    def download_files(self, local_directory, remote_directory=None, match_string=None):
+        """
+        Download all files in a given remote directory.
+        Args:
+            local_directory (str): Local directory where all downloaded files will be placed.
+            May be relative or absolute.
+            remote_directory (str or list): Absolute path to the remote directories to download files from.
+            match_string (str): If given only files that contain the string will be downloaded.
 
+        Returns:
 
-
-
-    def download_files(self, local_directory, match_string=None):
-        # TODO: stop grabbing folders
+        """
 
         if os.path.isdir(local_directory):
             pass
@@ -306,13 +336,20 @@ class JobRunner(object):
             except OSError as e:
                 raise e
 
+        if remote_directory:
+            self.output_directory = remote_directory
+
         # Make sure we have an SSH connection
         self.refresh_ssh_client()
 
         # Use existing client to run SFTP connection
         sftp_client = self.establish_sftp_client(self.client)
 
-        for output_directory in self.output_directory:
+        for output_directory, status in zip(self.output_directory, self.job_status):
+
+            if status != -2:
+                print("Job was not complete. No files downloaded from {}".format(output_directory))
+                continue
             # Move to output directory
             try:
                 sftp_client.chdir(output_directory)
@@ -320,10 +357,13 @@ class JobRunner(object):
                 print("Failed to retrieve from directory {}".format(output_directory))
                 continue
 
-            for fil in sftp_client.listdir():
-                # If a match_string is given only retrieve files containing match_string
+            for fil in sftp_client.listdir_attr():
+                if stat.S_ISDIR(fil.st_mode):
+                    # Skip if this is a directory
+                    continue
+
                 if match_string:
-                    if match_string in fil:
+                    if match_string in fil.filename:
                         pass
                     else:
                         continue
@@ -332,9 +372,9 @@ class JobRunner(object):
 
                 # Retrieve the next file
                 try:
-                    sftp_client.get(fil, os.path.join(local_directory, fil))
+                    sftp_client.get(fil.filename, os.path.join(local_directory, fil.filename))
                 except IOError as e:
-                    print "File retrieval failed for: {}".format(fil)
+                    print "File retrieval failed for: {}".format(fil.filename)
                     print "Error returned:\n {}".format(e)
                     pass
 
@@ -351,20 +391,31 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
         simulation_parameters: Dictionary with additional parameters that must be supplied at the simulation start
         batch_format: YAML template file or appropriate dictionary
 
-    Returns: None
+    Returns: (list, list) A list of all batch files and a list of all YAML design configuration files
 
     """
+    batchfile_list = []
     runfile_list = []
+    unevaluated = []
     directory = 'generation_{}'.format(generation)
     if not os.path.exists(directory):
         os.makedirs(directory)
     # Create .yaml files
     for i, individual in enumerate(population):
-        individual = dict(individual, **simulation_parameters)
-        individual['run_id'] = i
+        if individual.fitness.valid:
+            # If the individual already has a fitness assigned then do nothing
+            continue
+        unevaluated.append(i)
 
-        filepath = os.path.join(directory, 'tec_design_{}-{}.yaml'.format(generation, individual['run_id']))
+        individual = dict(individual, **simulation_parameters)
+        individual['run_id'] = '{}-{}'.format(generation, i)
+
+        filepath = os.path.join(directory, 'tec_design_{}.yaml'.format(individual['run_id']))
+        runfile_list.append(filepath)
         write_parameter_file(individual, filepath)
+
+    if len(unevaluated) == 0:
+        return None, None, None
 
     # create associated batch files
     if type(batch_format) == dict:
@@ -375,8 +426,9 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
         raise TypeError("batch_format must be a file name or dictionary")
 
     # handle formatting for array jobs
+    formatter = parse_numerical_list(unevaluated)
     if batch_format['batch_header'].find('#SBATCH --array=') != -1:
-        batch_format['batch_instructions']['array'] = '0-{}'.format(len(population) - 1)
+        batch_format['batch_instructions']['array'] = formatter + '%{}'.format(batch_format['batch_instructions']['array_simultaneous'])
         array_job = True
         batch_files = 1
     else:
@@ -388,20 +440,34 @@ def create_runfiles(generation, population, simulation_parameters, batch_format)
             i = 'array'
         filename = batch_format['batch_instructions']['file_base_name'] + '_{}'.format(i)
         run_header = batch_format['batch_header']
+        run_pre = batch_format['batch_pre_command']
         run_strings = batch_format['batch_srun']
-        run_tail = batch_format['batch_tail']
+        run_tail = batch_format['batch_post_command']
 
-        runfile_list.append(filename)
+        batchfile_list.append(os.path.join(directory, filename))
         with open(os.path.join(directory, filename), 'w') as f:
             f.write(run_header.format(id=i, **batch_format['batch_instructions']))
 
             if array_job:
                 i = '$SLURM_ARRAY_TASK_ID'
 
+            f.write(run_pre.format(gen=generation, id=i, **batch_format['batch_instructions']))
             f.writelines(run_strings.format(gen=generation, id=i, **batch_format['batch_instructions']))
             f.write(run_tail.format(gen=generation, id=i, **batch_format['batch_instructions']))
 
-    return runfile_list
+    return batchfile_list, runfile_list, unevaluated
+
+
+def parse_numerical_list(input):
+    # If a continuous range is present return start-end
+    # else return comma separated list
+
+    for i in range(1, len(input)):
+        if input[i] != input[i - 1] + 1:
+            return ','.join([str(x) for x in input])
+
+    return '{}-{}'.format(input[0], input[-1])
+
 
 def save_generation(filename, population, generation, labels=None, overwrite_generation=False):
     # If attributes are not labled then label with an id number
@@ -462,26 +528,26 @@ def return_efficiency(generation, population, directory):
     """
     efficiency = []
     files = os.listdir(directory)
-    for i, individual in enumerate(population):
+    for i in population:
         if "efficiency_id{}-{}.h5".format(generation, i) not in files:
-            efficiency.append(0.0)
+            efficiency.append(np.nan)
             continue
         else:
             f = os.path.join(directory, "efficiency_id{}-{}.h5".format(generation, i))
             data = h5.File(f, 'r')
 
-            penalty = 0
-            total_power = 0.0
-            for attr in ['P_ew', 'P_r', 'P_ec', 'P_load', 'P_gate']:
-                total_power += abs(data['efficiency'].attrs[attr])
-                if data['efficiency'].attrs[attr] < 0.0:
-                    penalty += data['efficiency'].attrs[attr]
+            if data.attrs['complete'] == 0 or data.attrs['complete'] == 3:
+                efficiency.append(data['efficiency'].attrs['eta'])
+            else:
+                efficiency.append(np.nan)
 
-            penalty = 1.0 + abs(penalty / total_power)
-            # print penalty, data['efficiency'].attrs['eta'], abs(data['efficiency'].attrs['eta']) * -penalty, \
-            #     data['efficiency'].attrs['P_load'] > data['efficiency'].attrs['P_gate'], i
-            efficiency.append(abs(data['efficiency'].attrs['eta']) * -penalty)
             data.close()
+
+    # Runs that do no complete
+    # TODO: Doing this here is making it so that the floor efficiency can jump even though nothing has improved
+    # that much since only a subset are run each time.
+    min_eff = np.nanmin(np.array(efficiency))
+    efficiency = np.isnan(efficiency) * min_eff + np.nan_to_num(efficiency)
 
     return efficiency
 
