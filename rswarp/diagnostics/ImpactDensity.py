@@ -94,31 +94,32 @@ class PlotDensity(object):
             self.dy = w3d.dy
 
     def generate_plots_2d(self):
+        minS, maxS = maxint, 0
         scatter_plots = []
         for cond in self.conductors.itervalues():
-            face_data = self.generate_plot_data_for_faces_2d(cond)
+            minS, maxS, face_data = self.generate_plot_data_for_faces_2d(cond, minS, maxS)
             for (x, z, s) in face_data:
                 if np.min(s) < 0.0:
                     scatter_plots.append(self.ax.scatter(z, x, c=s, s=1, linewidths=0, zorder=50))
                 else:
                     scatter_plots.append(self.ax.scatter(z, x, c=s, cmap=self.cmap, s=1, linewidths=0, zorder=50))
+        print('2D MIN {} MAX {}'.format(minS, maxS))
+        self.cmap_normalization = self.normalization(minS, maxS)
         ColorbarBase(self.ax_colorbar, cmap=self.cmap, norm=self.cmap_normalization)
 
-    def generate_plot_data_for_faces_2d(self, cond):
-        minS, maxS = maxint, 0
+    def generate_plot_data_for_faces_2d(self, cond, min_s=maxint, max_s=0):
         data = []
         for face in cond.generate_faces_2d():
             x, z, s = face[0] * self.scale[0], \
                          face[1] * self.scale[1], face[2] * e / self.time * 1e-4
             print("min/max by face", np.min(s), np.max(s))
-            if 0 <= np.min(s) < minS:  # -1 value indicates no particle anywhere on face
-                minS = np.min(s)
-            if np.max(s) > maxS:
-                maxS = np.max(s)
+            if 0 <= np.min(s) < min_s:  # -1 value indicates no particle anywhere on face
+                min_s = np.min(s)
+            if np.max(s) > max_s:
+                max_s = np.max(s)
 
             data.append((x, z, s))
-        self.cmap_normalization = self.normalization(minS, maxS)
-        return data
+        return min_s, max_s, data
 
     def generate_plots_3d(self):
         self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
@@ -128,7 +129,7 @@ class PlotDensity(object):
         contour_plots = []
         for cond in self.conductors.itervalues():
 
-            face_data = self.generate_plot_data_for_faces_3d(cond)
+            minS, maxS, face_data = self.generate_plot_data_for_faces_3d(cond, minS, maxS)
             for (x, y, z, s ) in face_data:
                 if isinstance(cond, conductor_type_3d['Unstructured']):
                     pts = mlab.points3d(x, y, z, s, scale_mode='none', scale_factor=0.002)
@@ -140,6 +141,7 @@ class PlotDensity(object):
                     else:
                         contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='viridis'))
 
+        print('3D MIN {} MAX {}'.format(minS, maxS))
         for cp in contour_plots:
             cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
 
@@ -147,19 +149,18 @@ class PlotDensity(object):
         mlab.colorbar(object=contour_plots[0], orientation='vertical')
         mlab.show()
 
-    def generate_plot_data_for_faces_3d(self, cond):
-        minS, maxS = maxint, 0
+
+    def generate_plot_data_for_faces_3d(self, cond, min_s=maxint, max_s=0):
         data = []
         for face in cond.generate_faces_3d():
             x, y, z, s = face[0] * self.scale[0], face[1] * self.scale[1], \
                          face[2] * self.scale[2], face[3] * e / self.time * 1e-4
 
-            if 0 <= np.min(s) < minS:  # -1 value indicates no particle anywhere on face
-                minS = np.min(s)
-            if np.max(s) > maxS:
-                maxS = np.max(s)
+            if 0 <= np.min(s) < min_s:  # -1 value indicates no particle anywhere on face
+                min_s = np.min(s)
+            if np.max(s) > max_s:
+                max_s = np.max(s)
 
             data.append((x, y, z, s))
 
-        self.cmap_normalization = self.normalization(minS, maxS)
-        return data
+        return min_s, max_s, data

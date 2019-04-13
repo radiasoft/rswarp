@@ -5,80 +5,84 @@ from warp import *
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-w3d.solvergeom = w3d.XYZgeom
+def main():
 
-# Set boundary conditions
-# Longitudinal conditions overriden by conducting plates
-w3d.bound0  = dirichlet
-w3d.boundnz = dirichlet
-w3d.boundxy = periodic
+    w3d.solvergeom = w3d.XYZgeom
 
-# Particles boundary conditions
-top.pbound0  = absorb
-top.pboundnz = absorb
-top.pboundxy = periodic
+    # Set boundary conditions
+    # Longitudinal conditions overriden by conducting plates
+    w3d.bound0  = neumann
+    w3d.boundnz = dirichlet
+    w3d.boundxy = periodic
 
-w3d.xmmin = -0.7
-w3d.xmmax =  0.7
-w3d.ymmin = -0.7
-w3d.ymmax =  0.7
-w3d.zmmin =  0.0
-w3d.zmmax =  1.4
+    # Particles boundary conditions
+    top.pbound0  = absorb
+    top.pboundnz = absorb
+    top.pboundxy = periodic
 
-w3d.nx = 140
-w3d.ny = 140
-w3d.nz = 140
+    w3d.xmmin = -0.7
+    w3d.xmmax =  0.7
+    w3d.ymmin = -0.7
+    w3d.ymmax =  0.7
+    w3d.zmmin =  0.0
+    w3d.zmmax =  1.4
 
-# Particles
-top.inject = 1
-beam = Species(type=Electron, name='beam')
-w3d.l_inj_exact = False
+    w3d.nx = 140
+    w3d.ny = 140
+    w3d.nz = 140
 
-PTCL_PER_STEP = 100
-top.npinject = PTCL_PER_STEP
-w3d.l_inj_addtempz_abs = True 
-w3d.l_inj_exact = True  
-top.linj_rectangle = (w3d.solvergeom == w3d.XYZgeom)
-w3d.l_inj_rz = (w3d.solvergeom == w3d.RZgeom)
+    # Particles
+    top.inject = 1
+    beam = Species(type=Electron, name='beam')
+    w3d.l_inj_exact = False
 
-beam.a0       = w3d.xmmax
-beam.b0       = w3d.ymmax
-beam.ap0      = .0e0
-beam.bp0      = .0e0
-beam.ibeam    = 1e-3
-beam.vzinject = 1.4 / 140 / 1e-10
-beam.vthperp  = 0
-derivqty()
+    PTCL_PER_STEP = 100
+    top.npinject = PTCL_PER_STEP
+    w3d.l_inj_addtempz_abs = True
+    w3d.l_inj_exact = True
+    top.linj_rectangle = (w3d.solvergeom == w3d.XYZgeom)
+    w3d.l_inj_rz = (w3d.solvergeom == w3d.RZgeom)
 
-
-# Conductors
-c = Sphere(radius=0.3, xcent=-0.35, ycent=-0.35, zcent=0.85, voltage=+7.0)
-b = Box(xsize=0.3, ysize=0.3, zsize=0.3, xcent=0.35, ycent=0.35, zcent=0.55, voltage=+3.0)
-k = Cone(r_zmin = 0.05, r_zmax =0.1, length=0.3, theta=-np.pi / 2., phi=0., xcent=0.0, 
-    ycent=0.0, zcent=0.4, voltage=+5.0)
-
-installed_conductors = [c, b, k,]
-
-E = MultiGrid3D()
-registersolver(E)
-for cond in installed_conductors:
-    E.installconductor(cond)
-scraper = ParticleScraper(installed_conductors, lcollectlpdata=True)
-
-# Run
-top.dt = 8e-11
-top.lprntpara = False
-top.lpsplots = False
-package("w3d")
-generate()
-for _ in range(1):
-    step(150)
+    beam.a0       = w3d.xmmax
+    beam.b0       = w3d.ymmax
+    beam.ap0      = .0e0
+    beam.bp0      = .0e0
+    beam.ibeam    = 1e-3
+    beam.vzinject = 1.4 / 140 / 1e-10
+    beam.vthperp  = 0
+    derivqty()
 
 
-# Plotting
-from rswarp.diagnostics.ImpactDensity import PlotDensity
-from mayavi import mlab
-myplot = PlotDensity(None, None, scraper=scraper, top=top, w3d=w3d, interpolation='kde')
-myplot.generate_plots_3d()
+    # Conductors
+    c = Sphere(radius=0.3, xcent=-0.35, ycent=-0.35, zcent=0.85, voltage=+7.0)
+    b = Box(xsize=0.3, ysize=0.3, zsize=0.3, xcent=0.35, ycent=0.35, zcent=0.55, voltage=+3.0)
+    k = Cone(r_zmin = 0.05, r_zmax =0.1, length=0.3, theta=-np.pi / 2., phi=0., xcent=0.0,
+        ycent=0.0, zcent=0.4, voltage=+5.0)
+
+    installed_conductors = [b]
+
+    E = MultiGrid3D()
+    registersolver(E)
+    for cond in installed_conductors:
+        E.installconductor(cond)
+    scraper = ParticleScraper(installed_conductors, lcollectlpdata=True)
+
+    # Run
+    top.dt = 8e-11
+    top.lprntpara = False
+    top.lpsplots = False
+    package("w3d")
+    generate()
+    for _ in range(1):
+        step(150)
 
 
+    # Plotting
+    from rswarp.diagnostics.ImpactDensity import PlotDensity
+    from mayavi import mlab
+    myplot = PlotDensity(None, None, scraper=scraper, top=top, w3d=w3d, interpolation='kde')
+    myplot.generate_plots_3d()
+
+
+if __name__ == "__main__":
+    main()

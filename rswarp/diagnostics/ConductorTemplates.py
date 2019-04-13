@@ -28,7 +28,7 @@ class Conductor(object):
         self.thresshold = 30  # how many particles need to be lost to generate a colormap
         self.points_2d = 1000  # Scatter points per line segment in 2d plots
 
-        self.debug = False
+        self.debug = True
 
         if w3d.solvergeom == w3d.XZgeom or w3d.solvergeom == w3d.RZgeom:
             self.axis = [0, 2, 0, 2]
