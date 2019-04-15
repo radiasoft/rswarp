@@ -76,6 +76,7 @@ class PlotDensity(object):
         self.scale = [1e9, 1e9, 1e9]
 
         self.time = top.dt * top.it
+        print('TOP DT {} IT {} TOTAL {}'.format(top.dt, top.it, self.time))
 
         if w3d.solvergeom == w3d.XZgeom or w3d.solvergeom == w3d.RZgeom:
             self.ax = ax
@@ -158,9 +159,11 @@ class PlotDensity(object):
     def generate_plot_data_for_faces_3d(self, cond, min_s=maxint, max_s=0):
         data = []
         for face in cond.generate_faces_3d():
-            x, y, z, s = face[0] * self.scale[0], face[1] * self.scale[1], \
-                         face[2] * self.scale[2], face[3] * e / self.time * 1e-4
-
+            x, y, z, s = face[0] * self.scale[0],\
+                         face[1] * self.scale[1], \
+                         face[2] * self.scale[2], \
+                         face[3] * e / self.time * 1e-4
+            print('FACE: {} -> S {}'.format(face[3], s))
             if 0 <= np.min(s) < min_s:  # -1 value indicates no particle anywhere on face
                 min_s = np.min(s)
             if np.max(s) > max_s:
