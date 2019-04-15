@@ -53,6 +53,7 @@ class Conductor(object):
         else:
             pids = self.pids
         scraped_parts = self.scraped_particles[:, pids]
+        print('SCRAPED PIDS {}: {} THRESH {}'.format(pids, scraped_parts, self.thresshold))
 
         if scraped_parts.shape[1] > self.thresshold:
             if self.interpolation == 'kde':
