@@ -126,11 +126,9 @@ class PlotDensity(object):
 
         minS, maxS = maxint, 0
         contour_plots = []
-        cx = 0
         for cond in self.conductors.itervalues():
 
             minS, maxS, face_data = self.generate_plot_data_for_faces_3d(cond, minS, maxS)
-            fx = 0
             for (x, y, z, s) in face_data:
                 if isinstance(cond, conductor_type_3d['Unstructured']):
                     pts = mlab.points3d(x, y, z, s, scale_mode='none', scale_factor=0.002)
@@ -141,12 +139,7 @@ class PlotDensity(object):
                         contour_plots.append(mlab.mesh(x, y, z, color=(0, 0, 0), colormap='viridis'))
                     else:
                         contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='viridis'))
-                print('COND {} FACE {} 3D MIN {} MAX {}'.format(cx, fx, minS, maxS))
-                fx += 1
-            print('COND {} 3D MIN {} MAX {}'.format(cx, minS, maxS))
-            cx += 1
 
-        print('TOTAL 3D MIN {} MAX {}'.format(minS, maxS))
         for cp in contour_plots:
             cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
 

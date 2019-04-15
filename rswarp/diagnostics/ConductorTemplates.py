@@ -40,7 +40,6 @@ class Conductor(object):
             self.domain = [w3d.xmmin, w3d.ymmin, w3d.zmmin, w3d.xmmax, w3d.ymmax, w3d.zmmax]
             self.cell_size = [w3d.dx, w3d.dy, w3d.dz]
             self.scraped_particles = np.array([self.top.xplost, self.top.yplost, self.top.zplost])
-            print('TOP {} XP {} YP {} ZP {}'.format(self.top, self.top.xplost, self.top.yplost, self.top.zplost))
 
     def _get_pids(self):
         scraped_particles = np.where(self.top.pidlost[:self.numlost, -1] == self.conductor.condid)[0]
@@ -54,7 +53,6 @@ class Conductor(object):
         else:
             pids = self.pids
         scraped_parts = self.scraped_particles[:, pids]
-        print('SCRAPED PIDS {}: {} THRESH {}'.format(pids, scraped_parts, self.thresshold))
 
         if scraped_parts.shape[1] > self.thresshold:
             if self.interpolation == 'kde':
