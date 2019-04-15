@@ -36,8 +36,8 @@ w3d.l_inj_exact = False
 
 PTCL_PER_STEP = 100
 top.npinject = PTCL_PER_STEP
-w3d.l_inj_addtempz_abs = True 
-w3d.l_inj_exact = True  
+w3d.l_inj_addtempz_abs = True
+w3d.l_inj_exact = True
 top.linj_rectangle = (w3d.solvergeom == w3d.XYZgeom)
 w3d.l_inj_rz = (w3d.solvergeom == w3d.RZgeom)
 
@@ -54,7 +54,7 @@ derivqty()
 # Conductors
 c = Sphere(radius=0.3, xcent=-0.35, ycent=-0.35, zcent=0.85, voltage=+7.0)
 b = Box(xsize=0.3, ysize=0.3, zsize=0.3, xcent=0.35, ycent=0.35, zcent=0.55, voltage=+3.0)
-k = Cone(r_zmin = 0.05, r_zmax =0.1, length=0.3, theta=-np.pi / 2., phi=0., xcent=0.0, 
+k = Cone(r_zmin = 0.05, r_zmax =0.1, length=0.3, theta=-np.pi / 2., phi=0., xcent=0.0,
     ycent=0.0, zcent=0.4, voltage=+5.0)
 
 installed_conductors = [c, b, k,]
@@ -80,5 +80,4 @@ from rswarp.diagnostics.ImpactDensity import PlotDensity
 from mayavi import mlab
 myplot = PlotDensity(None, None, scraper=scraper, top=top, w3d=w3d, interpolation='kde')
 myplot.generate_plots_3d()
-
 

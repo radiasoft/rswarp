@@ -33,8 +33,8 @@ w3d.l_inj_exact = False
 
 PTCL_PER_STEP = 100
 top.npinject = PTCL_PER_STEP
-w3d.l_inj_addtempz_abs = True 
-w3d.l_inj_exact = True  
+w3d.l_inj_addtempz_abs = True
+w3d.l_inj_exact = True
 top.linj_rectangle = (w3d.solvergeom == w3d.XZgeom)
 w3d.l_inj_rz = (w3d.solvergeom == w3d.RZgeom)
 
@@ -83,5 +83,4 @@ ax2 = plt.subplot(gs[1])
 myplot = PlotDensity(ax1, ax2, scraper=scraper, top=top, w3d=w3d, interpolation='kde')
 myplot.generate_plots_2d()
 plt.show()
-
 

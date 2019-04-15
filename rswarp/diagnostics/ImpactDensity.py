@@ -81,31 +81,24 @@ class PlotDensity(object):
             self.ax = ax
             zoffset = 0.05 * np.amax([w3d.zmmin, w3d.zmmax])
             xoffset = 0.05 * np.amax([w3d.xmmin, w3d.xmmax])
-            ax.set_xlim((w3d.zmmin - zoffset) * self.scale[2], (w3d.zmmax + zoffset) * self.scale[2])
-            ax.set_ylim((w3d.xmmin - xoffset) * self.scale[0], (w3d.xmmax + xoffset) * self.scale[0])
+            if ax is not None:
+                ax.set_xlim((w3d.zmmin - zoffset) * self.scale[2], (w3d.zmmax + zoffset) * self.scale[2])
+                ax.set_ylim((w3d.xmmin - xoffset) * self.scale[0], (w3d.xmmax + xoffset) * self.scale[0])
 
             self.ax_colorbar = ax_colorbar
             self.cmap = cm.coolwarm
             self.normalization = Normalize
             self.cmap_normalization = None
         else:
-            self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
-            self.clf = mlab.clf()
+            self.normalization = Normalize
+            self.dy = w3d.dy
 
     def generate_plots_2d(self):
         minS, maxS = maxint, 0
         scatter_plots = []
         for cond in self.conductors.itervalues():
-            print(cond)
-            for face in cond.generate_faces_2d():
-                x, z, s = face[0] * self.scale[0], \
-                             face[1] * self.scale[1], face[2] * e / self.time * 1e-4
-                print("m/m by face", np.min(s), np.max(s))
-                if 0 <= np.min(s) < minS:  # -1 value indicates no particle anywhere on face
-                    minS = np.min(s)
-                if np.max(s) > maxS:
-                    maxS = np.max(s)
-
+            minS, maxS, face_data = self.generate_plot_data_for_faces_2d(cond, minS, maxS)
+            for (x, z, s) in face_data:
                 if np.min(s) < 0.0:
                     scatter_plots.append(self.ax.scatter(z, x, c=s, s=1, linewidths=0, zorder=50))
                 else:
@@ -113,20 +106,30 @@ class PlotDensity(object):
         self.cmap_normalization = self.normalization(minS, maxS)
         ColorbarBase(self.ax_colorbar, cmap=self.cmap, norm=self.cmap_normalization)
 
+    def generate_plot_data_for_faces_2d(self, cond, min_s=maxint, max_s=0):
+        data = []
+        for face in cond.generate_faces_2d():
+            x, z, s = face[0] * self.scale[0], \
+                         face[1] * self.scale[1], face[2] * e / self.time * 1e-4
+            print("min/max by face", np.min(s), np.max(s))
+            if 0 <= np.min(s) < min_s:  # -1 value indicates no particle anywhere on face
+                min_s = np.min(s)
+            if np.max(s) > max_s:
+                max_s = np.max(s)
+
+            data.append((x, z, s))
+        return min_s, max_s, data
+
     def generate_plots_3d(self):
+        self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
+        self.clf = mlab.clf()
+
         minS, maxS = maxint, 0
         contour_plots = []
         for cond in self.conductors.itervalues():
 
-            for face in cond.generate_faces_3d():
-                x, y, z, s = face[0] * self.scale[0], face[1] * self.scale[1], \
-                             face[2] * self.scale[2], face[3] * e / self.time * 1e-4
-
-                if 0 <= np.min(s) < minS:  # -1 value indicates no particle anywhere on face
-                    minS = np.min(s)
-                if np.max(s) > maxS:
-                    maxS = np.max(s)
-
+            minS, maxS, face_data = self.generate_plot_data_for_faces_3d(cond, minS, maxS)
+            for (x, y, z, s) in face_data:
                 if isinstance(cond, conductor_type_3d['Unstructured']):
                     pts = mlab.points3d(x, y, z, s, scale_mode='none', scale_factor=0.002)
                     mesh = mlab.pipeline.delaunay3d(pts)
@@ -143,3 +146,19 @@ class PlotDensity(object):
         mlab.draw()
         mlab.colorbar(object=contour_plots[0], orientation='vertical')
         mlab.show()
+
+    def generate_plot_data_for_faces_3d(self, cond, min_s=maxint, max_s=0):
+        data = []
+        for face in cond.generate_faces_3d():
+            x, y, z, s = face[0] * self.scale[0],\
+                         face[1] * self.scale[1], \
+                         face[2] * self.scale[2], \
+                         face[3] * e / self.time * 1e-4
+            if 0 <= np.min(s) < min_s:  # -1 value indicates no particle anywhere on face
+                min_s = np.min(s)
+            if np.max(s) > max_s:
+                max_s = np.max(s)
+
+            data.append((x, y, z, s))
+
+        return min_s, max_s, data
