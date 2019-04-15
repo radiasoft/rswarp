@@ -229,6 +229,7 @@ class SpherePlot(Conductor):
         z = self.radius * np.cos(theta) + self.center[2]
 
         s = self._color_mesh(mesh=np.vstack([x.ravel(), y.ravel(), z.ravel()]), particle_subset=None).reshape(x.shape)
+        print('SPHERE STACK {} -> S {}'.format(np.vstack([x.ravel(), y.ravel(), z.ravel()]), s))
 
         yield x, y, z, s
 

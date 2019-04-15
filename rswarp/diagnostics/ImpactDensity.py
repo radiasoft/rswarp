@@ -163,7 +163,7 @@ class PlotDensity(object):
                          face[1] * self.scale[1], \
                          face[2] * self.scale[2], \
                          face[3] * e / self.time * 1e-4
-            print('FACE: {} -> S {}'.format(face[3], s))
+            #print('FACE: {} -> S {}'.format(face[3], s))
             if 0 <= np.min(s) < min_s:  # -1 value indicates no particle anywhere on face
                 min_s = np.min(s)
             if np.max(s) > max_s:
