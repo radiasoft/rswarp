@@ -155,7 +155,6 @@ class PlotDensity(object):
         mlab.colorbar(object=contour_plots[0], orientation='vertical')
         mlab.show()
 
-
     def generate_plot_data_for_faces_3d(self, cond, min_s=maxint, max_s=0):
         data = []
         for face in cond.generate_faces_3d():
