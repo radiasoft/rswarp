@@ -40,6 +40,7 @@ class Conductor(object):
             self.domain = [w3d.xmmin, w3d.ymmin, w3d.zmmin, w3d.xmmax, w3d.ymmax, w3d.zmmax]
             self.cell_size = [w3d.dx, w3d.dy, w3d.dz]
             self.scraped_particles = np.array([self.top.xplost, self.top.yplost, self.top.zplost])
+            print('TOP {} XP {} YP {} ZP {}'.format(self.top, self.top.xplost, self.top.yplost, self.top.zplost))
 
     def _get_pids(self):
         scraped_particles = np.where(self.top.pidlost[:self.numlost, -1] == self.conductor.condid)[0]
@@ -230,7 +231,6 @@ class SpherePlot(Conductor):
         z = self.radius * np.cos(theta) + self.center[2]
 
         s = self._color_mesh(mesh=np.vstack([x.ravel(), y.ravel(), z.ravel()]), particle_subset=None).reshape(x.shape)
-        print('SPHERE STACK {} -> S {}'.format(np.vstack([x.ravel(), y.ravel(), z.ravel()]), s))
 
         yield x, y, z, s
 
