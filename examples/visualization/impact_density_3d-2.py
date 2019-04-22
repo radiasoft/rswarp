@@ -38,8 +38,8 @@ w3d.l_inj_exact = False
 
 PTCL_PER_STEP = 100
 top.npinject = PTCL_PER_STEP
-w3d.l_inj_addtempz_abs = True 
-w3d.l_inj_exact = True  
+w3d.l_inj_addtempz_abs = True
+w3d.l_inj_exact = True
 top.linj_rectangle = (w3d.solvergeom == w3d.XYZgeom)
 w3d.l_inj_rz = (w3d.solvergeom == w3d.RZgeom)
 
@@ -81,5 +81,4 @@ from rswarp.diagnostics.ImpactDensity import PlotDensity
 from mayavi import mlab
 myplot = PlotDensity(None, None, scraper=scraper, top=top, w3d=w3d, interpolation='kde')
 myplot.generate_plots_3d()
-
 
