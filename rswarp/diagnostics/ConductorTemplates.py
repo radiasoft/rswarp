@@ -247,7 +247,7 @@ class UnstructuredPlot(Conductor):
         y = np.linspace(self.w3d.ymmin, self.w3d.ymmax, self.w3d.ny)
         z = np.linspace(self.w3d.zmmin, self.w3d.zmmax, self.w3d.nz)
 
-        X, Y, Z = np.meshgrid(x, y, z)
+        X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
 
         isin = self.conductor.isinside(X.ravel(), Y.ravel(), Z.ravel())
         dat_isin = 1 - isin.isinside.reshape(X.shape)
