@@ -156,6 +156,22 @@ class STLconductor(Assembly):
 
         self._surface_mesh_quality_check()
 
+        # Use conductor center to shift mesh
+        bounds = self.surface.bbox
+        mesh_ctr = [
+            bounds[0][0] + (bounds[1][0] - bounds[0][0]) / 2.,
+            bounds[0][1] + (bounds[1][1] - bounds[0][1]) / 2.,
+            bounds[0][2] + (bounds[1][2] - bounds[0][2]) / 2.
+        ]
+        offsets = [
+            xcent - mesh_ctr[0],
+            ycent - mesh_ctr[1],
+            zcent - mesh_ctr[2]
+        ]
+        vertices = deepcopy(self.surface.vertices)
+        for i in range(len(offsets)): vertices[:, i] += offsets[i]
+        self.surface = pymesh.form_mesh(vertices, self.surface.faces)
+
         if disp != "none" and disp != "auto":
             try:
                 if len(np.asarray(disp)) != 3: raise StandardError("")
