@@ -98,6 +98,7 @@ wp.top.pboundnz = wp.absorb
 # Type of particle push. 2 includes tan correction to Boris push.
 wp.top.ibpush = 2
 
+dx = (wp.w3d.xmmax - wp.w3d.xmmin) / wp.w3d.nx
 dz = (wp.w3d.zmmax - wp.w3d.zmmin) / wp.w3d.nz  # Because warp doesn't set w3d.dz until after solver instantiated
 wp.top.dt = 0.75 * dz / (beam_beta * wp.clight)  # Timestep set to cell crossing time with some padding
 
@@ -213,7 +214,7 @@ if simulateIonization is True:
 # Create conductors that will represent electrodes placed inside vacuum vessel
 
 pipe_voltage = 0.0  # Set main pipe section to ground
-electrode_voltage = +2e3  # electrodes held at several kV relative to main pipe
+electrode_voltage = +2e1  # electrodes held at several V relative to main pipe
 assert electrode_voltage < beam_ke, "Electrodes potential greater than beam KE."
 
 pipe_radius = pipe_radius
@@ -230,8 +231,12 @@ z_positions.append(z_positions[-1] + electrode_length)
 
 conductors = []
 
-bottom_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=electrode_voltage, zcent=.5*dz)
+#bottom_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=electrode_voltage, zcent=.5*dz)
+bottom_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=pipe_voltage, zcent=.5*dz)
 conductors.append(bottom_cap)
+
+left_electrode = wp.Box(xsize=2.*dx, ysize=2.*dx, zsize=dz, voltage=electrode_voltage, xcent=beam_radius+dx, zcent=2.5*dz)
+conductors.append(left_electrode)
 
 entrance_electrode = wp.ZCylinderOut(voltage=electrode_voltage, radius=pipe_radius,
                                      zlower=z_positions[0], zupper=z_positions[1])
@@ -246,7 +251,11 @@ exit_electrode = wp.ZCylinderOut(voltage=electrode_voltage, radius=pipe_radius,
                                  zlower=z_positions[4], zupper=z_positions[5])
 #conductors.append(exit_electrode)
 
-top_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=electrode_voltage, zcent=cooler_length-.5*dz)
+right_electrode = wp.Box(xsize=2.*dx, ysize=2.*dx, zsize=dz, voltage=electrode_voltage, xcent=beam_radius+dx, zcent=cooler_length-2.5*dz)
+conductors.append(right_electrode)
+
+#top_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=electrode_voltage, zcent=cooler_length-.5*dz)
+top_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=pipe_voltage, zcent=cooler_length-.5*dz)
 conductors.append(top_cap)
 
 ##############################
@@ -332,8 +341,8 @@ if field_diagnostic_switch:
 # Crossing Diagnostics
 #zcross_l = ZCrossingParticles(zz=z_positions[1], laccumulate=1)
 #zcross_r = ZCrossingParticles(zz=z_positions[4], laccumulate=1)
-zcross_l = ZCrossingParticles(zz=2.*dz, laccumulate=1)
-zcross_r = ZCrossingParticles(zz=cooler_length-2.*dz, laccumulate=1)
+zcross_l = ZCrossingParticles(zz=5.*dz, laccumulate=1)
+zcross_r = ZCrossingParticles(zz=cooler_length-5.*dz, laccumulate=1)
 
 
 ###########################
