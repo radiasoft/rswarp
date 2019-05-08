@@ -4,7 +4,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
-Nt = 2000000
+Nt = 100000
 
 f = h5py.File('diags/fields/electric/data' + str(Nt) + '.h5', 'r')
 #print f.keys()
@@ -13,10 +13,10 @@ Er = f['/data/' + str(Nt) + '/meshes/E/r'][0, :, :] * 1.0e2 * 1.0e-3
 Ez = f['/data/' + str(Nt) + '/meshes/E/z'][0, :, :] * 1.0e2 * 1.0e-3
 
 Nr = 128
-Nz = 1024
+Nz = 4096
 
 pipe_radius = 0.1524 / 2. * 100.
-pipe_length = 200.
+pipe_length = 750.
 
 dr = pipe_radius / Nr
 dz = pipe_length / Nz
@@ -49,12 +49,11 @@ ax[1].legend(prop = {'size': 10}, loc = 'upper center')
 ax[2].set_xlabel('radial location (cm)')
 ax[2].set_ylabel('radial electric field (kV/cm)')
 ax[2].plot(r, Er[:, Nz//2], 'r', label = 'middle')
-ax[2].plot(r, Er[:, Nz//4], 'b', label = 'halfway left')
-#ax[2].plot(r, Er[:, 10], 'g', label = 'almost left')
-#ax[2].plot(r, Er[:, 1], 'c', label = 'left')
-ax[2].legend(prop = {'size': 10}, loc = 'upper right')
+ax[2].plot(r, Er[:, 1], 'b', label = 'left')
+ax[2].plot(r, Er[:, -2], 'g', label = 'right')
+ax[2].legend(prop = {'size': 10}, loc = 'lower right')
 
 phi_plot.tight_layout()
-phi_plot.savefig('phi_plot.png')
+phi_plot.savefig('phi_plot-' + str(Nt) + '.png')
 #plt.show()
 plt.close()

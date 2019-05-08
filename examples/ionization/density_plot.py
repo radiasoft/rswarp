@@ -6,12 +6,14 @@ import numpy as np
 import math
 import sys
 
-Nt = 1000000
-Nr = 128
-Nz = 64
+Nt = 60000
+#Nr = 128
+#Nz = 4096
+Nr = 100
+Nz = 150
 
-pipe_radius = 0.1524 / 2. * 100.
-pipe_length = 200.
+pipe_radius = 3.
+pipe_length = 3000.
 
 dr = pipe_radius / Nr
 dz = pipe_length / Nz
@@ -23,33 +25,49 @@ tot_e_dens_z = np.empty((Nz))
 density_plot, ax = plt.subplots(1, 2, figsize=(12, 6))
 # exlicitly make density_plot the active figure:
 plt.figure(density_plot.number)
-plt.suptitle('Particle densities after ' + str(Nt) + ' time steps with drain electrodes at +20 V')
+plt.suptitle('Particle densitites after ' + str(Nt) + ' time steps')
 #plt.subplots_adjust(hspace=0.4)
 
-f = h5py.File('diags/hdf5/data0' + str(Nt) + '.h5', 'r')
+f = h5py.File('diags/hdf5/data' + str(Nt).zfill(8) + '.h5', 'r')
 
-species = ['Electron', 'emitted e-', 'H2+']
-
-for n in range(3):
+#species = ['Electron', 'emitted e-', 'H2+']
+#for n in range(3):
+species = ['Electron']
+for n in range(1):
 
     x = f['/data/' + str(Nt) + '/particles/' + species[n] + '/position/x'][:] * 1.0e2
     y = f['/data/' + str(Nt) + '/particles/' + species[n] + '/position/y'][:] * 1.0e2
     z = f['/data/' + str(Nt) + '/particles/' + species[n] + '/position/z'][:] * 1.0e2
     w = f['/data/' + str(Nt) + '/particles/' + species[n] + '/weighting'][:]
 
-    print species[n], ' weight mean (and standard deviation): ', np.mean(w), ' (', np.std(w), ')'
+#    print species[n], ' weight mean (and standard deviation): ', np.mean(w), ' (', np.std(w), ')'
+    print species[n], ' average axial location: ', np.mean(z), ' cm'
+    print species[n], ' average radial location: ', math.sqrt(np.var(x) + np.var(y)), ' cm'
 
     dens[:, :] = 0.
+    radcount = [0, 0]
+    radvar = [0., 0.]
     for i in range(x.size):
-        ir = int(math.sqrt(x[i] * x[i] + y[i] * y[i]) / dr)
+        r2 = x[i] * x[i] + y[i] * y[i]
+        ir = int(math.sqrt(r2) / dr)
         if ir > Nr - 1:
             ir = Nr - 1
         iz = int(z[i] / dz)
         if iz > Nz - 1:
             iz = Nz - 1
         dens[ir, iz] += w[i]
-        if i % 1000000 == 0:
-            print i, ir, iz, x[i], y[i], z[i]
+        if iz == 0:
+            radcount[0] += 1
+            radvar[0] += r2
+        if iz == Nz - 1:
+            radcount[1] += 1
+            radvar[1] += r2
+ #       if i % 1000000 == 0:
+ #           print i, ir, iz, x[i], y[i], z[i]
+    if radcount[0] > 99:
+        print species[n], ' average radial location at entry: ', math.sqrt(radvar[0] / radcount[0]), ' cm (', radcount[0], ' counts)'
+    if radcount[1] > 99:
+        print species[n], ' average radial location at exit: ', math.sqrt(radvar[1] / radcount[1]), ' cm (', radcount[1], ' counts)'
     for ir in range(Nr):
         dens[ir, :] /= 2. * math.pi * (ir + .5) * dr * dr * dz
 #        for iz in range(Nz):
@@ -91,4 +109,4 @@ ax[1].legend(prop = {'size': 10}, loc = 'upper left')
 density_plot.savefig('density_plot-' + str(Nt) + '.png')
 plt.close()
 
-print 'charge neutralization efficiency is ', 100. * (1. - (net - ni) / neb), '%'
+#print 'charge neutralization efficiency is ', 100. * (1. - (net - ni) / neb), '%'
