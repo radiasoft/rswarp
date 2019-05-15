@@ -15,11 +15,6 @@ from rswarp.diagnostics import FieldDiagnostic
 from rswarp.cathode.injectors import UserInjectors
 from rswarp.utilities.file_utils import cleanupPrevious
 
-import rsoopic.h2crosssections as h2crosssections
-sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
-from ionization import Ionization
-import crosssections as Xsect
-
 # Seed set for reproduction
 np.random.seed(967644)
 
@@ -156,59 +151,6 @@ else:
     beam.vthperp = np.sqrt(cathode_temperature * wp.jperev / beam.mass)  # x and y thermal velocity
     wp.w3d.l_inj_rz = (wp.w3d.solvergeom == wp.w3d.RZgeom)
 
-##############################
-# Ionization of background gas
-##############################
-
-# Ionization e- + H2 -> H2+ + e- + e-
-
-if simulateIonization is True:
-    # Particle species for emission products of an ionization event
-    h2plus = wp.Species(type=wp.Dihydrogen, charge_state=+1, name='H2+', weight=1000)
-    emittedelec = wp.Species(type=wp.Electron, name='emitted e-', weight=1000)
-
-    target_pressure = 0.4  # in Pa
-    target_temp = 273.0  # in K
-    target_density = target_pressure / wp.boltzmann / target_temp  # in 1/m^3
-
-    # Instantiate Ionization
-    # Dimensions control where background gas reservoir will be present in the domain
-    ioniz = Ionization(
-        stride=100,  # Number of particles allowed to be involved in ionization events per timestep
-        xmin=wp.w3d.xmmin,
-        xmax=wp.w3d.xmmax,
-        ymin=wp.w3d.ymmin,
-        ymax=wp.w3d.ymmax,
-        zmin=wp.w3d.zmmin,
-        zmax=wp.w3d.zmmax,
-        nx=wp.w3d.nx,
-        ny=wp.w3d.ny,
-        nz=wp.w3d.nz,
-        l_verbose=True
-    )
-
-    # add method used to add possible ionization events
-    h2xs = Xsect.H2IonizationEvent()
-    def xswrapper(vi):
-        return h2xs.getCrossSection(vi)
-    ioniz.add(
-        incident_species=beam,
-        emitted_species=[h2plus, emittedelec],  # iterable of species created from ionization
-        #cross_section=h2crosssections.h2_ioniz_crosssection,  # Cross section, can be float or function
-        cross_section=xswrapper,
-        #emitted_energy0=[0, h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
-        # or set to 'thermal' to create ions with a thermal energy spread set by temperature
-        emitted_energy0=['thermal', h2crosssections.ejectedEnergy],  # Energy of each emitted species, can be float or function
-        emitted_energy_sigma=[0, 0],  # Energy spread of emitted species (gives width of gaussian distribution)
-        temperature=[target_temp, None],
-        sampleEmittedAngle=h2crosssections.generateAngle,
-        writeAngleDataDir=False,  # Write file recording statistics of angles
-        writeAnglePeriod=1000,  # Period to write angle data, if used
-        l_remove_incident=False,  # Remove incident macroparticles involved in ionization
-        l_remove_target=False,  # Remove target macroparticles (only used if target_species set)
-        ndens=target_density  # Background gas density (if target is reservoir of gas and not macroparticles)
-    )
-
 ####################
 # Install Conductors
 ####################
@@ -266,16 +208,14 @@ top_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=pipe_vo
 # for time being this is represented as an ideal magnetic field B = (0, 0, bz)
 
 # External B-Field can be added by setting vector components at each cell
-bz = np.zeros([wp.w3d.nx, wp.w3d.ny, wp.w3d.nz])
-bz[:, :, :] = 1.0 # T
-z_start = wp.w3d.zmmin
-z_stop = wp.w3d.zmmax
+bz = np.zeros([wp.w3d.nx // 2, wp.w3d.ny // 2, wp.w3d.nz // 2])
+bz[:, :, :] = 0.04 # T
 
 # Add B-Field to simulation
-wp.addnewbgrd(z_start, z_stop,
-              xs=wp.w3d.xmmin, dx=(wp.w3d.xmmax - wp.w3d.xmmin),
-              ys=wp.w3d.ymmin, dy=(wp.w3d.ymmax - wp.w3d.ymmin),
-              nx=wp.w3d.nx, ny=wp.w3d.ny, nz=wp.w3d.nz, bz=bz)
+wp.addnewbgrd(wp.w3d.zmmin, wp.w3d.zmmax,
+              xs = wp.w3d.xmmin, dx = 2. * (wp.w3d.xmmax - wp.w3d.xmmin),
+              ys = wp.w3d.ymmin, dy = 2. * (wp.w3d.ymmax - wp.w3d.ymmin),
+              nx = wp.w3d.nx // 2, ny = wp.w3d.ny // 2, nz = wp.w3d.nz // 2, bz = bz)
 
 ########################
 # Register Field Solvers
@@ -298,9 +238,6 @@ if space_charge:
 # Conductors must be registered after Field Solver is instantiated if we want them to impact field solve
 for cond in conductors:
     wp.installconductor(cond)
-
-#print 'BCs: ', solverE.bounds
-#sys.exit(0)
 
 # Conductors set as scrapers will remove impacting macroparticles from the simulation
 #scraper = wp.ParticleScraper(conductors, lsavecondid=1)
