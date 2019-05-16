@@ -2,6 +2,7 @@ from __future__ import division
 import warp as wp
 import numpy as np
 import h5py as h5
+import math
 import os
 
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
@@ -52,8 +53,8 @@ else:
     variable_weight = True
 
 # Dimensions for the electron cooler
-#pipe_radius = 0.1524 / 2. # m (Based on ECE specs)
-pipe_radius = 0.03
+pipe_radius = 0.1524 / 2. # m (Based on ECE specs)
+#pipe_radius = 0.03
 cooler_length = 30. # m
 
 cathode_temperature = 0.25  # eV
@@ -70,8 +71,8 @@ beam_radius = 0.01  # m
 ##########################
 
 # Set cells (nx == ny in cylindrical coordinates)
-wp.w3d.nx = 40
-wp.w3d.ny = 40
+wp.w3d.nx = 100
+wp.w3d.ny = 100
 wp.w3d.nz = 40000
 
 # Set field boundary conditions (Warp only allows setting x and y together)
@@ -208,14 +209,48 @@ top_cap = wp.Box(xsize=pipe_radius, ysize=pipe_radius, zsize=dz, voltage=pipe_vo
 # for time being this is represented as an ideal magnetic field B = (0, 0, bz)
 
 # External B-Field can be added by setting vector components at each cell
-bz = np.zeros([wp.w3d.nx // 2, wp.w3d.ny // 2, wp.w3d.nz // 2])
-bz[:, :, :] = 0.04 # T
+nxb = wp.w3d.nx // 2
+nyb = wp.w3d.ny // 2
+nzb = wp.w3d.nz // 2
+
+bx = np.zeros([nxb, nyb, nzb])
+by = np.zeros([nxb, nyb, nzb])
+bz = np.zeros([nxb, nyb, nzb])
+
+dxb = wp.w3d.xmmax - wp.w3d.xmmin
+dyb = wp.w3d.ymmax - wp.w3d.ymmin
+dzb = wp.w3d.zmmax - wp.w3d.zmmin
+
+B0 = 0.1 # T
+bz[:, :, :] = B0
+bz_shape = bz.shape
+
+bi = 1.e-4 * B0
+Ncoil = 300
+lambda_i = dzb / Ncoil
+kzi = 2. * math.pi / lambda_i
+phizi = 0.
+kxi = kzi / math.sqrt(2.)
+kyi = kxi
+
+for j in range(bz_shape[0]):
+    xj = wp.w3d.xmmin + j * dxb / nxb
+    for k in range(bz_shape[1]):
+        yk = wp.w3d.ymmin + k * dyb / nyb
+        for l in range(bz_shape[2]):
+            zl = wp.w3d.zmmin + l * dzb / nzb
+            fxy = math.exp(kxi * xj) * math.exp(kyi * yk)
+            fxyz = fxy * math.sin(kzi * zl + phizi)
+            bx[j, k, l] = bi * kxi / kzi * fxyz
+            by[j, k, l] = bi * kyi / kzi * fxyz
+            bz[j, k, l] += bi * fxy * math.cos(kzi * zl + phizi)
 
 # Add B-Field to simulation
 wp.addnewbgrd(wp.w3d.zmmin, wp.w3d.zmmax,
-              xs = wp.w3d.xmmin, dx = 2. * (wp.w3d.xmmax - wp.w3d.xmmin),
-              ys = wp.w3d.ymmin, dy = 2. * (wp.w3d.ymmax - wp.w3d.ymmin),
-              nx = wp.w3d.nx // 2, ny = wp.w3d.ny // 2, nz = wp.w3d.nz // 2, bz = bz)
+              xs = wp.w3d.xmmin, dx = dxb,
+              ys = wp.w3d.ymmin, dy = dyb,
+              nx = nxb, ny = nyb, nz = nzb,
+              bx = bx, by = by, bz = bz)
 
 ########################
 # Register Field Solvers
