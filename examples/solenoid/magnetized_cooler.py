@@ -1,3 +1,5 @@
+# this simulation runs 62% faster on 20 jupyter cores than on 10
+
 from __future__ import division
 import warp as wp
 import numpy as np
@@ -53,8 +55,8 @@ else:
     variable_weight = True
 
 # Dimensions for the electron cooler
-pipe_radius = 0.1524 / 2. # m (Based on ECE specs)
-#pipe_radius = 0.03
+#pipe_radius = 0.1524 / 2. # m (Based on ECE specs)
+pipe_radius = 0.03
 cooler_length = 30. # m
 
 cathode_temperature = 0.25  # eV
@@ -71,8 +73,8 @@ beam_radius = 0.01  # m
 ##########################
 
 # Set cells (nx == ny in cylindrical coordinates)
-wp.w3d.nx = 100
-wp.w3d.ny = 100
+wp.w3d.nx = 40
+wp.w3d.ny = 40
 wp.w3d.nz = 40000
 
 # Set field boundary conditions (Warp only allows setting x and y together)
@@ -225,7 +227,7 @@ B0 = 0.1 # T
 bz[:, :, :] = B0
 bz_shape = bz.shape
 
-bi = 1.e-4 * B0
+bi = 1.e-3 * B0
 Ncoil = 300
 lambda_i = dzb / Ncoil
 kzi = 2. * math.pi / lambda_i
