@@ -226,17 +226,22 @@ dzb = wp.w3d.zmmax - wp.w3d.zmmin
 B0 = 0.1 # T
 bz[:, :, :] = B0
 bz_shape = bz.shape
-
-bi = 1.e-3 * B0
+if wp.comm_world.rank == 0:
+    print 'bz_shape =', bz_shape
+bi = 5.e-1 * B0
 Ncoil = 300
 lambda_i = dzb / Ncoil
 kzi = 2. * math.pi / lambda_i
 phizi = 0.
-kxi = kzi / math.sqrt(2.)
-kyi = kxi
+#kxi = kzi / math.sqrt(2.)
+#kyi = kxi
+kxi = kzi
+kyi = 0.
 
 for j in range(bz_shape[0]):
     xj = wp.w3d.xmmin + j * dxb / nxb
+#    if wp.comm_world.rank == 0:
+#        print 'xj =', xj
     for k in range(bz_shape[1]):
         yk = wp.w3d.ymmin + k * dyb / nyb
         for l in range(bz_shape[2]):
@@ -246,6 +251,13 @@ for j in range(bz_shape[0]):
             bx[j, k, l] = bi * kxi / kzi * fxyz
             by[j, k, l] = bi * kyi / kzi * fxyz
             bz[j, k, l] += bi * fxy * math.cos(kzi * zl + phizi)
+#    if wp.comm_world.rank == 0:
+#        print 'bx[', j,  bz_shape[1] // 2, bz_shape[2] // 2, '] =', bx[j, bz_shape[1] // 2, bz_shape[2] // 2], bi, kxi / kzi, fxyz
+
+if wp.comm_world.rank == 0:
+    np.save('bx', bx)
+    np.save('by', by)
+    np.save('bz', bz)
 
 # Add B-Field to simulation
 wp.addnewbgrd(wp.w3d.zmmin, wp.w3d.zmmax,

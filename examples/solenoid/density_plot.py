@@ -25,7 +25,7 @@ tot_e_dens_z = np.empty((Nz))
 density_plot, ax = plt.subplots(1, 2, figsize=(12, 6))
 # exlicitly make density_plot the active figure:
 plt.figure(density_plot.number)
-plt.suptitle('Beam densitity profiles after ' + str(Nt) + ' time steps with 50 mT magnetic field')
+plt.suptitle('Beam densitity profiles after ' + str(Nt) + ' time steps with 100 mT magnetic field')
 #plt.subplots_adjust(hspace=0.4)
 
 f = h5py.File('diags/hdf5/data' + str(Nt).zfill(8) + '.h5', 'r')
@@ -52,8 +52,8 @@ for n in range(1):
     print species[n], ' average azimuthal speed: ', np.mean(vtheta), ' m/s'
 
     dens[:, :] = 0.
-    radcount = [0, 0]
-    radvar = [0., 0.]
+    radcount = [0, 0, 0]
+    radvar = [0., 0., 0.]
     for i in range(x.size):
         r2 = x[i] * x[i] + y[i] * y[i]
         ir = int(math.sqrt(r2) / dr)
@@ -66,15 +66,20 @@ for n in range(1):
         if iz == 0:
             radcount[0] += 1
             radvar[0] += r2
-        if iz == Nz - 1:
+        if iz == Nz // 2:
             radcount[1] += 1
             radvar[1] += r2
+        if iz == Nz - 1:
+            radcount[2] += 1
+            radvar[2] += r2
  #       if i % 1000000 == 0:
  #           print i, ir, iz, x[i], y[i], z[i]
     if radcount[0] > 99:
         print species[n], ' average radial location at entry: ', math.sqrt(radvar[0] / radcount[0]), ' cm (', radcount[0], ' counts)'
     if radcount[1] > 99:
-        print species[n], ' average radial location at exit: ', math.sqrt(radvar[1] / radcount[1]), ' cm (', radcount[1], ' counts)'
+        print species[n], ' average radial location in center: ', math.sqrt(radvar[1] / radcount[1]), ' cm (', radcount[1], ' counts)'
+    if radcount[2] > 99:
+        print species[n], ' average radial location at exit: ', math.sqrt(radvar[2] / radcount[2]), ' cm (', radcount[2], ' counts)'
     for ir in range(Nr):
         dens[ir, :] /= 2. * math.pi * (ir + .5) * dr * dr * dz
 #        for iz in range(Nz):
@@ -114,7 +119,7 @@ for n in range(1):
 
 #density_plot.tight_layout()
 ax[0].legend(prop = {'size': 10}, loc = 'upper right')
-ax[1].legend(prop = {'size': 10}, loc = 'upper left')
+ax[1].legend(prop = {'size': 10}, loc = 'lower left')
 density_plot.savefig('density_plot-' + str(Nt) + '.png')
 plt.close()
 
