@@ -466,12 +466,13 @@ def analyze_collected_charge(top, solver):
     return collected_charge
 
 
-def analyze_reflected_charge(top, reflectors):
+def analyze_reflected_charge(top, reflectors, comm_world=None):
     """Analyze charges due to reflection.
 
     Args:
       top: Warp's top module.
       reflectors: A list of particle reflectors.
+      comm_wold: MPI communicator, must be passed in if running in parallel.
 
     Return:
       reflected_charge: A list of charges reflected particle info
@@ -487,5 +488,13 @@ def analyze_reflected_charge(top, reflectors):
         cond_ids.append(reflector._conductor.condid)
     for i, ids in enumerate(cond_ids):
         reflected_charge[ids] = np.copy(cond_objs[i].emitparticles_data[:, 0:5])
-        
-    return reflected_charge
+    if comm_world:
+        all_reflected_charge = {}
+        for ids in cond_ids:
+            print(comm_world.rank, ids)
+            all_reflected_charge[ids] = comm_world.gather(reflected_charge[ids], root=0)
+            if comm_world.rank == 0:
+                all_reflected_charge[ids] = np.vstack(all_reflected_charge[ids])
+        return all_reflected_charge
+    else:
+        return reflected_charge
