@@ -491,7 +491,6 @@ def analyze_reflected_charge(top, reflectors, comm_world=None):
     if comm_world:
         all_reflected_charge = {}
         for ids in cond_ids:
-            print(comm_world.rank, ids)
             all_reflected_charge[ids] = comm_world.gather(reflected_charge[ids], root=0)
             if comm_world.rank == 0:
                 all_reflected_charge[ids] = np.vstack(all_reflected_charge[ids])
