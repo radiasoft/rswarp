@@ -223,13 +223,13 @@ dxb = wp.w3d.xmmax - wp.w3d.xmmin
 dyb = wp.w3d.ymmax - wp.w3d.ymmin
 dzb = wp.w3d.zmmax - wp.w3d.zmmin
 
-B0 = 0.1 # T
+B0 = 1.0 # T
 bz[:, :, :] = B0
 bz_shape = bz.shape
 if wp.comm_world.rank == 0:
     print 'bz_shape =', bz_shape
-bi = 5.e-1 * B0
-Ncoil = 300
+bi = 1.e-2 * B0
+Ncoil = 20
 lambda_i = dzb / Ncoil
 kzi = 2. * math.pi / lambda_i
 phizi = 0.

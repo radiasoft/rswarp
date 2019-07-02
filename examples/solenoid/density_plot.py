@@ -25,7 +25,7 @@ tot_e_dens_z = np.empty((Nz))
 density_plot, ax = plt.subplots(1, 2, figsize=(12, 6))
 # exlicitly make density_plot the active figure:
 plt.figure(density_plot.number)
-plt.suptitle('Beam densitity profiles after ' + str(Nt) + ' time steps with 100 mT magnetic field')
+plt.suptitle('Beam densitity profiles after ' + str(Nt) + ' time steps with 1 T magnetic field')
 #plt.subplots_adjust(hspace=0.4)
 
 f = h5py.File('diags/hdf5/data' + str(Nt).zfill(8) + '.h5', 'r')
