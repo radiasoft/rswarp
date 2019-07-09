@@ -38,7 +38,8 @@ field_base_path = 'diags/fields/'
 diagFDir = {'magnetic':'diags/fields/magnetic','electric':'diags/fields/electric'}
 
 # Cleanup previous files
-cleanupPrevious(diagDir,diagFDir)
+if comm_world.rank == 0:
+    cleanupPrevious(diagDir,diagFDir)
 
 
 # ## Grid parameters
@@ -162,7 +163,7 @@ cl_limit = sources.cl_limit(CATHODE_PHI, ANODE_WF, GRID_BIAS, PLATE_SPACING)
 
 
 #INJECTION SPECIFICATION
-USER_INJECT = 1
+USER_INJECT = 2
 
 # --- Setup simulation species
 beam = Species(type=Electron, name='beam')
@@ -216,7 +217,8 @@ if USER_INJECT == 1:
     beam.b0     = SOURCE_RADIUS_2
     
     #sources.constant_current(beam, CHANNEL_WIDTH, Z_PART_MIN, ptcl_per_step)
-    myInjector = injectors.injectorUserDefined(beam, CATHODE_TEMP, CHANNEL_WIDTH, Z_PART_MIN, PTCL_PER_STEP)
+
+    myInjector = injectors.UserInjectors(beam, w3d, gchange, CATHODE_TEMP, CHANNEL_WIDTH, PTCL_PER_STEP, zmin_scale=Z_PART_MIN)
     installuserinjection(myInjector.inject_constant)
     
 if USER_INJECT == 2:
