@@ -180,7 +180,7 @@ class ElectrostaticFields(FieldDiagnostic):
         else:
             self.efield = []
             for dim in ['x', 'y', 'z']:
-                self.efield.append(getselfe(comp=dim))
+                self.efield.append(getselfe(comp=dim, bcast=0))
 
             self.efield = np.array(self.efield)
 
@@ -188,7 +188,7 @@ class ElectrostaticFields(FieldDiagnostic):
         if self.lparallel == 1:
             self.phi = self.solver.getphi()
         else:
-            self.phi = getphi()
+            self.phi = getphi(bcast=0)
 
     def write(self):
         if not self.write_dir:
@@ -244,11 +244,11 @@ class MagnetostaticFields(FieldDiagnostic):
 
     def gatherfields(self):
         if self.lparallel == 1:
-            self.bfield = self.solver.getb()
+            self.bfield = self.solver.getb(bcast=0)
         else:
             self.bfield = []
             for dim in ['x', 'y', 'z']:
-                self.bfield.append(getb(comp=dim))
+                self.bfield.append(getb(comp=dim, bcast=0))
 
             self.bfield = np.array(self.bfield)
 

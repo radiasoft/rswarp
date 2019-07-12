@@ -206,7 +206,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         background_beam.ibeam = beam_current * CURRENT_MODIFIER
 
         background_beam.a0 = SOURCE_RADIUS_1
-        background_beam.b0 = SOURCE_RADIUS_1
+        background_beam.b0 = SOURCE_RADIUS_2
         background_beam.ap0 = .0e0
         background_beam.bp0 = .0e0
 
@@ -238,7 +238,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         print('child-langmuir  limit: {}, current density {}'.format(jcl, jcl / cathode_area))
         background_beam.ibeam = measurement_beam.ibeam = beam_current
         background_beam.a0 = measurement_beam.a0 = SOURCE_RADIUS_1
-        background_beam.b0 = measurement_beam.b0 = SOURCE_RADIUS_1
+        background_beam.b0 = measurement_beam.b0 = SOURCE_RADIUS_2
         background_beam.ap0 = measurement_beam.ap0 = .0e0
         background_beam.bp0 = measurement_beam.bp0 = .0e0
 
