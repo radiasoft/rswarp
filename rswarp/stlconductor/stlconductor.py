@@ -102,7 +102,7 @@ class STLconductor(Assembly):
 
         Args:
           filename: File that defines the mesh in the stl format.
-          xcent, ycent, zcent: Coordinate of conductor center (unncessary for STLconductor, but legacy of Warp code).
+          xcent, ycent, zcent: Coordinates of desired conductor center. Used to define offsets for translating the conductor.
           raytri_scheme: Scheme to calculate ray-triangle intercepts. Legal options are "watertight" (default) or "moller".
           precision_decimal: Numeric precision is kept to this value in decimal for data read from stl file.
           normalization_factor: Normalize data read from stl file by this value.
@@ -117,7 +117,10 @@ class STLconductor(Assembly):
         """
         usenewconductorgeneration()
         kwlist = []
-        Assembly.__init__(self, voltage, xcent, ycent, zcent, condid, kwlist,
+        
+        #Note: the Assembly class must be instantiated with dummy centroid values of (0,0,0).
+        #Providing alternative values leads to inconsistent installation of the conductors
+        Assembly.__init__(self, voltage, 0, 0, 0, condid, kwlist,
                           self.conductorf, self.conductord, self.intercept,
                           self.conductorfnew,
                           kw=kw)
