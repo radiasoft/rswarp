@@ -81,4 +81,3 @@ from rswarp.diagnostics.ImpactDensity import PlotDensity
 from mayavi import mlab
 myplot = PlotDensity(None, None, scraper=scraper, top=top, w3d=w3d, interpolation='kde')
 myplot.generate_plots_3d()
-
