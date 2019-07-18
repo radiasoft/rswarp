@@ -84,4 +84,3 @@ myplot = PlotDensity(ax1, ax2, scraper=scraper, top=top, w3d=w3d, interpolation=
 myplot.generate_plots_2d()
 plt.show()
 
-
