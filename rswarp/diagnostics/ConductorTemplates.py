@@ -260,7 +260,6 @@ class UnstructuredPlot(Conductor):
         X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
 
         isin = self.conductor.isinside(X.ravel(), Y.ravel(), Z.ravel(), aura=aura)
-        #isin = self.conductor.isinside(X.ravel(), Y.ravel(), Z.ravel())
         dat_isin = 1 - isin.isinside.reshape(X.shape)
         transitions = np.ones(X.shape + (3,))
 
