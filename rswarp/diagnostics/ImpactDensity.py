@@ -156,7 +156,7 @@ class PlotDensity(object):
                          face[1] * self.scale[1], \
                          face[2] * self.scale[2], \
                          face[3] * e / self.time * 1e-4
-            if s.shape == 0:
+            if np.prod(s.shape) == 0:
                 print('Cannot build cells for face')
                 continue
             if 0 <= np.min(s) < min_s:  # -1 value indicates no particle anywhere on face
