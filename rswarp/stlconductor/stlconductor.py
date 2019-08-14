@@ -97,12 +97,12 @@ class STLconductor(Assembly):
     def __init__(self, filename, voltage=0.,
                        xcent=0., ycent=0., zcent=0.,
                        raytri_scheme="watertight", precision_decimal=None, normalization_factor=None, fuzz=1e-12,
-                       disp="none", verbose="off", condid="next", **kw):
+                       disp="none", verbose="off", condid="next", scale=None, **kw):
         """Initialize a stl conductor.
 
         Args:
           filename: File that defines the mesh in the stl format.
-          xcent, ycent, zcent: Coordinate of conductor center (unncessary for STLconductor, but legacy of Warp code).
+          xcent, ycent, zcent: Coordinates of desired conductor center. Used to define offsets for translating the conductor.
           raytri_scheme: Scheme to calculate ray-triangle intercepts. Legal options are "watertight" (default) or "moller".
           precision_decimal: Numeric precision is kept to this value in decimal for data read from stl file.
           normalization_factor: Normalize data read from stl file by this value.
@@ -111,13 +111,18 @@ class STLconductor(Assembly):
             Available options are "none" (default), "auto", or (delta_x, delta_y, delta_z)
           verbose: If "on", detailed information on processing conductor defined by stl file will be printed out.
           condid: Conductor id. Must be a positive integer, or "next". If "next", condid will be automatically determined.
+          scale: scale of the units used in the stl file, by which we multiply to convert the mesh to meters. If None,
+            we make a guess based on the bounds.  Note that this is independent of normalization_factor
 
         Returns:
 
         """
         usenewconductorgeneration()
         kwlist = []
-        Assembly.__init__(self, voltage, xcent, ycent, zcent, condid, kwlist,
+        
+        #Note: the Assembly class must be instantiated with dummy centroid values of (0,0,0).
+        #Providing alternative values leads to inconsistent installation of the conductors
+        Assembly.__init__(self, voltage, 0, 0, 0, condid, kwlist,
                           self.conductorf, self.conductord, self.intercept,
                           self.conductorfnew,
                           kw=kw)
@@ -156,6 +161,24 @@ class STLconductor(Assembly):
 
         self._surface_mesh_quality_check()
 
+        # Scale vertices to fit the problem
+        print(' ---  STL Conductor scale {}'.format(scale))
+        if scale is None:
+            scale = 1
+            bounds = self.surface.bbox
+            min_length = np.min([
+                abs(bounds[1][0] - bounds[0][0]),
+                abs(bounds[1][1] - bounds[0][1]),
+                abs(bounds[1][2] - bounds[0][2])
+            ])
+            for dim_idx, unit in enumerate([1000, 1, 1e-3, 1e-6, 1e-9]):
+                if min_length >= unit:
+                    scale = 1e-9 / unit
+                    break
+        if scale != 1:
+            vertices = deepcopy(self.surface.vertices) * scale
+            self.surface = pymesh.form_mesh(vertices, self.surface.faces)
+
         # Use conductor center to shift mesh
         bounds = self.surface.bbox
         mesh_ctr = [
@@ -186,6 +209,9 @@ class STLconductor(Assembly):
             for i in range(len(disp)): vertices[:, i] += disp[i]
 
             self.surface = pymesh.form_mesh(vertices, self.surface.faces)
+
+        # Another check to look at scale, offset, dispersion
+        self._surface_mesh_quality_check()
 
         # select actual conductord
         # precompute and cache necessary attributes
