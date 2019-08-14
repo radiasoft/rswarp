@@ -16,7 +16,7 @@ class PlotDensity(object):
 
     """Plots density of scraped particles on conducting objects."""
 
-    def __init__(self, ax, ax_colorbar, scraper, top, w3d, interpolation='kde'):
+    def __init__(self, ax, ax_colorbar, scraper, top, w3d, interpolation='kde', use_aura=False):
         """
         Plots density of scraped particles on conducting objects. For 2D plotting matplotlib is used. Plotting
         in 3D requires use of Mayavi to render plots.
@@ -55,6 +55,8 @@ class PlotDensity(object):
         self.gated_ids = {}
         self.conductors = {}  # will replace gated_ids
 
+        self.use_aura = use_aura
+
         if w3d.solvergeom == w3d.XYZgeom:
             conductor_type = conductor_type_3d
         else:
@@ -66,7 +68,7 @@ class PlotDensity(object):
             except KeyError:
                 try:
                     self.conductors[cond.condid] = conductor_type['Unstructured'](top, w3d, cond,
-                                                                              interpolation=self.interpolation)
+                                                                              interpolation=self.interpolation, use_aura=self.use_aura)
                     print("{} not currently implemented. Falling back to Unstructured method.".format(type(cond)))
                 except KeyError:
                     print("{} not available")
@@ -158,6 +160,9 @@ class PlotDensity(object):
                          face[1] * self.scale[1], \
                          face[2] * self.scale[2], \
                          face[3] * e / self.time * 1e-4
+            if np.prod(s.shape) == 0:
+                print('Cannot build cells for face')
+                continue
             if 0 <= np.min(s) < min_s:  # -1 value indicates no particle anywhere on face
                 min_s = np.min(s)
             if np.max(s) > max_s:
