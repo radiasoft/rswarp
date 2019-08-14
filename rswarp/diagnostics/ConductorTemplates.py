@@ -237,8 +237,9 @@ class UnstructuredPlot(Conductor):
     """
     Can represent any convex shaped conductor in Warp.
     """
-    def __init__(self, top, w3d, conductor, interpolation='kde'):
+    def __init__(self, top, w3d, conductor, interpolation='kde', use_aura=False):
         super(UnstructuredPlot, self).__init__(top, w3d, conductor, interpolation=interpolation)
+        self.use_aura = use_aura
 
     def _isinside(self):
         if self.debug:
@@ -246,10 +247,19 @@ class UnstructuredPlot(Conductor):
         x = np.linspace(self.w3d.xmmin, self.w3d.xmmax, self.w3d.nx)
         y = np.linspace(self.w3d.ymmin, self.w3d.ymmax, self.w3d.ny)
         z = np.linspace(self.w3d.zmmin, self.w3d.zmmax, self.w3d.nz)
+        aura = None
+        if self.use_aura:
+            dx = abs(self.w3d.xmmax - self.w3d.xmmin) / self.w3d.nx
+            dy = abs(self.w3d.ymmax - self.w3d.ymmin) / self.w3d.ny
+            dz = abs(self.w3d.zmmax - self.w3d.zmmin) / self.w3d.nz
+            # add an "aura" the size of the smallest cell dimension
+            aura = np.min([dx, dy, dz]) / 1.
+            if self.debug:
+                print('inside aura {}', aura)
 
         X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
 
-        isin = self.conductor.isinside(X.ravel(), Y.ravel(), Z.ravel())
+        isin = self.conductor.isinside(X.ravel(), Y.ravel(), Z.ravel(), aura=aura)
         dat_isin = 1 - isin.isinside.reshape(X.shape)
         transitions = np.ones(X.shape + (3,))
 
