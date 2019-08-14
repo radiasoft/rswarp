@@ -1,6 +1,8 @@
 import numpy as np
 from warp.field_solvers.generateconductors import XPlane, YPlane, ZPlane, Box, Sphere
+from warp import comm_world, toperror
 from scipy.stats import gaussian_kde
+from .parallel import gather_lost_particles
 
 
 class Conductor(object):
@@ -16,6 +18,12 @@ class Conductor(object):
 
     def __init__(self, top, w3d, conductor, interpolation='kde'):
         assert interpolation == 'kde', "Interpolation must be 'kde'"
+
+        if not comm_world:
+            self.lparallel = 0
+        else:
+            self.lparallel = comm_world.size
+
         self.interpolation = interpolation
         self.top = top
         self.w3d = w3d
@@ -34,15 +42,42 @@ class Conductor(object):
             self.axis = [0, 2, 0, 2]
             self.domain = [w3d.xmmin, w3d.zmmin, w3d.xmmax, w3d.zmmax]
             self.cell_size = [w3d.dx, w3d.dz]
-            self.scraped_particles = np.array([self.top.xplost, self.top.zplost])
+            if self.pids:
+                if self.lparallel < 2:
+                    self.scraped_particles = np.array([self.top.xplost, self.top.zplost])
+                else:
+                    x, _, z = gather_lost_particles(self.top, comm_world)
+                    self.scraped_particles = np.array([x, z])
+            else:
+                self.scraped_particles = np.array([]).reshape(0, 0)
         elif w3d.solvergeom == w3d.XYZgeom:
             self.axis = [0, 1, 2, 0, 1, 2]
+            # TODO: check if w3d returns global values in parallel
             self.domain = [w3d.xmmin, w3d.ymmin, w3d.zmmin, w3d.xmmax, w3d.ymmax, w3d.zmmax]
             self.cell_size = [w3d.dx, w3d.dy, w3d.dz]
-            self.scraped_particles = np.array([self.top.xplost, self.top.yplost, self.top.zplost])
+            if self.pids:
+                if self. lparallel < 2:
+                    self.scraped_particles = np.array([self.top.xplost, self.top.yplost, self.top.zplost])
+                else:
+                    x, y, z = gather_lost_particles(self.top, comm_world)
+                    self.scraped_particles = np.array([x, y, z])
+            else:
+                self.scraped_particles = np.array([]).reshape(0, 0)
 
     def _get_pids(self):
-        scraped_particles = np.where(self.top.pidlost[:self.numlost, -1] == self.conductor.condid)[0]
+        if self.lparallel < 2:
+            try:
+                scraped_particles = np.where(self.top.pidlost[:self.numlost, -1] == self.conductor.condid)[0]
+            except toperror:
+                # Will still allow plotting of surfaces with no colormap applied
+                print("Warning! No lost particles found")
+                return None
+        else:
+            conductor_ids = gather_cond_id(self.top)
+            if conductor_ids.shape[0] == 0:
+                print("Warning! No lost particles found")
+                return None
+            scraped_particles = np.where(conductor_ids[:self.numlost] == self.conductor.condid)[0]
 
         return scraped_particles
 
@@ -84,8 +119,11 @@ class BoxPlot(Conductor):
     def get_particles(self):
         scraped_parts = self.scraped_particles.T[self.pids, :]
         for bound, axis, cell_size in zip(self.cbounds, self.axis, 2 * self.cell_size):
-            pof = np.where(np.abs(scraped_parts[:, axis] - bound) <= cell_size)
-            yield pof[0]
+            if self.pids:
+                pof = np.where(np.abs(scraped_parts[:, axis] - bound) <= cell_size)
+                yield pof[0]
+            else:
+                yield None
 
     def generate_faces_2d(self):
         if self.debug:
@@ -309,6 +347,29 @@ class UnstructuredPlot(Conductor):
         s = self._color_mesh(mesh=np.vstack([x.ravel(), y.ravel(), z.ravel()]), particle_subset=None)
 
         yield x, y, z, s
+
+
+def gather_cond_id(top):
+    try:
+        if comm_world.size == 1:
+            return top.pidlost[:, -1]
+    except NameError:
+        return top.pidlost[:, -1]
+
+    # Prepare head to receive particles arrays from all valid ranks
+    if comm_world.rank == 0:
+        surface_id = []
+        for rank in range(1, comm_world.size):
+            surface_id.extend(comm_world.recv(source=rank, tag=0))
+
+    # All ranks that have valid data send to head
+    if comm_world.rank != 0:
+        try:
+            comm_world.send(top.pidlost[:, -1], dest=0, tag=0)
+        except toperror:
+            comm_world.send([], dest=0, tag=0)
+
+
 
 
 conductor_type_2d = {XPlane: XPlanePlot,

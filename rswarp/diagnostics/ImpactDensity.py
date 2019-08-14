@@ -43,7 +43,7 @@ class PlotDensity(object):
         """
 
         self.numlost = top.npslost[0]
-        assert self.numlost > 1, "No particles lost in simulation. Nothing to plot."
+        # assert self.numlost > 1, "No particles lost in simulation. Nothing to plot."
         assert scraper.lcollectlpdata, "Flag 'lcollectlpdata' not enabled for scraper. No particle data to plot."
         assert interpolation == 'kde' or interpolation == 'cubic', "Interpolation must be either 'cubic' or 'kde'"
         self.interpolation = interpolation
@@ -141,7 +141,11 @@ class PlotDensity(object):
                         contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='viridis'))
 
         for cp in contour_plots:
-            cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
+            if minS < maxS:
+                cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
+            else:
+                # no particles on surface
+                cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[0, 1])
 
         mlab.draw()
         mlab.colorbar(object=contour_plots[0], orientation='vertical')
