@@ -33,11 +33,12 @@ class Conductor(object):
         self.center = None
         self.cbounds = None
         self.pids = self._get_pids()
-        print("gathered pids")
+        if comm_world.rank == 0:
+            print("PIDS on ", self.conductor, self.pids.shape)
         self.thresshold = 30  # how many particles need to be lost to generate a colormap
         self.points_2d = 1000  # Scatter points per line segment in 2d plots
 
-        self.debug = True
+        self.debug = False
 
         if w3d.solvergeom == w3d.XZgeom or w3d.solvergeom == w3d.RZgeom:
             self.axis = [0, 2, 0, 2]
@@ -56,30 +57,36 @@ class Conductor(object):
             # TODO: check if w3d returns global values in parallel
             self.domain = [w3d.xmmin, w3d.ymmin, w3d.zmmin, w3d.xmmax, w3d.ymmax, w3d.zmmax]
             self.cell_size = [w3d.dx, w3d.dy, w3d.dz]
-            if self.pids.size > 0:
-                if self. lparallel < 2:
-                    self.scraped_particles = np.array([self.top.xplost, self.top.yplost, self.top.zplost])
-                else:
-                    x, y, z = gather_lost_particles(self.top, comm_world)
-                    self.scraped_particles = np.array([x, y, z])
+
+            if self. lparallel < 2:
+                self.scraped_particles = np.array([self.top.xplost, self.top.yplost, self.top.zplost])
             else:
-                self.scraped_particles = np.array([]).reshape(3, 0)
+                x, y, z = gather_lost_particles(self.top, comm_world)
+                # gather_lost_particles returns None for empty arrays
+                if x is not None:
+                    self.scraped_particles = np.array([x, y, z])
+                else:
+                    self.scraped_particles = np.array([]).reshape(3, 0)
+        # print("Found particles on", comm_world.rank, self.scraped_particles.shape)
+        # print("Rank {} cleared init".format(comm_world.rank))
 
     def _get_pids(self):
         if self.lparallel < 2:
             try:
-                scraped_particles = np.where(self.top.pidlost[:self.numlost, -1] == self.conductor.condid)[0]
+                scraped_particles = np.where(self.top.pidlost[:, -1] == self.conductor.condid)[0]
             except toperror:
                 # Will still allow plotting of surfaces with no colormap applied
-                print("Warning! No lost particles found")
+                # print("Warning! No lost particles found")
                 return np.array([], dtype=int)
+            print("SHAPE", self.top.pidlost[:, -1].shape)
         else:
             conductor_ids = gather_cond_id(self.top, self.lparallel)
-            print("I got conductor IDS:", conductor_ids)
+            # print("Rank {} got conductor IDS:".format(comm_world.rank), conductor_ids.shape)
             if conductor_ids.shape[0] == 0:
-                print("Warning! No lost particles found")
+                # print("Warning! No lost particles found")
                 return np.array([], dtype=int)
-            scraped_particles = np.where(conductor_ids[:self.numlost] == self.conductor.condid)[0]
+            print("SHAPE",conductor_ids.shape)
+            scraped_particles = np.where(conductor_ids[:] == self.conductor.condid)[0]
 
         return scraped_particles
 
@@ -90,7 +97,9 @@ class Conductor(object):
         else:
             pids = self.pids
         scraped_parts = self.scraped_particles[:, pids]
-
+        # print("SHAPRE", self.conductor, self.scraped_particles.shape)
+        # print("collected shapre", pids.shape, scraped_parts.shape)
+        # print("Scraped particles on ", comm_world.rank, scraped_parts)
         if scraped_parts.shape[1] > self.thresshold:
             if self.interpolation == 'kde':
                 # Bandwidth based on Scott's rule with empirically determinted factor of 1/3 to reduce smoothing
@@ -368,7 +377,10 @@ def gather_cond_id(top, lparallel):
 
     # Prepare head to receive particles arrays from all valid ranks
     if comm_world.rank == 0:
-        surface_id = []
+        try:
+            surface_id = [top.pidlost[:, -1]]
+        except toperror:
+            surface_id = []
         for rank in range(1, comm_world.size):
             surface_id.append(comm_world.recv(source=rank, tag=0))
 
@@ -380,7 +392,9 @@ def gather_cond_id(top, lparallel):
             comm_world.send([], dest=0, tag=0)
 
     if comm_world.rank == 0:
-        return np.array(surface_id).flatten()
+        # print(len(surface_id))
+        # print(np.where(np.concatenate(surface_id) == 2))
+        return np.concatenate(surface_id)
     else:
         return np.array([], dtype=int)
 
