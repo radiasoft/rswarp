@@ -33,8 +33,7 @@ class Conductor(object):
         self.center = None
         self.cbounds = None
         self.pids = self._get_pids()
-        if comm_world.rank == 0:
-            print("PIDS on ", self.conductor, self.pids.shape)
+
         self.thresshold = 30  # how many particles need to be lost to generate a colormap
         self.points_2d = 1000  # Scatter points per line segment in 2d plots
 
@@ -67,8 +66,6 @@ class Conductor(object):
                     self.scraped_particles = np.array([x, y, z])
                 else:
                     self.scraped_particles = np.array([]).reshape(3, 0)
-        # print("Found particles on", comm_world.rank, self.scraped_particles.shape)
-        # print("Rank {} cleared init".format(comm_world.rank))
 
     def _get_pids(self):
         if self.lparallel < 2:
@@ -76,16 +73,13 @@ class Conductor(object):
                 scraped_particles = np.where(self.top.pidlost[:, -1] == self.conductor.condid)[0]
             except toperror:
                 # Will still allow plotting of surfaces with no colormap applied
-                # print("Warning! No lost particles found")
                 return np.array([], dtype=int)
-            print("SHAPE", self.top.pidlost[:, -1].shape)
         else:
             conductor_ids = gather_cond_id(self.top, self.lparallel)
-            # print("Rank {} got conductor IDS:".format(comm_world.rank), conductor_ids.shape)
+
             if conductor_ids.shape[0] == 0:
-                # print("Warning! No lost particles found")
                 return np.array([], dtype=int)
-            print("SHAPE",conductor_ids.shape)
+
             scraped_particles = np.where(conductor_ids[:] == self.conductor.condid)[0]
 
         return scraped_particles
@@ -97,9 +91,6 @@ class Conductor(object):
         else:
             pids = self.pids
         scraped_parts = self.scraped_particles[:, pids]
-        # print("SHAPRE", self.conductor, self.scraped_particles.shape)
-        # print("collected shapre", pids.shape, scraped_parts.shape)
-        # print("Scraped particles on ", comm_world.rank, scraped_parts)
         if scraped_parts.shape[1] > self.thresshold:
             if self.interpolation == 'kde':
                 # Bandwidth based on Scott's rule with empirically determinted factor of 1/3 to reduce smoothing
@@ -128,11 +119,14 @@ class BoxPlot(Conductor):
         self.cbounds = np.hstack([mine, maxe])
 
     def get_particles(self):
-        scraped_parts = self.scraped_particles.T[self.pids, :]
+
         for bound, axis, cell_size in zip(self.cbounds, self.axis, 2 * self.cell_size):
             if np.any(self.pids):
-                pof = np.where(np.abs(scraped_parts[:, axis] - bound) <= cell_size)
-                yield pof[0]
+                pof = np.where(np.abs(self.scraped_particles[axis, :] - bound) <= cell_size)[0]
+                # Take intersection with group Warp scraped on this conductor
+                print(pof, self.pids)
+                pof = np.intersect1d(pof, self.pids)
+                yield pof
             else:
                 yield np.array([], dtype=int)
 
@@ -392,8 +386,6 @@ def gather_cond_id(top, lparallel):
             comm_world.send([], dest=0, tag=0)
 
     if comm_world.rank == 0:
-        # print(len(surface_id))
-        # print(np.where(np.concatenate(surface_id) == 2))
         return np.concatenate(surface_id)
     else:
         return np.array([], dtype=int)
