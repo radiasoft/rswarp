@@ -124,7 +124,6 @@ class BoxPlot(Conductor):
             if np.any(self.pids):
                 pof = np.where(np.abs(self.scraped_particles[axis, :] - bound) <= cell_size)[0]
                 # Take intersection with group Warp scraped on this conductor
-                print(pof, self.pids)
                 pof = np.intersect1d(pof, self.pids)
                 yield pof
             else:

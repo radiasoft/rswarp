@@ -4,12 +4,21 @@ import matplotlib.cm as cm
 try:
     from mayavi import mlab
 except ImportError:
-    print("Mayavi not found. 3D plotting not enabled.")
+    try:
+        # newer import formulation
+        import mlab
+    except ImportError:
+        print("Mayavi not found. 3D plotting not enabled.")
+    else:
+        print("Mayavi not found. 3D plotting not enabled.")
 
 from sys import maxint
 from ConductorTemplates import conductor_type_2d, conductor_type_3d
 import numpy as np
 from scipy.constants import e
+from warp import comm_world
+
+# TODO: Plotting routine may fail on systems with serial only install
 
 
 class PlotDensity(object):
@@ -123,35 +132,38 @@ class PlotDensity(object):
         return min_s, max_s, data
 
     def generate_plots_3d(self):
-        self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
-        self.clf = mlab.clf()
+        if comm_world.rank == 0:
+            self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
+            self.clf = mlab.clf()
 
         minS, maxS = maxint, 0
         contour_plots = []
         for cond in self.conductors.itervalues():
 
             minS, maxS, face_data = self.generate_plot_data_for_faces_3d(cond, minS, maxS)
-            for (x, y, z, s) in face_data:
-                if isinstance(cond, conductor_type_3d['Unstructured']):
-                    pts = mlab.points3d(x, y, z, s, scale_mode='none', scale_factor=0.002)
-                    mesh = mlab.pipeline.delaunay3d(pts)
-                    contour_plots.append(mlab.pipeline.surface(mesh, colormap='viridis'))
+            if comm_world.rank == 0:
+                for (x, y, z, s) in face_data:
+                        if isinstance(cond, conductor_type_3d['Unstructured']):
+                            pts = mlab.points3d(x, y, z, s, scale_mode='none', scale_factor=0.002)
+                            mesh = mlab.pipeline.delaunay3d(pts)
+                            contour_plots.append(mlab.pipeline.surface(mesh, colormap='viridis'))
+                        else:
+                            if np.min(s) < 0.0:
+                                contour_plots.append(mlab.mesh(x, y, z, color=(0, 0, 0), colormap='viridis'))
+                            else:
+                                contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='viridis'))
+
+        if comm_world.rank == 0:
+            for cp in contour_plots:
+                if minS < maxS:
+                    cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
                 else:
-                    if np.min(s) < 0.0:
-                        contour_plots.append(mlab.mesh(x, y, z, color=(0, 0, 0), colormap='viridis'))
-                    else:
-                        contour_plots.append(mlab.mesh(x, y, z, scalars=s, colormap='viridis'))
+                    # no particles on surface
+                    cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[0, 1])
 
-        for cp in contour_plots:
-            if minS < maxS:
-                cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[minS * 0.95, maxS * 1.05])
-            else:
-                # no particles on surface
-                cp.module_manager.scalar_lut_manager.trait_set(default_data_range=[0, 1])
-
-        mlab.draw()
-        mlab.colorbar(object=contour_plots[0], orientation='vertical')
-        mlab.show()
+            mlab.draw()
+            mlab.colorbar(object=contour_plots[0], orientation='vertical')
+            mlab.show()
 
     def generate_plot_data_for_faces_3d(self, cond, min_s=maxint, max_s=0):
         data = []
