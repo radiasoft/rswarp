@@ -186,7 +186,6 @@ class BoxPlot(Conductor):
 class Plane(Conductor):
     def generate_faces_2d(self):
         for i in self.axis:
-            print(1 - (i % 2), 3 - (i % 2))
             a, b = np.linspace(self.cbounds[1 - i // 2], self.cbounds[3 - i // 2], self.points_2d), \
                    np.linspace(self.center, self.center, self.points_2d)
             z, x = [a, b][i // 2], [b, a][i // 2]

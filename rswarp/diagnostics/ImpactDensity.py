@@ -122,7 +122,6 @@ class PlotDensity(object):
         for face in cond.generate_faces_2d():
             x, z, s = face[0] * self.scale[0], \
                          face[1] * self.scale[1], face[2] * e / self.time * 1e-4
-            print("min/max by face", np.min(s), np.max(s))
             if 0 <= np.min(s) < min_s:  # -1 value indicates no particle anywhere on face
                 min_s = np.min(s)
             if np.max(s) > max_s:
