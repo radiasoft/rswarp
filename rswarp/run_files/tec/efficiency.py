@@ -150,6 +150,8 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
         emiss_eff: Emissivity (none)
         T_env: Ambient temperature (K)
         occlusion: Fractional occlusion of collector by grid ()
+        rho_load: Effective load resistivity (Ohms*cm)
+                  if set < 0 then perfect matching is assumed -> V_load = phi_em - phi_col.
         **kwargs: Catch unused arguments
 
     Returns:
@@ -182,8 +184,12 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
     # P_load
     V_lead = J_ec * rho_cw + (J_ec - t * J_coll) * rho_ew
     # TODO: Check R_total for adjustment in rho
-    R_total = rho_cw + rho_ew + rho_load
-    V_load = R_total * J_ec - V_lead
+    if rho_load > 0:
+        R_total = rho_cw + rho_ew + rho_load
+        V_load = R_total * J_ec - V_lead
+    else:
+        R_total = rho_cw + rho_ew
+        V_load = (phi_em - phi_coll) + R_total * J_ec - V_lead
     P_load = J_ec * V_load
 
     # P_gate

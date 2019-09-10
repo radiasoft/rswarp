@@ -33,7 +33,7 @@ def cl_limit(cathode_phi, anode_wf, grid_bias, plate_spacing):
         plate_spacing (float)   : distance between cathode and anode in m
     
     Returns:
-        cl_current (float)      : Child-Langmuir current in A
+        cl_current (float)      : Child-Langmuir current in A/m^2
     
     """
     
