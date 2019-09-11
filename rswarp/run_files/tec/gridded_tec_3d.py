@@ -37,8 +37,9 @@ m = m_e  # electron mass in kg
 def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
          rho_ew, T_em, phi_em, T_coll, phi_coll, rho_cw, gap_distance, rho_load,
          run_id, channel_width=100e-9,
-         injection_type=2, magnetic_field=0.0, random_seed=True, install_grid=True, max_wall_time=1e9,
-         particle_diagnostic_switch=False, field_diagnostic_switch=False, lost_diagnostic_switch=False):
+         injection_type=2, magnetic_field=0.0, random_seed=True, install_grid=True, install_circuit=True,
+         max_wall_time=1e9, particle_diagnostic_switch=False,
+         field_diagnostic_switch=False, lost_diagnostic_switch=False):
     """
     Run a simulation of a gridded TEC.
     Args:
@@ -62,6 +63,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         random_seed: True/False. If True, will force a random seed to be used for emission positions.
         install_grid: True/False. If False the grid will not be installed. Results in simple parallel plate setup.
                                   If False then phi_em - phi_coll specifies the voltage on the collector.
+        install_circuit: True/False. Include external circuit that will modulate gap voltage based on
+                                     current flow and contact potential between cathode/anode.
         max_wall_time: Wall time to allow simulation to run for. Simulation is periodically checked and will halt if it
                         appears the next segment of the simulation will exceed max_wall_time. This is not guaranteed to
                         work since the guess is based on the run time up to that point.
@@ -285,12 +288,14 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     total_rho = efficiency.tec_parameters['rho_load'][0]
     if install_grid:
         plate = ZPlane(zcent=zplate, condid=3)
-        circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=False)
+        if install_circuit:
+            circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=False)
         plate.voltage = circuit
         # plate.voltage = collector_voltage
     else:
         plate = ZPlane(zcent=zplate)
-        circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=False)
+        if install_circuit:
+            circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=False)
         plate.voltage = circuit
         # plate.voltage = collector_voltage
 
