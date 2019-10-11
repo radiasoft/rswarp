@@ -155,6 +155,13 @@ class spherical(protrusion):
 
         return x, y, z
 
+    def install_conductor(self):
+        protrusion.install_conductor(self)
+        # To redefine, comment the above line and redefine below:
+
+    def register(self, solver, beam, top):
+        protrusion.register(self, solver, beam, top)
+        # To redefine, comment the above line and redefine below:
 
 class conical(protrusion):
 
@@ -190,3 +197,11 @@ class conical(protrusion):
         z =  -h + self.z_cone
 
         return x, y, z
+
+    def install_conductor(self):
+        protrusion.install_conductor(self)
+        # To redefine, comment the above line and redefine below:
+
+    def register(self, solver, beam, top):
+        protrusion.register(self, solver, beam, top)
+        # To redefine, comment the above line and redefine below:
