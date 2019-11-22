@@ -181,15 +181,20 @@ class spherical(protrusion):
 
         '''
 
-
         protrusion.__init__(self,work_function, temperature,
                     x_offset, y_offset, voltage, N_particles,
                     output_to_file, file_name )
 
         self.radius = radius
 
-        self.z_pts = np.linspace(0, self.radius, 100)
-        self.r_pts = np.sqrt(self.radius ** 2. - self.z_pts ** 2.)
+        z_pts = np.linspace(0, self.radius, 100)
+        r_pts = np.sqrt(self.radius ** 2. - z_pts ** 2.)
+        z_pts = np.append(z_pts, 0)
+        r_pts = np.append(r_pts, 0)
+
+        self.z_pts = z_pts
+        self.r_pts = r_pts
+
         self.area = self.radius ** 2. * 4. * np.pi / self.N_particles
 
 
@@ -215,6 +220,7 @@ class spherical(protrusion):
         protrusion.register(self, solver, beam, top)
         # To redefine, comment the above line and redefine below:
 
+
 class conical(protrusion):
     """Subclass for describing emission from a conical emitter using variable weight macroparticles in Warp."""
 
@@ -236,7 +242,6 @@ class conical(protrusion):
 
         '''
 
-
         protrusion.__init__(self,work_function, temperature,
                     x_offset, y_offset, voltage, N_particles,
                     output_to_file, file_name )
@@ -244,8 +249,14 @@ class conical(protrusion):
         self.z_cone = z_cone
         self.r_cone = r_cone
 
-        self.z_pts = np.linspace(0, self.z_cone, 100)
-        self.r_pts = - self.z_pts * self.r_cone / self.z_cone + self.r_cone
+        z_pts = np.linspace(0, self.z_cone, 100)
+        r_pts = - z_pts * self.r_cone / self.z_cone + self.r_cone
+        z_pts = np.append(z_pts, 0)
+        r_pts = np.append(r_pts, 0)
+
+        self.z_pts = z_pts
+        self.r_pts = r_pts
+
         self.area = self.r_cone * np.pi * (self.r_cone + np.sqrt(self.z_cone ** 2. + self.r_cone ** 2.)) / self.N_particles
 
 
@@ -263,6 +274,122 @@ class conical(protrusion):
         y = np.ones(N_particles) * self.y_offset + r * np.sin(t)
         z =  -h + self.z_cone
 
+        return x, y, z
+
+    def install_conductor(self):
+        protrusion.install_conductor(self)
+        # To redefine, comment the above line and redefine below:
+
+    def register(self, solver, beam, top):
+        protrusion.register(self, solver, beam, top)
+        # To redefine, comment the above line and redefine below:
+
+
+class gaussian(protrusion):
+
+    def __init__(self, r_cutoff = 1.0e-7, a = 1.0e-7, sigma = 1.0e-7,
+                work_function = 2.05, temperature = 1000,
+                x_offset = 0.0, y_offset = 0.0, voltage = 0.0, N_particles = 100,
+                output_to_file = False, file_name = 'emitted_particles_gauss.h5' ):
+        '''
+        conical class __init__ method. Follows base class call signature.
+
+        Args:
+            work_function (float, optional)     : Emitter workfunction in eV. Defaults to 2.05 eV.
+            temperature (float, optional)       : Emitter temperature in K. Defaults to 1000 K.
+            x_offset, y_offset (float, optional):  Defaults to 0.
+            voltage (float, optional)           : Potential at emitter surface. Defaults to 0.
+            N_particles (int, optional)         : Number of macroparticles to be injected each step. Defaults to 100.
+            output_to_file (Bool, optional)     : Flag for dumping particle phase spaces. Defaults to `emitted_
+                                                  particles_sph.h5`
+
+        '''
+
+        protrusion.__init__(self,work_function, temperature,
+                    x_offset, y_offset, voltage, N_particles,
+                    output_to_file, file_name )
+
+        self.r_cutoff = r_cutoff
+        self.a = a
+        self.sigma = sigma
+        self.z_offset = a * np.exp( - (r_cutoff ** 2.) / (sigma ** 2. * 2))
+
+        r_pts = np.linspace(0, r_cutoff, 100)
+        z_pts = a * np.exp(- (r_pts ** 2.) / (2.0 * sigma ** 2.)) - self.z_offset
+        z_pts = np.append(z_pts, 0)
+        r_pts = np.append(r_pts, 0)
+        
+        self.r_pts = r_pts
+        self.z_pts = z_pts
+        
+        self.area = self.compute_areas()
+
+    def sec_gamma(self, X, Y):
+    
+        df_dx = - X * self.a / ( self.sigma ** 2.) * np.exp( - ( X ** 2. + Y ** 2.) / (2.0 * self.sigma ** 2.))
+        df_dy = - Y * self.a / ( self.sigma ** 2.) * np.exp( - ( X ** 2. + Y ** 2.) / (2.0 * self.sigma ** 2.))
+    
+        return np.sqrt( 1 + df_dx ** 2. + df_dy ** 2.)
+    
+    def compute_areas(self):
+
+        r_beam = self.r_cutoff
+        n_sites = int(np.round(np.sqrt(self.N_particles)))
+        n_r = n_sites
+        n_th = n_sites
+
+        r_bins = np.sqrt(np.linspace(self.r_cutoff**2./10000., self.r_cutoff ** 2., n_r))
+        
+        self.r_bins = r_bins
+        self.r_beam = r_beam
+        self.n_r = n_r
+        self.n_th = n_th
+        
+        theta_bins = np.linspace(0, 2.0 * np.pi, n_th)
+        r_centers = r_bins[0:-1] + np.diff(r_bins) / 2.
+        theta_centers = theta_bins + np.mean(np.diff(theta_bins)) / 2.
+
+        R_b, Th_b = np.meshgrid(r_bins, theta_bins)
+        self.R_bins = R_b
+        self.Th_bins = Th_b
+        
+        areas = (R_b[:,1::]**2. - R_b[:,0::-1] **2.) * np.pi * np.mean(np.diff(theta_bins)) / (2.0 * np.pi)
+
+        X_b = R_b * np.cos(Th_b)
+        Y_b = R_b * np.sin(Th_b)
+
+        R_c, Th_c = np.meshgrid(r_centers, theta_centers)
+        X_c = R_c * np.cos(Th_c)
+        Y_c = R_c * np.sin(Th_c)
+
+        x_cent = X_c.flatten()
+        y_cent = Y_c.flatten()
+
+        secgamma = self.sec_gamma(x_cent, y_cent)
+        
+        area = areas.flatten() * secgamma
+
+        return area
+
+
+
+    def compute_emission_sites(self, N_particles):
+        '''Define emission sites for macroparticle injection specific to conical emitter.'''
+
+        R_low = self.R_bins[:,0:-1]
+        R_high = self.R_bins[:,1::]
+        Th_low = self.Th_bins[0:-1,:]
+        Th_high = self.Th_bins[1::,:]
+
+        R_p = np.random.uniform(R_low, R_high)
+        Th_p = np.random.uniform(Th_low, Th_high)
+
+        r_part = R_p.flatten()
+        th_part = Th_p.flatten()
+        x = r_part * np.cos(th_part)
+        y = r_part * np.sin(th_part)
+        z = self.a * np.exp(- (x**2. + y**2.) / (self.sigma ** 2. * 2.)) - self.z_offset
+        
         return x, y, z
 
     def install_conductor(self):
