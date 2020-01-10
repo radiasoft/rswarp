@@ -154,7 +154,93 @@ class protrusion():
         if self.output_to_file:
             self.dump(x, y, z, vx, vy, vz, Ex_s, Ey_s, Ez_s, phi_s, weights)
 
-class spherical(protrusion):
+class spheroid(protrusion):
+    """
+    Subclass for describing emission from a hemi spheroid emitter using variable weight macroparticles in Warp.
+
+    spheroid overrides the base class function `compute_emission_sites`
+
+    """
+
+    def __init__(self, x_radius = 1.0e-7, z_radius = 1.0e-7,
+                work_function = 2.05, temperature = 1000,
+                x_offset = 0.0, y_offset = 0.0, voltage = 0.0, N_particles = 100,
+                output_to_file = False, file_name = 'emitted_particles_sph.h5' ):
+
+        '''
+        spheroid class __init__ method. Follows base class call signature.
+
+        Args:
+            work_function (float, optional)     : Emitter workfunction in eV. Defaults to 2.05 eV.
+            temperature (float, optional)       : Emitter temperature in K. Defaults to 1000 K.
+            x_offset, y_offset (float, optional):  Defaults to 0.
+            voltage (float, optional)           : Potential at emitter surface. Defaults to 0.
+            N_particles (int, optional)         : Number of macroparticles to be injected each step. Defaults to 100.
+            output_to_file (Bool, optional)     : Flag for dumping particle phase spaces. Defaults to `emitted_
+                                                  particles_sph.h5`
+
+        '''
+
+        protrusion.__init__(self,work_function, temperature,
+                    x_offset, y_offset, voltage, N_particles,
+                    output_to_file, file_name )
+
+        self.x_radius = x_radius
+        self.z_radius = z_radius
+
+        z_pts = np.linspace(0, self.z_radius, 100)
+        r_pts = self.x_radius * np.sqrt((self.z_radius ** 2.- z_pts ** 2.) / self.z_radius ** 2.)
+        z_pts = np.append(z_pts, 0)
+        r_pts = np.append(r_pts, 0)
+
+        self.z_pts = z_pts
+        self.r_pts = r_pts
+
+        if self.x_radius < self.z_radius:
+            self.area = np.pi * self.x_radius ** 2. + np.pi * self.x_radius * self.z_radius / (np.sqrt(self.z_radius ** 2. - self.x_radius **2)/self.z_radius) * np.arccos(self.x_radius / self.z_radius) / self.N_particles
+        elif self.x_radius > self.z_radius:
+            self.area = np.pi * self.x_radius ** 2. + np.pi * self.z_radius ** 2 / (np.sqrt(self.x_radius ** 2. - self.z_radius **2)/self.x_radius) * np.log((1 + (np.sqrt(self.x_radius ** 2. - self.z_radius **2)/self.x_radius)) / (self.z_radius / self.x_radius)) / self.N_particles
+        else:
+            self.area = self.x_radius ** 2. * 2. * np.pi / self.N_particles
+
+
+    def compute_emission_sites(self, N_particles):
+        '''Define emission sites for macroparticle injection specific to hemispherical emitter.'''
+        if self.x_radius == self.z_radius:
+            u = np.random.uniform(0, 1, N_particles)
+            theta =  np.pi * u
+            v = np.random.uniform(0, 1, N_particles)
+            psi = np.arccos(2 * v - 1)
+
+            y = np.ones(N_particles) * self.y_offset + self.x_radius * np.cos(theta) * np.sin(psi)
+            z = self.x_radius * np.sin(theta) * np.sin(psi)
+            x = np.ones(N_particles) * self.x_offset + self.x_radius * np.cos(psi)
+
+            return x, y, z
+        else:
+            a = self.x_radius
+            b = self.z_radius
+
+            h = b * np.sqrt(np.random.uniform(0, 1, N_particles))
+            r = self.x_radius * np.sqrt((self.z_radius ** 2.- h ** 2.) / self.z_radius ** 2.)
+            t = 2 * np.pi * np.random.uniform(0, 1, N_particles)
+
+            x = np.ones(N_particles) * self.x_offset + r * np.cos(t)
+            y = np.ones(N_particles) * self.y_offset + r * np.sin(t)
+            z =  h
+
+            return x, y, z
+
+    def install_conductor(self):
+        protrusion.install_conductor(self)
+        # To redefine, comment the above line and redefine below:
+
+    def register(self, solver, beam, top):
+        protrusion.register(self, solver, beam, top)
+        # To redefine, comment the above line and redefine below:
+
+
+class spherical(spheroid):
     """
     Subclass for describing emission from a hemispherical emitter using variable weight macroparticles in Warp.
 
@@ -181,44 +267,9 @@ class spherical(protrusion):
 
         '''
 
-        protrusion.__init__(self,work_function, temperature,
+        spheroid.__init__(self, radius, radius, work_function, temperature,
                     x_offset, y_offset, voltage, N_particles,
                     output_to_file, file_name )
-
-        self.radius = radius
-
-        z_pts = np.linspace(0, self.radius, 100)
-        r_pts = np.sqrt(self.radius ** 2. - z_pts ** 2.)
-        z_pts = np.append(z_pts, 0)
-        r_pts = np.append(r_pts, 0)
-
-        self.z_pts = z_pts
-        self.r_pts = r_pts
-
-        self.area = self.radius ** 2. * 4. * np.pi / self.N_particles
-
-
-    def compute_emission_sites(self, N_particles):
-        '''Define emission sites for macroparticle injection specific to hemispherical emitter.'''
-
-        u = np.random.uniform(0, 1, N_particles)
-        theta =  np.pi * u
-        v = np.random.uniform(0, 1, N_particles)
-        psi = np.arccos(2 * v - 1)
-
-        y = np.ones(N_particles) * self.y_offset + self.radius * np.cos(theta) * np.sin(psi)
-        z = self.radius * np.sin(theta) * np.sin(psi)
-        x = np.ones(N_particles) * self.x_offset + self.radius * np.cos(psi)
-
-        return x, y, z
-
-    def install_conductor(self):
-        protrusion.install_conductor(self)
-        # To redefine, comment the above line and redefine below:
-
-    def register(self, solver, beam, top):
-        protrusion.register(self, solver, beam, top)
-        # To redefine, comment the above line and redefine below:
 
 
 class conical(protrusion):
@@ -257,7 +308,7 @@ class conical(protrusion):
         self.z_pts = z_pts
         self.r_pts = r_pts
 
-        self.area = self.r_cone * np.pi * (self.r_cone + np.sqrt(self.z_cone ** 2. + self.r_cone ** 2.)) / self.N_particles
+        self.area = self.r_cone * np.pi * np.sqrt(self.z_cone ** 2. + self.r_cone ** 2.)/ self.N_particles
 
 
     def compute_emission_sites(self, N_particles):
@@ -283,6 +334,7 @@ class conical(protrusion):
     def register(self, solver, beam, top):
         protrusion.register(self, solver, beam, top)
         # To redefine, comment the above line and redefine below:
+
 
 
 class gaussian(protrusion):
@@ -318,19 +370,19 @@ class gaussian(protrusion):
         z_pts = a * np.exp(- (r_pts ** 2.) / (2.0 * sigma ** 2.)) - self.z_offset
         z_pts = np.append(z_pts, 0)
         r_pts = np.append(r_pts, 0)
-        
+
         self.r_pts = r_pts
         self.z_pts = z_pts
-        
+
         self.area = self.compute_areas()
 
     def sec_gamma(self, X, Y):
-    
+
         df_dx = - X * self.a / ( self.sigma ** 2.) * np.exp( - ( X ** 2. + Y ** 2.) / (2.0 * self.sigma ** 2.))
         df_dy = - Y * self.a / ( self.sigma ** 2.) * np.exp( - ( X ** 2. + Y ** 2.) / (2.0 * self.sigma ** 2.))
-    
+
         return np.sqrt( 1 + df_dx ** 2. + df_dy ** 2.)
-    
+
     def compute_areas(self):
 
         r_beam = self.r_cutoff
@@ -339,12 +391,12 @@ class gaussian(protrusion):
         n_th = n_sites
 
         r_bins = np.sqrt(np.linspace(self.r_cutoff**2./10000., self.r_cutoff ** 2., n_r))
-        
+
         self.r_bins = r_bins
         self.r_beam = r_beam
         self.n_r = n_r
         self.n_th = n_th
-        
+
         theta_bins = np.linspace(0, 2.0 * np.pi, n_th)
         r_centers = r_bins[0:-1] + np.diff(r_bins) / 2.
         theta_centers = theta_bins + np.mean(np.diff(theta_bins)) / 2.
@@ -352,7 +404,7 @@ class gaussian(protrusion):
         R_b, Th_b = np.meshgrid(r_bins, theta_bins)
         self.R_bins = R_b
         self.Th_bins = Th_b
-        
+
         areas = (R_b[:,1::]**2. - R_b[:,0::-1] **2.) * np.pi * np.mean(np.diff(theta_bins)) / (2.0 * np.pi)
 
         X_b = R_b * np.cos(Th_b)
@@ -366,7 +418,7 @@ class gaussian(protrusion):
         y_cent = Y_c.flatten()
 
         secgamma = self.sec_gamma(x_cent, y_cent)
-        
+
         area = areas.flatten() * secgamma
 
         return area
@@ -389,7 +441,7 @@ class gaussian(protrusion):
         x = r_part * np.cos(th_part)
         y = r_part * np.sin(th_part)
         z = self.a * np.exp(- (x**2. + y**2.) / (self.sigma ** 2. * 2.)) - self.z_offset
-        
+
         return x, y, z
 
     def install_conductor(self):
