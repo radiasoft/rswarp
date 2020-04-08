@@ -1,4 +1,10 @@
-from __future__ import division
+# -*- coding: utf-8 -*-
+u"""?
+
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
 import pymesh
 from warp import *
 from copy import deepcopy
@@ -30,7 +36,7 @@ class LineSegment:
 
 class Ray:
     """Class that manages ray instance.
-    
+
     To use:
     >>> ls = LineSegment([[0., 0., 0.], [1., 0., 0.]])
     >>> ray = Ray(ls)
@@ -45,7 +51,7 @@ class Ray:
 
 class Triangle:
     """Class that manages triangle instance.
-    
+
     To use:
     >>> tri = Triangle([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]])
     >>> tri.vertex(0)
@@ -90,7 +96,7 @@ class STLconductor(Assembly):
 
       Normalization of the stl mesh by the PIC cell size (dx) is recommended for robustly finding stl-mesh/PIC-cell intersections:
       >>> c = STLconductor("some_mesh.stl", voltage=V, normalization_factor=dx)
-      
+
       To install the defined conductor for Warp:
       >>> installconductor(c)
     """
@@ -119,7 +125,7 @@ class STLconductor(Assembly):
         """
         usenewconductorgeneration()
         kwlist = []
-        
+
         #Note: the Assembly class must be instantiated with dummy centroid values of (0,0,0).
         #Providing alternative values leads to inconsistent installation of the conductors
         Assembly.__init__(self, voltage, 0, 0, 0, condid, kwlist,
@@ -296,7 +302,7 @@ class STLconductor(Assembly):
 #                                [self.xcent, self.ycent, self.zcent])
 
     # end of getextent function
-    
+
     def conductorf(self):
         raise Exception("This function should never be called")
 
@@ -306,7 +312,7 @@ class STLconductor(Assembly):
         """Compute the distance to the conductor.
 
         Args:
-          xcent, ycent, zcent: Coordinate of conductor center (unncessary for STLconductor, but legacy of Warp code) 
+          xcent, ycent, zcent: Coordinate of conductor center (unncessary for STLconductor, but legacy of Warp code)
           x: A list of x-coordinates
           y: A list of y-coordinates
           z: A list of z-coordinates
@@ -329,14 +335,14 @@ class STLconductor(Assembly):
     def _conductord_winding_squared(self, pts, distance):
         """Compute and returned the signed distances between particles and mesh.
 
-        
+
         The distances are computed via the functions of winding number and squared distance provided by PyMesh.
         PyMesh's distance_to_mesh function needs to compute BVH engine every time it is called.
         The PyMesh library has been modified so distance_to_mesh can take BVH engine as an argument
         to avoid this time consuming step called every time.
 
         Args:
-          pts: numpy.ndarray of Nx3 storing the positions of particles for query. 
+          pts: numpy.ndarray of Nx3 storing the positions of particles for query.
           distance: A list to store the computed distance
 
         Return:
@@ -359,19 +365,19 @@ class STLconductor(Assembly):
     def _conductord_signed(self, pts, distance):
         """Compute and returned the signed distances between particles and mesh.
 
-        
+
         The distances are computed via the signed_disntace_to_mesh function.
         This is based on IGL library's igl::signed_distance_pseudonormal,
         and provided by our modified PyMesh library.
 
         Args:
-          pts: numpy.ndarray of Nx3 storing the positions of particles for query. 
+          pts: numpy.ndarray of Nx3 storing the positions of particles for query.
           distance: A list to store the computed distance
 
         Return:
           distance: A list. Points outside conductor have positive values, and those inside have negative values.
         """
-        
+
         distance[:], _, _, _ = pymesh.signed_distance_to_mesh(self.surface, pts, bvh=self._bvh)
 
     # end of _conductord_signed function
@@ -384,7 +390,7 @@ class STLconductor(Assembly):
 
     def conductorfnew(self, xcent, ycent, zcent, intercepts, fuzz):
         """Generate x, y, z intercepts.
-        
+
         Warning: STLconductor caches xi, yi, and zi to save computational time
         by assuming that CAD conductors, once installed, never change during a simulation.
         Warp code recomputes intercepts for the MG field solver every PIC step.
@@ -393,7 +399,7 @@ class STLconductor(Assembly):
         and recomputing these intercepts every PIC step is unacceptable.
 
         Args:
-          xcent, ycent, zcent: Coordinate of conductor center (unncessary for STLconductor, but legacy of Warp code) 
+          xcent, ycent, zcent: Coordinate of conductor center (unncessary for STLconductor, but legacy of Warp code)
           intercepts: Fortran data structure ConductorInterceptType to store computed intercepts used by Warp.
           fuzz: fuzzy number. Required by Warp, but not used in STLconductor.
 
@@ -410,7 +416,7 @@ class STLconductor(Assembly):
 
         if not mglevel in self.installedintercepts:
             if self._verbose:
-                print " ---  generating intercepts for mglevel = {}".format(mglevel)
+                print(" ---  generating intercepts for mglevel = {}".format(mglevel))
             xi, yi, zi = self._conductorfnew_impl(intercepts)
             self.installedintercepts[mglevel] = (xi, yi, zi)
         else:
@@ -427,12 +433,12 @@ class STLconductor(Assembly):
         return xi, yi, zi
 
     # end of conductorfnew function
-    
+
     def _round_float(self, f, n, expr):
         return float(('%.' + str(n) + expr) % f)
 
     def _surface_mesh_quality_check(self):
-        
+
         # extent of surface
         surface_boxlo = np.amin(self.surface.vertices, axis=0)
         surface_boxhi = np.amax(self.surface.vertices, axis=0)
@@ -463,7 +469,7 @@ class STLconductor(Assembly):
 
     def _conductorfnew_impl(self, intercepts):
         """Function that does the actual compuation of intercepts.
-        
+
         conductorfnew is the public interface and calls this private member function
         to do the actual computation.
 
@@ -485,11 +491,11 @@ class STLconductor(Assembly):
 
         # lower and higher corners of simulation box
         boxlo = np.array([intercepts.xmmin, intercepts.ymmin, intercepts.zmmin])
-        boxhi = np.array([intercepts.xmmin + nx*dx[0], intercepts.ymmin + ny*dx[1], intercepts.zmmin + nz*dx[2]]) 
+        boxhi = np.array([intercepts.xmmin + nx*dx[0], intercepts.ymmin + ny*dx[1], intercepts.zmmin + nz*dx[2]])
 
         if not self._normalization_factor:
             # minimal box that can enclose the surface
-            surface_boxlo = self._surface_boxlo 
+            surface_boxlo = self._surface_boxlo
             surface_boxhi = self._surface_boxhi
             dx0 = self._dx0     # cell size at mglevel = 0
             # surface mesh vertices
@@ -504,7 +510,7 @@ class STLconductor(Assembly):
             surface_boxhi = self._surface_boxhi / self._normalization_factor
             # surface mesh vertices
             vertices = self.surface.vertices / self._normalization_factor
-            
+
         if self._precision_decimal:
             if not self._normalization_factor: expr = 'e'
             else: expr = 'f'
@@ -525,15 +531,15 @@ class STLconductor(Assembly):
         surface_box_extent = surface_boxhi - surface_boxlo
 
         if self._verbose:
-            print " ---  (nx,ny,nz)=({},{},{}), (dx,dy,dz)=({},{},{})".format(nx,ny,nz,dx[0],dx[1],dx[2])
-            print " ---  boxlo=({},{},{}), boxhi=({},{},{})".format(boxlo[0],boxlo[1],boxlo[2],boxhi[0],boxhi[1],boxhi[2])
-            print " ---  surface_boxlo=({},{},{}), surface_boxhi=({},{},{})".format(surface_boxlo[0],surface_boxlo[1],surface_boxlo[2],
-                                                                                    surface_boxhi[0],surface_boxhi[1],surface_boxhi[2])
+            print(" ---  (nx,ny,nz)=({},{},{}), (dx,dy,dz)=({},{},{})".format(nx,ny,nz,dx[0],dx[1],dx[2]))
+            print(" ---  boxlo=({},{},{}), boxhi=({},{},{})".format(boxlo[0],boxlo[1],boxlo[2],boxhi[0],boxhi[1],boxhi[2]))
+            print(" ---  surface_boxlo=({},{},{}), surface_boxhi=({},{},{})".format(surface_boxlo[0],surface_boxlo[1],surface_boxlo[2],
+                                                                                    surface_boxhi[0],surface_boxhi[1],surface_boxhi[2]))
 
         eps = 5e-4*dx0
 
         if self._verbose:
-            print " ---  generating xintercepts ..."
+            print(" ---  generating xintercepts ...")
         xmin = surface_boxlo[0]-0.5*surface_box_extent[0]; xmax = surface_boxhi[0]+0.5*surface_box_extent[0]
         imp = (0, 1, 2)
         directions = [(0, 0, 0), (0, 1, 1), (0, -1, -1), (0, 1, -1), (0, -1, 1)]
@@ -559,7 +565,7 @@ class STLconductor(Assembly):
             if successful: break
 
         if self._verbose:
-            print " ---  generating yintercepts ..."
+            print(" ---  generating yintercepts ...")
         ymin = surface_boxlo[1]-0.5*surface_box_extent[1]; ymax = surface_boxhi[1]+0.5*surface_box_extent[1]
         imp = (1, 0, 2)
         directions = [(0, 0, 0), (1, 0, 1), (-1, 0, -1), (1, 0, -1), (-1, 0, 1)]
@@ -585,7 +591,7 @@ class STLconductor(Assembly):
             if successful: break
 
         if self._verbose:
-            print " ---  generating zintercepts ..."
+            print(" ---  generating zintercepts ...")
         zmin = surface_boxlo[2]-0.5*surface_box_extent[2]; zmax = surface_boxhi[2]+0.5*surface_box_extent[2]
         imp = (2, 0, 1)
         directions = [(0, 0, 0), (1, 1, 0), (-1, -1, 0), (1, -1, 0), (-1, 1, 0)]
@@ -754,7 +760,7 @@ class STLconductor(Assembly):
         # create (m+1)by(n+1) list
         # for each element: intercepts[m][n] = [ [], [] ]
         intercepts = [ [ [ [], [] ] for _ in range(n+1) ] for _ in range(m+1) ]
-        
+
         r0 = [0, 0, 0]; r1 = [0, 0, 0]
         r0[imp[0]] = rmin; r1[imp[0]] = rmax
         faces = self.surface.faces
@@ -801,7 +807,7 @@ class STLconductor(Assembly):
         for i in range(m):
             for j in range(n):
                 pos = i*n + j
-                
+
                 d = np.unique([self._round_float(icpt, decimal, expr) for icpt in intercepts[i][j][0]])
                 if len(d) % 2 == 1:
                     return None, False
@@ -832,5 +838,5 @@ class STLconductor(Assembly):
         return c_intercepts, True
 
     # end of _produce_intercepts function
-  
+
 # end of class STLconductor

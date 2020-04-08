@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+u"""
+
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
 import os
 import h5py as h5
 import numpy as np
@@ -85,7 +92,7 @@ class JobRunner(object):
             client.load_system_host_keys(filename=host_keys)
             client.connect(hostname=server, username=username, key_filename=key_filename)
         except IOError, e:
-            print "Failed to connect to server on: {}@{}\n".format(username, server)
+            print("Failed to connect to server on: {}@{}\n".format(username, server))
             return e
 
         return client
@@ -100,7 +107,7 @@ class JobRunner(object):
             sftp_client = ssh_client.open_sftp()
             return sftp_client
         except IOError, e:
-            print "Failed to connect to establish sftp connection.\n"
+            print("Failed to connect to establish sftp connection.\n")
             return e
 
     def refresh_ssh_client(self, verbose=False):
@@ -112,14 +119,14 @@ class JobRunner(object):
         # Actual check for live client
         if not self.client.get_transport() or self.client.get_transport().is_active() != True:
             if verbose:
-                print "Reopening SSH Client"
+                print("Reopening SSH Client")
             self.client = self.establish_ssh_client(self.server, self.username, self.key_filename,
                                                     host_keys=self.host_keys)
 
             return self.client
         else:
             if verbose:
-                print "SSH Client is live"
+                print("SSH Client is live")
             return self.client
 
     def upload_file(self, remote_directory, upload_files, debug=False):
@@ -164,10 +171,10 @@ class JobRunner(object):
             # Back to home before next file uploaded
             sftp_client.chdir(home_directory)
             if debug:
-                print "{} Uploaded".format(ufile)
+                print("{} Uploaded".format(ufile))
 
         sftp_client.close()
-        print "SFTP Connection Closed"
+        print("SFTP Connection Closed")
 
         return 0
 
@@ -198,7 +205,7 @@ class JobRunner(object):
 
         for p, j in izip_longest(self.project_directory, job_name, fillvalue=self.project_directory[-1]):
             j = os.path.split(j)[-1]
-            print 'Starting batch file: {} in directory {}'.format(j, p)
+            print('Starting batch file: {} in directory {}'.format(j, p))
 
             # Check for path existence
             stdin, stdout, stderr = self.client.exec_command('ls {}'.format(p))
@@ -374,12 +381,12 @@ class JobRunner(object):
                 try:
                     sftp_client.get(fil.filename, os.path.join(local_directory, fil.filename))
                 except IOError as e:
-                    print "File retrieval failed for: {}".format(fil.filename)
-                    print "Error returned:\n {}".format(e)
+                    print("File retrieval failed for: {}".format(fil.filename))
+                    print("Error returned:\n {}".format(e))
                     pass
 
         sftp_client.close()
-        print "SFTP Connection Closed"
+        print("SFTP Connection Closed")
 
 
 def create_runfiles(generation, population, simulation_parameters, batch_format):
@@ -550,4 +557,3 @@ def return_efficiency(generation, population, directory):
     efficiency = np.isnan(efficiency) * min_eff + np.nan_to_num(efficiency)
 
     return efficiency
-

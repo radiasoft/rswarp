@@ -127,7 +127,7 @@ def calculate_power_flux(velocity, weight, phi, run_time, A_em, **kwargs):
     ke = 0.5 * m_e * np.sum(v_sqr)
     N = v_sqr.size
     E_tot = ke + phi * e * N
-    print "Etot: {}".format(E_tot)
+    print("Etot: {}".format(E_tot))
     return E_tot * weight / run_time / A_em
 
 
@@ -207,10 +207,10 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
 
     debug = True  # Hardwiring this because Python2 is dumb and doesn't let you set fixed kwargs and use **kwargs
     if debug:
-        print "Power lost in wiring:", P_ew
-        print "Power lost to radiation:", P_r
-        print "Power carried away by electrons:", P_ec
-        print "Power produced in the load:", P_load
-        print "Power lost to maintain gate voltage:", P_gate
+        print("Power lost in wiring:", P_ew)
+        print("Power lost to radiation:", P_r)
+        print("Power carried away by electrons:", P_ec)
+        print("Power produced in the load:", P_load)
+        print("Power lost to maintain gate voltage:", P_gate)
 
     return efficiency_data

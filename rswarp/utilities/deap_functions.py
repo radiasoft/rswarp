@@ -1,12 +1,19 @@
+# -*- coding: utf-8 -*-
+u"""
+
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
 import random, os
 from rswarp.utilities.deap_interface import JobRunner, return_efficiency, save_generation
 from deap import tools
 from deap.algorithms import varAnd
 """
-Using `random` package for random number generation. 
+Using `random` package for random number generation.
 This is to keep in line with the implementation in the DEAP library.
-Note that `random.randint` has inclusive lower and upper bounds 
-(differs from `np.random.randint`). 
+Note that `random.randint` has inclusive lower and upper bounds
+(differs from `np.random.randint`).
 """
 
 tec_template = {
@@ -252,7 +259,7 @@ def eaSimpleWarp(population, toolbox, filename, cxpb, mutpb, ngen, stats=None,
 
     # Find which individuals have no fitness assigned (probably all of them here)
     fitnesses = return_efficiency(population, 'generation_0')
-    print fitnesses
+    print(fitnesses)
     # Assign new fitness values to the individuals
     for ind, fit in zip(population, fitnesses):
         ind.fitness.values = (fit,)
@@ -264,7 +271,7 @@ def eaSimpleWarp(population, toolbox, filename, cxpb, mutpb, ngen, stats=None,
 
     # Begin the generational process
     for gen in range(1, ngen + 1):
-        print "Starting Generation: {}".format(gen)
+        print("Starting Generation: {}".format(gen))
         # Select the next generation individuals
         offspring = toolbox.select(population, len(population))
 
@@ -290,8 +297,8 @@ def eaSimpleWarp(population, toolbox, filename, cxpb, mutpb, ngen, stats=None,
         #         record = stats.compile(population) if stats else {}
         #         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         #         if verbose:
-        #             print logbook.stream
-        print "Completed Generation: {}".format(gen)
+        #             print(logbook.stream)
+        print("Completed Generation: {}".format(gen))
 
     # TODO switch return back to population
     return offspring, logbook

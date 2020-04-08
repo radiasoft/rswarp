@@ -75,11 +75,11 @@ def readparticles(filename):
     if f.attrs.get('openPMD') is None:
         print("Warning!: Not an openPMD file. This may not work.")
 
-    step = f['data'].keys()[0]
+    step = list(f['data'].keys())[0]
     time = f['data/%s' % step].attrs["time"]
     dt = f['data/%s' % step].attrs["dt"]
 
-    species_list = f['data/%s/particles' % step].keys()
+    species_list = list(f['data/%s/particles' % step].keys())
 
     for species in species_list:
         parray = f['data/%s/particles/%s/position/x' % (step, species)]
