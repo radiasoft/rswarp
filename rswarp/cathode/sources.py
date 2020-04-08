@@ -8,7 +8,7 @@ Authors: Nathan Cook and Chris Hall
 from __future__ import division
 import numpy as np
 from scipy.special import erf,erfinv
-import injectors
+from rswarp.cathode import injectors
 
 
 # Specify constants
@@ -20,29 +20,29 @@ m = m_e  # mass of electron
 
 ##########################################
 ###### SUPPORT FUNCTIONS
-##########################################    
+##########################################
 
 def cl_limit(cathode_phi, anode_wf, grid_bias, plate_spacing):
     """
     Compute the (cold) Child-Langmuir limit using grid geometry.
-    
+
     Arguments:
         cathode_phi (float)      : cathode work function in V
         anode_wf (float)        : anode work function in V
         grid_bias (float)       : voltage on grid electrodes in V
         plate_spacing (float)   : distance between cathode and anode in m
-    
+
     Returns:
         cl_current (float)      : Child-Langmuir current in A/m^2
-    
+
     """
-    
+
     # Compute vacuum level prior to computing current
     vacuum_level = cathode_phi - anode_wf + grid_bias
     cl_limit = 4. * epsilon_0 / 9. * np.sqrt(2. * e / m_e) * abs(vacuum_level)**(3./2.) / plate_spacing**2
-    
+
     return cl_limit
-    
+
 
 def j_rd(T, phi):
     """Returns the Richardson-Dushmann thermionic emission given a temperature
@@ -54,7 +54,7 @@ def j_rd(T, phi):
 
     Returns:
         J (float)   : current density in Amp/m^2
-    
+
     """
 
     A = 1.20e6  # amp/m^2/degK^2
@@ -64,9 +64,9 @@ def j_rd(T, phi):
 
 def get_MB_velocities(n_part, T):
     """Return a distribution of particle velocities representing a Maxwell-Boltzmann
-    distribution. 
+    distribution.
 
-    Each velocity distribution is a temperature dependent Gaussian. Due to the geometry 
+    Each velocity distribution is a temperature dependent Gaussian. Due to the geometry
     of the cathode, negative longitudinal velocities are discarded. The individual
     velocity distributions are assumed to be independent, and hence there is no covariance
     between them.
@@ -94,7 +94,7 @@ def get_MB_velocities(n_part, T):
         pos_output = output[np.where(output[:,2] > 0.)[0]]
         if pos_output.shape[0] >= n_part:
             flag_array_full = True
-        
+
     return pos_output[:n_part]
 
 
@@ -105,9 +105,9 @@ def compute_expected_velocity(T):
     """
 
     var_z = 2*kb_J*T/m
-    
+
     return (2./np.pi)*np.sqrt(var_z)
-    
+
 
 def compute_cutoff_beta(T, frac=0.99):
     """Returns the velocity for which the fraction frac of a beam emitted from a thermionic
@@ -126,41 +126,41 @@ def compute_cutoff_beta(T, frac=0.99):
 
     multiplier = erfinv(frac)  # the multiplier on sigma accounting for frac of the distribution
 
-    return multiplier*sigma/c 
-    
+    return multiplier*sigma/c
+
 
 def compute_crossing_fraction(cathode_temp, phi, zmesh):
     """
     Returns the % of particles expected to cross the gap
-    
+
     Arguments:
         cathode_temp    (float) : cathode temperature in K
         phi             (scipy) : Interpolation (scipy.interpolate.interpolate.interp1d) of Phi from initial solve
         zmesh          (ndArray) : 1D array with positions of the z-coordinates of the grid
-        
+
     Returns:
         e_frac          (float) : fraction of beam that overcomes the peak potential barrier phi
-    """ 
-    
+    """
+
     # Conditions at cathode edge
     var_xy = kb_J*cathode_temp/m  # Define the variance of the distribution in the x,y planes
     var_z = 2*kb_J*cathode_temp/m  # Variance in z plane is twice that in the horizontal
-    
+
     #Phi is in eV
-    vz_phi = np.sqrt(2.*e*np.max(phi(zmesh))/m_e) 
-    
+    vz_phi = np.sqrt(2.*e*np.max(phi(zmesh))/m_e)
+
     #cumulative distribution function for a Maxwellian
     CDF_Maxwell = lambda v, a: erf(v/(np.sqrt(2)*a)) - np.sqrt(2./np.pi)*v*np.exp(-1.*v**2/(2.*a**2))/a
-    
+
     e_frac = CDF_Maxwell(vz_phi,np.sqrt(var_z)) #fraction with velocity below vz_phi
-    
+
     return (1.-e_frac)*100. #Multiply by 100 to get % value
 
 
 def compute_expected_time(beam, cathode_temp,Ez, zmin, zmax, dt):
     """
     Returns the expected time of flight for a particle with average initial velocity across the gap.
-    
+
     Arguments:
         beam            (Warp)  : warp beam object (e.g. Species() call)
         cathode_temp    (float) : cathode temperature in K
@@ -170,7 +170,7 @@ def compute_expected_time(beam, cathode_temp,Ez, zmin, zmax, dt):
         dt              (float) : step size in time (specified by top.dt)
 
     Returns:
-        t_curr (float)     : final time value at which simulated particle reaches right boundary    
+        t_curr (float)     : final time value at which simulated particle reaches right boundary
     """
 
     # Conditions at cathode edge
@@ -190,21 +190,21 @@ def compute_expected_time(beam, cathode_temp,Ez, zmin, zmax, dt):
         z_curr = z_curr + v_curr*dt
         # Update t to get traversal time
         t_curr = t_curr + dt
-        
+
         assert z_curr > 0, \
             'Expected crossing time could not be calculated. Particle with expected velocity {:.3e} fails to cross specified geometry'.format(v0)
-        
+
     return t_curr
 
 ##########################################
 ###### INSTANTIATIONS
-##########################################    
+##########################################
 
 
 def constant_current(beam, channel_width, z_part_min, ptcl_per_step):
     """
     Instantiate a beam with constant, user-specified current and zero temperature.
-    
+
     Arguments:
         current (float)         : beam current in Amperes
         a0      (float)         : X-plane source radius in m
@@ -218,17 +218,17 @@ def constant_current(beam, channel_width, z_part_min, ptcl_per_step):
 
     # fixed cathode temperature
     myInjector = injectors.injectorUserDefined(beam, 4.0, channel_width, z_part_min, ptcl_per_step)
-    
+
     installuserinjection(myInjector.inject_electrons)
-    
+
     # These must be set for user injection
-    top.ainject = 1.0          
+    top.ainject = 1.0
     top.binject = 1.0
-    
-    
+
+
 # def child_langmuir_current(current,cathode_phi,anode_wf,grid_bias):
 # def child_langmuir_current(current, a0, b0):
-def child_langmuir_current():    
+def child_langmuir_current():
     """
     Instantiate a beam with (cold) Child-Langmuir limited current. Current must be computed using
     available geometry.
@@ -242,7 +242,7 @@ def child_langmuir_current():
     # beam.vthz   = 0
     # beam.vthperp= 0
     w3d.l_inj_exact = True  # this is needed for top.inject=2
-    
+
 
 def thermionic_current(beam, cathode_temp, channel_width, z_part_min, ptcl_per_step):
     """Instantiate a beam with the Richardson-Dushmann current and a thermal distribution of velocities.
@@ -257,17 +257,17 @@ def thermionic_current(beam, cathode_temp, channel_width, z_part_min, ptcl_per_s
         b0              (float) : Y-plane source radius in m FOR 3D SIMULATIONS
         channel_width   (float) : width of domain in x/y plane
         z_part_min      (float) : z coordinate of particles injected - provides separation from left boundary
-        ptcl_per_step   (int)   : number of macro particles injected per step        
-    
+        ptcl_per_step   (int)   : number of macro particles injected per step
+
 
     """
 
     # top.inject = 6 must be specified in main script
 
     myInjector = injectors.injectorUserDefined(beam, cathode_temp, channel_width, z_part_min, ptcl_per_step)
-    
+
     installuserinjection(myInjector.inject_thermionic)
-    
+
     # These must be set for user injection
-    top.ainject = 1.0          
+    top.ainject = 1.0
     top.binject = 1.0

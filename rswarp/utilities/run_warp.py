@@ -1,5 +1,14 @@
+# -*- coding: utf-8 -*-
+u"""run warp
+
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
+from pykern.pkcollections import PKDict
+from pykern.pkdebug import pkdc, pkdlog, pkdp
 from subprocess import Popen, PIPE
-from file_utils import cleanupPrevious
+from rswarp.utilities.file_utils import cleanupPrevious
 import os
 import sys
 
@@ -74,21 +83,21 @@ class RunWarp():
                              stderr=PIPE, shell=True)
                 stdout, stderr = call.communicate()
         elif self.runflag != True:
-            print "Output directory already exists. Please change directory path to run." \
-                  "\n To override this set attribute runflag to True"
+            print("Output directory already exists. Please change directory path to run."
+                  "\n To override this set attribute runflag to True")
             return
 
         if call.returncode == 0:
-            print "Warp Run Completed"
+            print("Warp Run Completed")
             self.runflag = False
 
             return
         elif call.returncode != 0:
-            print "Warp Failed to Run with Traceback:"
+            print("Warp Failed to Run with Traceback:")
             if stderr:
-                print
-                print stderr
+                print('')
+                print(stderr)
             else:
-                print "No Traceback Available"
+                print("No Traceback Available")
 
             return
