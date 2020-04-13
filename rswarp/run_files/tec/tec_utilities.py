@@ -134,7 +134,7 @@ def read_parameter_file(filename):
     parameters = yaml.load(open(filename, 'r'))
     input_deck = {}
     for key0 in parameters:
-        for key1, val in parameters[key0].iteritems():
+        for key1, val in parameters[key0].items():
             input_deck[key1] = val
 
     return input_deck

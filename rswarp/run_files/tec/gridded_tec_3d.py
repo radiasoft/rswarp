@@ -29,7 +29,7 @@ from warp.particles.extpart import ZCrossingParticles
 from warp.utils.loadbalance import LoadBalancer
 from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.file_utils import cleanupPrevious
-from tec_utilities import record_time, SteadyState, ExternalCircuit, write_parameter_file
+from .tec_utilities import record_time, SteadyState, ExternalCircuit, write_parameter_file
 from rswarp.diagnostics.ConductorDiagnostics import analyze_scraped_particles
 
 # Constants imports
@@ -122,9 +122,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # TODO: cells in all dimensions reduced by 10x for testing, will need to verify if this is reasonable (TEMP)
     # Grid parameters
-    dx_want = 5e-9
-    dy_want = 5e-9
-    dz_want = 5e-9
+    dx_want = 1e-6
+    dy_want = 1e-6
+    dz_want = 1.1e-6
 
     NUM_X = int(round(channel_width / dx_want))  # 20 #128 #10
     NUM_Y = int(round(channel_width / dy_want))  # 20 #128 #10
@@ -175,7 +175,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     EMITTER_PHI = phi_em # work function in eV
     COLLECTOR_PHI = phi_coll  # Can be used if vacuum level is being set
     ACCEL_VOLTS = V_grid  # ACCEL_VOLTS used for velocity and CL calculations
-    collector_voltage = phi_em - phi_coll
+    if install_grid:
+        collector_voltage = phi_em - phi_coll
+    else:
+        collector_voltage = ACCEL_VOLTS
 
     # Emitted species
     background_beam = Species(type=Electron, name='background')
@@ -200,7 +203,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Returns velocity beam_beta (in units of beta) for which frac of emitted particles have v < beam_beta * c
     beam_beta = sources.compute_cutoff_beta(EMITTER_TEMP, frac=0.99)
 
-    PTCL_PER_STEP = 100
+    PTCL_PER_STEP = 1001
 
     if injection_type == 1:
         CURRENT_MODIFIER = 0.5  # Factor to multiply CL current by when setting beam current
@@ -302,8 +305,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         plate = ZPlane(zcent=zplate)
         if install_circuit:
             circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=False)
-        plate.voltage = circuit
-        # plate.voltage = collector_voltage
+            plate.voltage = circuit
 
     if install_grid:
         installconductor(accel_grid)
@@ -337,10 +339,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         installafterstep(particle_diagnostic_0.write)
 
     if field_diagnostic_switch:
-        fieldperiod = 1000
+        fieldperiod = 500
         efield_diagnostic_0 = FieldDiagnostic.ElectrostaticFields(solver=solverE, top=top, w3d=w3d,
                                                                   comm_world=comm_world,
-                                                                  period=fieldperiod)
+                                                                  period=fieldperiod, write_dir=field_base_path)
         installafterstep(efield_diagnostic_0.write)
 
     # Set externally derived parameters for efficiency calculation
@@ -386,6 +388,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     solverE.mgmaxiters = regular_iters
 
     print("weights (background) (measurement): {}, {}".format(background_beam.sw, measurement_beam.sw))
+    print("Time step: {} s".format(dt))
+    print("Steps to cross gap at max predicted velocity: {}".format(w3d.zmmax / vzfinal / dt))
 
     # Use rnpinject to set number of macroparticles emitted
     background_beam.rnpinject = PTCL_PER_STEP
@@ -399,9 +403,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Switch off measurement species and wait for simulation to clear (background species is switched on)
 
     early_abort = 0  # If true will flag output data to notify
-    startup_time = 4 * gap_distance / vz_accel  # ~4 crossing times to approach steady-state with external circuit
+    startup_time = 4 * gap_distance / np.max([vz_accel, beam_beta * c])  # ~4 crossing times to approach steady-state with external circuit
     crossing_measurements = 10  # Number of crossing times to record for
-    steps_per_crossing = int(gap_distance / vz_accel / dt)
+    steps_per_crossing = int(gap_distance / np.max([vz_accel, beam_beta * c]) / dt)
     ss_check_interval = int(steps_per_crossing / 2.)
     ss_max_checks = 8  # Maximum number of of times to run steady-state check procedure before aborting
     times = []  # Write out timing of cycle steps to file
@@ -471,6 +475,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # particle_diagnostic_0.period = steps_per_crossing #TEMP commented out
     # Switch to measurement beam species
+
+    np.save('current_0.npy', top.curr)
+
     measurement_beam.rnpinject = PTCL_PER_STEP
     background_beam.rnpinject = 0
 
@@ -503,7 +510,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         emitter_flux.append(velocity_array)
 
         ZCross.clear()  # Clear ZcrossingParticles memory
-
+        np.save('current_1.npy', top.curr)
         print("Measurement: {} of {} intervals completed. Interval run time: {} s".format(sint + 1,
                                                                                           crossing_measurements,
                                                                                           times[-1]))
@@ -598,8 +605,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     if comm_world.rank == 0:
         if not os.path.exists('diags_id{}'.format(run_id)):
             os.makedirs('diags_id{}'.format(run_id))
-
-        np.save('iv_data.npy', np.array([circuit.current_history, circuit.voltage_history]))
+        if install_circuit:
+            np.save('iv_data.npy', np.array([circuit.current_history, circuit.voltage_history]))
 
         write_parameter_file(run_attributes, filename='diags_id{}/'.format(run_id))
 
