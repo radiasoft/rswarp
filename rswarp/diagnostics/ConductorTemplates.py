@@ -167,9 +167,9 @@ class Plane(Conductor):
                  // self.cell_size[(axis + 2) % 3]
 
             x, y = np.meshgrid(np.linspace(self.cbounds[(axis + 1) % 3],
-                                           self.cbounds[(axis + 1) % 3 + 3], xn),
+                                           self.cbounds[(axis + 1) % 3 + 3], int(xn)),
                                np.linspace(self.cbounds[(axis + 2) % 3],
-                                           self.cbounds[(axis + 2) % 3 + 3], yn))
+                                           self.cbounds[(axis + 2) % 3 + 3], int(yn)))
             z = np.ones_like(x) * self.center
             if self.debug:
                 print("cells for plane", x.shape, y.shape)
