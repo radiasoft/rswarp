@@ -103,7 +103,7 @@ class STLconductor(Assembly):
     def __init__(self, filename, voltage=0.,
                        xcent=0., ycent=0., zcent=0.,
                        raytri_scheme="watertight", precision_decimal=None, normalization_factor=None, fuzz=1e-12,
-                       disp="none", verbose="off", condid="next", scale=None, **kw):
+                       disp="none", verbose="off", condid="next", scale=None, auto_center=False, **kw):
         """Initialize a stl conductor.
 
         Args:
@@ -119,6 +119,7 @@ class STLconductor(Assembly):
           condid: Conductor id. Must be a positive integer, or "next". If "next", condid will be automatically determined.
           scale: scale of the units used in the stl file, by which we multiply to convert the mesh to meters. If None,
             we make a guess based on the bounds.  Note that this is independent of normalization_factor
+         auto_center: If "on", the center of conductor will be automatically detected and installed at the specified (xcent, ycent, zcent).
 
         Returns:
 
@@ -186,20 +187,21 @@ class STLconductor(Assembly):
             self.surface = pymesh.form_mesh(vertices, self.surface.faces)
 
         # Use conductor center to shift mesh
-        bounds = self.surface.bbox
-        mesh_ctr = [
-            bounds[0][0] + (bounds[1][0] - bounds[0][0]) / 2.,
-            bounds[0][1] + (bounds[1][1] - bounds[0][1]) / 2.,
-            bounds[0][2] + (bounds[1][2] - bounds[0][2]) / 2.
-        ]
-        offsets = [
-            xcent - mesh_ctr[0],
-            ycent - mesh_ctr[1],
-            zcent - mesh_ctr[2]
-        ]
-        vertices = deepcopy(self.surface.vertices)
-        for i in range(len(offsets)): vertices[:, i] += offsets[i]
-        self.surface = pymesh.form_mesh(vertices, self.surface.faces)
+        if auto_center:
+            bounds = self.surface.bbox
+            mesh_ctr = [
+                bounds[0][0] + (bounds[1][0] - bounds[0][0]) / 2.,
+                bounds[0][1] + (bounds[1][1] - bounds[0][1]) / 2.,
+                bounds[0][2] + (bounds[1][2] - bounds[0][2]) / 2.
+            ]
+            offsets = [
+                xcent - mesh_ctr[0],
+                ycent - mesh_ctr[1],
+                zcent - mesh_ctr[2]
+            ]
+            vertices = deepcopy(self.surface.vertices)
+            for i in range(len(offsets)): vertices[:, i] += offsets[i]
+            self.surface = pymesh.form_mesh(vertices, self.surface.faces)
 
         if disp != "none" and disp != "auto":
             try:
