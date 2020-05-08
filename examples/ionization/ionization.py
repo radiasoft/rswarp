@@ -4,13 +4,12 @@ import numpy as np
 from warp import *
 from warp.data_dumping.openpmd_diag.particle_diag import ParticleDiagnostic
 
-from rswarp.utilities.ionization import Ionization
+from rswarp.ionization.ionization import Ionization
 from rswarp.utilities.beam_distributions import createKV
 from rswarp.utilities.file_utils import cleanupPrevious
 
 import rsoopic.h2crosssections as h2crosssections
-sys.path.insert(1, '/home/vagrant/jupyter/rswarp/rswarp/ionization')
-import crosssections as Xsect
+import rswarp.ionization.crosssections as Xsect
 
 import shutil
 from shutil import os
