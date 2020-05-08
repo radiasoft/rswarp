@@ -102,8 +102,8 @@ def write_parameter_file(pars, filename=None):
     tec_keys = ['x_struts', 'y_struts', 'V_grid', 'grid_height', 'strut_width', 'strut_height',
                 'rho_ew', 'T_em', 'phi_em', 'T_coll', 'phi_coll', 'rho_cw', 'gap_distance', 'rho_load',
                 'run_id']
-    simulation_keys = ['injection_type', 'random_seed', 'install_grid', 'max_wall_time',
-                       'particle_diagnostic_switch', 'field_diagnostic_switch', 'lost_diagnostic_switch']
+    simulation_keys = ['injection_type', 'random_seed', 'install_grid', 'install_circuit', 'max_wall_time',
+                       'particle_diagnostic_switch', 'field_diagnostic_switch', 'lost_diagnostic_switch', 'channel_width']
 
     tec_parameters = {}
     simulation_parameters = {}
@@ -124,7 +124,7 @@ def write_parameter_file(pars, filename=None):
 
 
 def read_parameter_file(filename):
-    parameters = yaml.load(open(filename, 'r'))
+    parameters = yaml.safe_load(open(filename, 'r'))
     input_deck = {}
     for key0 in parameters:
         for key1, val in parameters[key0].iteritems():
