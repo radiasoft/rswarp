@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+u"""
+
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
 import time
 import os
 import yaml
@@ -76,7 +83,7 @@ class ExternalCircuit:
             self.voltage_history.append(voltage)
             self.current_history.append(current / self.area)
             if self.debug:
-                print "Current/voltage at step: {} = {}, {}".format(self.top.it, current / self.area, voltage)
+                print("Current/voltage at step: {} = {}, {}".format(self.top.it, current / self.area, voltage))
 
         return voltage
 
@@ -87,7 +94,7 @@ def write_parameter_file(pars, filename=None):
         try:
             filename = 'run_attributes_{}.yaml'.format(pars['run_id'], pars['run_id'])
         except KeyError:
-            print "No Filename or run_id, attributes will not be saved"
+            print("No Filename or run_id, attributes will not be saved")
             return
         if path:
             filename = os.path.join(path, filename)
@@ -127,7 +134,7 @@ def read_parameter_file(filename):
     parameters = yaml.safe_load(open(filename, 'r'))
     input_deck = {}
     for key0 in parameters:
-        for key1, val in parameters[key0].iteritems():
+        for key1, val in parameters[key0].items():
             input_deck[key1] = val
 
     return input_deck

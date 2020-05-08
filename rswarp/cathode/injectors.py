@@ -7,7 +7,7 @@ Authors: Nathan Cook and Chris Hall
 
 from __future__ import division
 import numpy as np
-import sources
+from rswarp.cathode import sources
 
 
 # Specify constants
@@ -34,7 +34,7 @@ class UserInjectors(object):
         dz = (w3d.zmmax - w3d.zmmin) / w3d.nz
         assert dz > 0, "Must define w3d.zmmin and w3d.zmmax before initializing injector"
         self.z_part_min = dz / self.zmin_scale
-        
+
     def inject_thermionic(self):
         """
         Define particle coordinates for thermionic injection.
@@ -52,7 +52,7 @@ class UserInjectors(object):
 
         self.species.addparticles(x=ptclArray[:, 0], y=ptclArray[:, 2], z=ptclArray[:, 4],
                                   vx=ptclArray[:, 1], vy=ptclArray[:, 3], vz=ptclArray[:, 5])
-        
+
     def inject_constant(self):
         """
         Same as inject thermionic but with a very low default (4 K) temperature and no transverse velocities
@@ -71,7 +71,7 @@ class UserInjectors(object):
 
         self.species.addparticles(x=ptclArray[:, 0], y=ptclArray[:, 2], z=ptclArray[:, 4],
                                   vx=ptclArray[:, 1], vy=ptclArray[:, 3], vz=ptclArray[:, 5])
-        
+
     def inject_thermionic_egun(self):
         """
         Define particle coordinates for thermionic injection.

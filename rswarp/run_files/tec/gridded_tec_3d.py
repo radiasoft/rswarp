@@ -1,4 +1,10 @@
-from __future__ import division
+# -*- coding: utf-8 -*-
+u"""
+
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
 
 # TODO: cycle times for comparison against wall clock are still not calculated correctly
 # TODO: decide on handling for tails. are we hurting the effiency estimation?
@@ -23,7 +29,7 @@ from warp.particles.extpart import ZCrossingParticles
 from warp.utils.loadbalance import LoadBalancer
 from rswarp.diagnostics import FieldDiagnostic
 from rswarp.utilities.file_utils import cleanupPrevious
-from tec_utilities import record_time, SteadyState, ExternalCircuit, write_parameter_file
+from .tec_utilities import record_time, SteadyState, ExternalCircuit, write_parameter_file
 from rswarp.diagnostics.ConductorDiagnostics import analyze_scraped_particles
 
 # Constants imports
@@ -129,9 +135,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     dx = channel_width / NUM_X
     dy = channel_width / NUM_Y
 
-    print "Channel  width: {}, DX = {}".format(channel_width, dx)
-    print "Channel  width: {}, DY = {}".format(channel_width, dy)
-    print "Channel length: {}, DZ = {}".format(gap_distance, dz)
+    print("Channel width: {}, DX = {}".format(channel_width, dx))
+    print("Channel width: {}, DY = {}".format(channel_width, dy))
+    print("Channel length: {}, DZ = {}".format(gap_distance, dz))
+
 
     # Solver Geometry and Boundaries
 
@@ -470,9 +477,9 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
     # particle_diagnostic_0.period = steps_per_crossing #TEMP commented out
     # Switch to measurement beam species
-    
+
     np.save('current_0.npy', top.curr)
-    
+
     measurement_beam.rnpinject = PTCL_PER_STEP
     background_beam.rnpinject = 0
 
@@ -532,7 +539,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
             velocity_array = np.array([ZCross.getvx(js=measurement_beam.js),
                                        ZCross.getvy(js=measurement_beam.js),
                                        ZCross.getvz(js=measurement_beam.js)]).transpose()
-            print "Backwards particles: {}".format(np.where(velocity_array[:, 2] < 0.)[0].shape[0])
+            print("Backwards particles: {}".format(np.where(velocity_array[:, 2] < 0.)[0].shape[0]))
             # velocity_array = velocity_array[velocity_array[:, 2] >= 0.]  # Filter particles moving to emitter
             emitter_flux.append(velocity_array)
             ZCross.clear()  # Clear ZcrossingParticles memory

@@ -1,5 +1,4 @@
 from __future__ import division
-import numpy as np
 
 from warp import *
 from warp.data_dumping.openpmd_diag.particle_diag import ParticleDiagnostic
@@ -11,7 +10,6 @@ from rswarp.utilities.file_utils import cleanupPrevious
 import rsoopic.h2crosssections as h2crosssections
 import rswarp.ionization.crosssections as Xsect
 
-import shutil
 from shutil import os
 
 # prevent gist from starting upon setup

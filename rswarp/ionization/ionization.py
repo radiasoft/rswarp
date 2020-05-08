@@ -1,8 +1,10 @@
-#!/usr/bin/env python
-"""
-Ionization class derived from Warp's Ionization, with some improvements.
-"""
+# -*- coding: utf-8 -*-
+u"""?
 
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
 from warp import *
 from warp.particles import ionization
 from rswarp.utilities.beam_manipulation import rotateVec
@@ -529,7 +531,7 @@ class Ionization(ionization.Ionization):
                                                           top.boost_gamma)
 
                             if self.l_verbose:
-                                print 'add ', nnew, emitted_species.name, ' from by impact ionization:', incident_species.name, '+', ((target_species is None and 'background gas') or target_species.name)
+                                print('add ', nnew, emitted_species.name, ' from by impact ionization:', incident_species.name, '+', ((target_species is None and 'background gas') or target_species.name))
                             if self.inter[incident_species]['remove_incident'][it] and (emitted_species.type is incident_species.type):
                                 self.addpart(nnew, xnewp, ynewp, znewp, uxnew, uynew, uznew, ginew, epg, emitted_species.jslist[0],
                                              self.inter[incident_species]['emitted_tag'][it], injdatapid, w)
@@ -567,7 +569,7 @@ class Ionization(ionization.Ionization):
                                 top.clearlostpart, top.time, top.zbeam)
 
                 if self.l_timing:
-                    print 'time ionization = ', time.clock() - t1, 's'
+                    print('time ionization = ', time.clock() - t1, 's')
 
     def _deposit_target_species(self, jstarget):
         """ Depositing target species to the grid """

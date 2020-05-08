@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+u"""file utilities
+
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
 import h5py as h5
 import numpy as np
 import os
@@ -5,7 +12,7 @@ import re
 
 
 def _printname(name):
-    print name
+    print(name)
 
 
 def explore(filename):
@@ -66,13 +73,13 @@ def readparticles(filename):
     f = h5.File(filename, 'r')
 
     if f.attrs.get('openPMD') is None:
-        print "Warning!: Not an openPMD file. This may not work."
+        print("Warning!: Not an openPMD file. This may not work.")
 
-    step = f['data'].keys()[0]
+    step = list(f['data'].keys())[0]
     time = f['data/%s' % step].attrs["time"]
     dt = f['data/%s' % step].attrs["dt"]
 
-    species_list = f['data/%s/particles' % step].keys()
+    species_list = list(f['data/%s/particles' % step].keys())
 
     for species in species_list:
         parray = f['data/%s/particles/%s/position/x' % (step, species)]

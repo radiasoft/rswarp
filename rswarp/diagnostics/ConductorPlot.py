@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+u"""?
+
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.collections import PatchCollection
@@ -240,7 +247,7 @@ class PlotConductors(object):
             xlength = conductor.zsize
             ylength = conductor.xsize
         except:
-            print "Conductor does not have correct attributes to plot: \n{}".format(conductor)
+            print("Conductor does not have correct attributes to plot: \n{}".format(conductor))
             return
 
         xcorner = x - xlength / 2.
@@ -326,5 +333,3 @@ class PlotConductors(object):
         """
         self.legend_fontsize = fontsize
         self.legend_anchor = anchor
-
-

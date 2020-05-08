@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+u"""
+
+:copyright: Copyright (c) 2020 RadiaSoft LLC.  All Rights Reserved.
+:license: http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+from __future__ import absolute_import, division, print_function
 from matplotlib.colors import Normalize
 from matplotlib.colorbar import ColorbarBase
 import matplotlib.cm as cm
@@ -6,8 +13,8 @@ try:
 except ImportError:
     print("Mayavi not found. 3D plotting not enabled.")
 
-from sys import maxint
-from ConductorTemplates import conductor_type_2d, conductor_type_3d
+from sys import maxsize
+from rswarp.diagnostics.ConductorTemplates import conductor_type_2d, conductor_type_3d
 import numpy as np
 from scipy.constants import e
 
@@ -96,7 +103,7 @@ class PlotDensity(object):
             self.dy = w3d.dy
 
     def generate_plots_2d(self):
-        minS, maxS = maxint, 0
+        minS, maxS = maxsize, 0
         scatter_plots = []
         for cond in self.conductors.itervalues():
             minS, maxS, face_data = self.generate_plot_data_for_faces_2d(cond, minS, maxS)
@@ -108,7 +115,7 @@ class PlotDensity(object):
         self.cmap_normalization = self.normalization(minS, maxS)
         ColorbarBase(self.ax_colorbar, cmap=self.cmap, norm=self.cmap_normalization)
 
-    def generate_plot_data_for_faces_2d(self, cond, min_s=maxint, max_s=0):
+    def generate_plot_data_for_faces_2d(self, cond, min_s=maxsize, max_s=0):
         data = []
         for face in cond.generate_faces_2d():
             x, z, s = face[0] * self.scale[0], \
@@ -126,7 +133,7 @@ class PlotDensity(object):
         self.ax = mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(800, 600))
         self.clf = mlab.clf()
 
-        minS, maxS = maxint, 0
+        minS, maxS = maxsize, 0
         contour_plots = []
         for cond in self.conductors.itervalues():
 
@@ -149,7 +156,7 @@ class PlotDensity(object):
         mlab.colorbar(object=contour_plots[0], orientation='vertical')
         mlab.show()
 
-    def generate_plot_data_for_faces_3d(self, cond, min_s=maxint, max_s=0):
+    def generate_plot_data_for_faces_3d(self, cond, min_s=maxsize, max_s=0):
         data = []
         for face in cond.generate_faces_3d():
             x, y, z, s = face[0] * self.scale[0],\
