@@ -631,7 +631,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
             # for key, value in scraper_dictionary.iteritems():
             #     scrap_group.attrs[key] = measured_charge[value]
             #
-            inv_scraper_dict = {value: key for key, value in scraper_dictionary.iteritems()}
+            inv_scraper_dict = {value: key for key, value in scraper_dictionary.items()}
             for cond in solverE.conductordatalist:
                 cond_objs = cond[0]
                 scrap_group.attrs[inv_scraper_dict[cond_objs.condid]] = measured_charge[cond_objs.condid]
