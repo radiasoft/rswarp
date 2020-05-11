@@ -18,12 +18,12 @@ import numpy as np
 import h5py as h5
 import sys, os
 
-sys.path.append('/global/homes/h/hallcc/github/rswarp')
+sys.path.insert(2, '/home/vagrant/jupyter/repos/rswarp/rswarp/run_files/tec/')
 
 from copy import deepcopy
 from random import randint
 from rswarp.cathode import sources
-from rswarp.run_files.tec import efficiency
+import efficiency
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from warp.particles.extpart import ZCrossingParticles
 from warp.utils.loadbalance import LoadBalancer
@@ -138,6 +138,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     print("Channel width: {}, DX = {}".format(channel_width, dx))
     print("Channel width: {}, DY = {}".format(channel_width, dy))
     print("Channel length: {}, DZ = {}".format(gap_distance, dz))
+
 
     # Solver Geometry and Boundaries
 
@@ -302,7 +303,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         plate.voltage = circuit
         # plate.voltage = collector_voltage
     else:
-        plate = ZPlane(zcent=zplate)
+        print("DONE")
+        plate = ZPlane(zcent=zplate, voltage=5.0)
         if install_circuit:
             circuit = ExternalCircuit(top, solverE, total_rho, collector_voltage, cathode_area * 1e4, plate, debug=False)
             plate.voltage = circuit
@@ -495,7 +497,6 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         if (max_wall_time - clock) < crossing_wall_time:
             early_abort = 2
             break
-
         record_time(step, times, steps_per_crossing)
         clock += times[-1]
 
@@ -585,7 +586,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                              efficiency.tec_parameters['A_em'][0])
     except KeyError:
         efficiency.tec_parameters['J_grid'][0] = 0.0
-
+    
     efficiency.tec_parameters['J_ec'][0] = e * measured_charge[scraper_dictionary['collector']] * measurement_beam.sw / \
                                         efficiency.tec_parameters['run_time'][0] / efficiency.tec_parameters['A_em'][0]
 

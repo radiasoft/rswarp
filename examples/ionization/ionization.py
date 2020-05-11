@@ -9,6 +9,7 @@ from rswarp.utilities.file_utils import cleanupPrevious
 
 import rsoopic.h2crosssections as h2crosssections
 import rswarp.ionization.crosssections as Xsect
+
 from shutil import os
 
 # prevent gist from starting upon setup

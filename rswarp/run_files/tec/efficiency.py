@@ -173,7 +173,10 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
     J_ec = J_ec - J_coll
 
     # P_ew
-    P_ew = 0.5 * (L / rho_ew * (T_em - T_env) ** 2 - (J_em - t * J_coll) ** 2 * rho_ew)
+    try:
+        P_ew = 0.5 * (L / rho_ew * (T_em - T_env) ** 2 - (J_em - t * J_coll) ** 2 * rho_ew)
+    except ZeroDivisionError:
+        P_ew = 0.0
 
     # P_r
     P_r = emiss_eff * sigma_sb * (T_em ** 4 - t * T_coll ** 4)
@@ -190,6 +193,8 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
     else:
         R_total = rho_cw + rho_ew
         V_load = (phi_em - phi_coll) + R_total * J_ec - V_lead
+    print("current on collector", J_ec)
+    print("The load voltage", V_load)
     P_load = J_ec * V_load
 
     # P_gate
