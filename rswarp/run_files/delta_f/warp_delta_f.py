@@ -106,7 +106,7 @@ wp.w3d.boundxy = wp.neumann
 # TODO: This could be made more rigorous for this particular example
 #  so that we guarantee there is periodic shifting
 
-_, b, _ = dft.drift_twiss(L_mod, alpha_x_ini, beta_x_ini)
+_, b, _ = dft.drift_twiss(L_mod, beta_x_ini, alpha_x_ini)
 width = 8 * np.sqrt(b * eps_rms_x)  # factor of 8 may not be enough with a gaussian with no cutoff
 
 # Set boundary dimensions
@@ -118,8 +118,8 @@ wp.w3d.zmmin = z_min
 wp.w3d.zmmax = z_max
 
 # Set particle boundary conditions
-wp.top.pbound0 = wp.absorb
-wp.top.pboundnz = wp.absorb
+wp.top.pbound0 = wp.periodic
+wp.top.pboundnz = wp.periodic
 
 # Type of particle push. 2 includes tan correction to Boris push.
 wp.top.ibpush = 2
@@ -162,23 +162,23 @@ wp.installparticleloader(load_particles)
 ##############################
 # Install Single Ion Field
 ##############################
-# External B-Field can be added by setting vector components at each cell
-X, Y, Z = dft.create_grid((wp.w3d.xmmin, wp.w3d.ymmin, wp.w3d.zmmin),
-                          (wp.w3d.xmmax, wp.w3d.ymmax, wp.w3d.zmmax),
-                          (2*wp.w3d.nx, 2*wp.w3d.ny, 2*wp.w3d.nz))
+# # External B-Field can be added by setting vector components at each cell
+# X, Y, Z = dft.create_grid((wp.w3d.xmmin, wp.w3d.ymmin, wp.w3d.zmmin),
+#                           (wp.w3d.xmmax, wp.w3d.ymmax, wp.w3d.zmmax),
+#                           (2*wp.w3d.nx, 2*wp.w3d.ny, 2*wp.w3d.nz))
 
-ex, ey, ez = dft.ion_electric_field(X, Y, Z, X_ion, charge=Z_ion, coreSq=coreSq)
+# ex, ey, ez = dft.ion_electric_field(X, Y, Z, X_ion, charge=Z_ion, coreSq=coreSq)
 
 
-z_start = wp.w3d.zmmin
-z_stop = wp.w3d.zmmax
+# z_start = wp.w3d.zmmin
+# z_stop = wp.w3d.zmmax
 
-# Add B-Field to simulation
-wp.addnewegrd(z_start, z_stop,
-              xs=wp.w3d.xmmin / 2., dx=dx/2.,
-              ys=wp.w3d.ymmin, dy=(wp.w3d.ymmax - wp.w3d.ymmin),
-              nx=wp.w3d.nx, ny=wp.w3d.ny, nz=wp.w3d.nz,
-              ex=ex, ey=ey, ez=ez)
+# # Add B-Field to simulation
+# wp.addnewegrd(z_start, z_stop,
+#               xs=wp.w3d.xmmin / 2., dx=dx/2.,
+#               ys=wp.w3d.ymmin, dy=(wp.w3d.ymmax - wp.w3d.ymmin),
+#               nx=wp.w3d.nx, ny=wp.w3d.ny, nz=wp.w3d.nz,
+#               ex=ex, ey=ey, ez=ez)
 
 
 ########################
@@ -191,6 +191,7 @@ wp.top.lpsplots = False
 
 
 solverE = wp.MultiGrid3D()
+solverE.mgtol = 1e-2  # TODO: right now we don't account for space charge
 wp.registersolver(solverE)
 solverE.mgverbose = -1
 wp.top.verbosity = -1
@@ -221,5 +222,5 @@ wp.package("w3d")
 wp.generate()
 
 wp.step(1)
-while wp.top.it < Nsteps:
-    wp.step(1)
+particle_diagnostic_0.period = 250
+wp.step(Nsteps - 1)
