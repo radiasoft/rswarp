@@ -47,15 +47,15 @@ def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds):
     beam_x_minus = rand4.normal(0., vx_rms_ini, Npart)
     beam_x_minus -= np.mean(beam_x_minus)
     beam_x_minus *= vx_rms_ini / np.std(beam_x_minus)
-    beam_x_minus /= c0
+#     beam_x_minus /= c0
     beam_y_minus = rand5.normal(0., vy_rms_ini, Npart)
     beam_y_minus -= np.mean(beam_y_minus)
     beam_y_minus *= vy_rms_ini / np.std(beam_y_minus)
-    beam_y_minus /= c0
+#     beam_y_minus /= c0
     beam_z_minus = rand6.normal(0., vz_rms_ini, Npart)
     beam_z_minus -= np.mean(beam_z_minus)
     beam_z_minus *= vz_rms_ini / np.std(beam_z_minus)
-    beam_z_minus /= c0
+#     beam_z_minus /= c0
 
     distribution = np.column_stack([x, y , z, beam_x_minus, beam_y_minus, beam_z_minus])
 
