@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.constants import c as c0
-
+from scipy.constants import e, m_e
 
 def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds):
     """
@@ -118,3 +118,81 @@ def drift_twiss(s, betas, alphas):
     beta = betas - 2 * s * alphas + s**2 * gammas
 
     return alpha, beta, gammas
+
+
+class DriftWeightUpdate:
+    """
+    Update Weights for Delta-f PIC
+    Coded for electrons
+    """
+
+    def __init__(self, top, species, gamma0, twiss, emittance):
+        self.top = top
+        self.species = species
+        self.twiss = twiss
+        self.gamma0 = gamma0
+        self.beta0 =  np.sqrt(1. - 1. / (gamma0**2))
+        self.emit_x, self.emit_y = emittance
+        pass
+
+    def update_weights(self):
+        # Needs to be before udpates for the step
+        self._set_twiss_at_s()
+
+        dt = self.top.dt
+        q2m = -e / m_e
+
+        # Current particle quantities from Warp
+        weights = self.top.pgroup.pid[:self.top.nplive, self.top.wpid - 1]
+        x = self.top.pgroup.xp[:self.top.nplive]
+        y = self.top.pgroup.xp[:self.top.nplive]
+        # z = self.top.pgroup.xp[:self.top.nplive]
+
+        # Warp keeps gamma * v for the velocity component
+        # gamma_inv = self.top.pgroup.gaminv[:self.top.nplive]
+        vx_n = self.top.pgroup.uxp[:self.top.nplive] / c0 / (self.gamma0**2 * self.beta0)
+        vy_n = self.top.pgroup.uyp[:self.top.nplive] / c0 / (self.gamma0**2 * self.beta0)
+        vz_n = self.top.pgroup.uyp[:self.top.nplive] / c0
+
+        E_x = self.top.pgroup.ex[:self.top.nplive]
+        E_y = self.top.pgroup.ey[:self.top.nplive]
+        E_z = self.top.pgroup.ez[:self.top.nplive]
+
+        # Weight before update will be needed in the middle of the update sequence
+        weights_minus = weights.copy()
+
+        # Start updates
+        # x component update
+        weights += dt * q2m * (1. - weights_minus) * \
+                   (self.alphax * x + self.betax * vx_n * E_x) / \
+                   (self.gamma0 * self.beta0 * self.emit_x)
+
+        # y component update
+        weights += dt * q2m * (1. - weights_minus) * \
+                   (self.alphay * y + self.betay * vy_n * E_y) / \
+                   (self.gamma0 * self.beta0 * self.emit_y)
+
+        # z component update
+        vz_mean = np.mean(vz_n)
+        vz_std = np.std(vz_n)
+        weights += dt * q2m * (1. - weights_minus) * \
+                   (1. / (vz_std * vz_std)) * (vz_n - vz_mean) * E_z
+
+    def _set_twiss_at_s(self):
+        """
+        Assign betax, alphax, betay, alphay based on current time step in Warp
+        Currently calculates from Twiss at s=0
+        Returns:
+
+        """
+        betax, alphax, betay, alphay = self.twiss
+
+        # Time step is in the beam frame
+        # Convert to distance in lab frame
+        s = self.top.it * self.top.dt * self.beta0 * self.gamma0 * c0
+
+        self.alphax, self.betax, _ = drift_twiss(s, betax, alphax)
+        self.alphay, self.betay, _ = drift_twiss(s, betay, alphay)
+
+
+
