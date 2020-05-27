@@ -137,6 +137,9 @@ class DriftWeightUpdate:
         
 
     def update_weights(self):
+        """
+        To be called by a Warp install wrapper
+        """
         # Needs to be before udpates for the step
         self._set_twiss_at_s()
 
@@ -170,17 +173,6 @@ class DriftWeightUpdate:
 
         # Start updates
         # x component update
-        if self.top.it == 250:
-            print('dt', dt)
-            print('q2m', q2m)
-            print('alpha term', self.alphax * x[:5])
-            print('beta', self.betax)
-            print('vel term', vx_n[:5])
-            print('ion ex', E_x[:5])
-            print('denom', self.gamma0 * self.beta0 * self.emit_x)
-    
-
-
         weights += dt * q2m * (1. - weights_minus) * \
                    (self.alphax * x + self.betax * vx_n) * E_x / \
                    (self.gamma0 * self.beta0 * self.emit_x)
@@ -195,14 +187,6 @@ class DriftWeightUpdate:
         vz_std = np.std(vz_n)
         weights += dt * q2m * (1. - weights_minus) * \
                    (1. / (vz_std * vz_std)) * (vz_n - vz_mean) * E_z
-        
-        if self.top.it == 250:
-            # long. printout
-            print('')
-            print('bzm_rms', vz_std)
-            print('bzm_mean', vz_mean)
-            print('ion ez', E_z[:5])
-            print('beam_z_minus', vz_n[:5])
 
     def _set_twiss_at_s(self):
         """

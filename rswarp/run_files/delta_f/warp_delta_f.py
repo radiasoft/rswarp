@@ -1,6 +1,5 @@
 """
-Warp run script for demonstrating particle weight control.
-See notebook interactive_weight_control.ipynb for the tutorial.
+Testing of delta-f implementation in Warp for a drift
 """
 
 import numpy as np
@@ -146,9 +145,6 @@ transverse_sigmas = [x_rms_ini, y_rms_ini, vx_rms_ini, vy_rms_ini]
 initial_distribution_f0 = dft.create_distribution(Npart=Npart, transverse_sigmas=transverse_sigmas,
                                                   length=z_max-z_min, z_sigma=vz_rms_ini, seeds=seeds)
 
-# ion = wp.Species(type=wp.Gold, name='Gold')
-# ion.sw = 1
-
 def load_particles():
     beam.addparticles(x=initial_distribution_f0[:, 0],
                       y=initial_distribution_f0[:, 1],
@@ -156,12 +152,6 @@ def load_particles():
                       vx=initial_distribution_f0[:, 3],
                       vy=initial_distribution_f0[:, 4],
                       vz=initial_distribution_f0[:, 5])
-#     ion.addparticles(x=[0.],
-#                      y=[0.],
-#                      z=[0.],
-#                      vx=[1000000],
-#                      vy=[1000000],
-#                      vz=[100000])
 
 
 wp.installparticleloader(load_particles)
@@ -170,26 +160,26 @@ wp.installparticleloader(load_particles)
 ##############################
 # Install Single Ion Field
 ##############################
-# # External B-Field can be added by setting vector components at each cell
-# X, Y, Z = dft.create_grid((wp.w3d.xmmin, wp.w3d.ymmin, wp.w3d.zmmin),
-#                           (wp.w3d.xmmax, wp.w3d.ymmax, wp.w3d.zmmax),
-#                           (2*wp.w3d.nx, 2*wp.w3d.ny, 2*wp.w3d.nz))
+# External B-Field can be added by setting vector components at each cell
+X, Y, Z = dft.create_grid((wp.w3d.xmmin, wp.w3d.ymmin, wp.w3d.zmmin),
+                          (wp.w3d.xmmax, wp.w3d.ymmax, wp.w3d.zmmax),
+                          (2*wp.w3d.nx, 2*wp.w3d.ny, 2*wp.w3d.nz))
 
-# ex, ey, ez = dft.ion_electric_field(X, Y, Z, X_ion, charge=Z_ion, coreSq=coreSq)
-# ex = 29.9792458 * np.abs(-1.6021766208e-19) * ex
-# ey = 29.9792458 * np.abs(-1.6021766208e-19) * ey
-# ez = 29.9792458 * np.abs(-1.6021766208e-19) * ez
+ex, ey, ez = dft.ion_electric_field(X, Y, Z, X_ion, charge=Z_ion, coreSq=0.)
+ex = 29.9792458 * np.abs(-1.6021766208e-19) * ex
+ey = 29.9792458 * np.abs(-1.6021766208e-19) * ey
+ez = 29.9792458 * np.abs(-1.6021766208e-19) * ez
 
-# z_start = wp.w3d.zmmin
-# z_stop = wp.w3d.zmmax
+z_start = wp.w3d.zmmin
+z_stop = wp.w3d.zmmax
 
-# # Add B-Field to simulation
-# wp.addnewegrd(z_start, z_stop,
-#               xs=wp.w3d.xmmin, dx=dx/2.,
-#               ys=wp.w3d.ymmin, dy=dy/2., 
-#               nx=2*wp.w3d.nx, ny=2*wp.w3d.ny, 
-#               nz=2*wp.w3d.nz,
-#               ex=ex, ey=ey, ez=ez)
+# Add B-Field to simulation
+wp.addnewegrd(z_start, z_stop,
+              xs=wp.w3d.xmmin, dx=dx/2.,
+              ys=wp.w3d.ymmin, dy=dy/2., 
+              nx=2*wp.w3d.nx, ny=2*wp.w3d.ny, 
+              nz=2*wp.w3d.nz,
+              ex=ex, ey=ey, ez=ez)
 
 
 ########################
@@ -242,12 +232,10 @@ wp.derivqty()
 wp.package("w3d")
 wp.generate()
 
-np.save('diags/bef.npy', wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1])
+# Initialize weights to 0 for delta-f algorithm
 wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1] *= 0
-np.save('diags/aft.npy', wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1])
 
 wp.step(1)
-print(np.array(wp.top.pgroup.uxp).shape)
 particle_diagnostic_0.period = 250
 wp.step(Nsteps - 1)
 np.save('diags/final_weights.npy', wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1])
