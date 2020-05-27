@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.constants import c as c0
 from scipy.constants import e, m_e
-np.seterr(all='raise')
+
+
 def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds):
     """
     Create normally distributed partices in x, y and vx, vy, vz. Particle positions
@@ -127,6 +128,20 @@ class DriftWeightUpdate:
     """
 
     def __init__(self, top, species, gamma0, twiss, emittance, externally_defined_field=True):
+        """
+        Prepare to calculate weight updates for delta-f method
+        For drift case the update method `update_weights` may be installed before step only
+        Args:
+            top: Warp's top object
+            species: Warp species object for the electron beam
+            gamma0: (float) Reference relativistic gamma for the beam frame
+            twiss: (float)*4 Initial Twiss values in form (betax, alphax, betay, alphay)
+            emittance: (float)*2 Initial emittance (un-normalized)
+            externally_defined_field: (boolean) If false the exact ion fields are calculate from particle
+            positions supplied by Warp. Otherwise the user should install an external electric field to
+            Warp. In that case Warp is queried for the field at each particle location. This requires
+            care in setting grid resolution.
+        """
         self.top = top
         self.species = species
         self.twiss = twiss
@@ -134,7 +149,6 @@ class DriftWeightUpdate:
         self.beta0 =  np.sqrt(1. - 1. / (gamma0**2))
         self.emit_x, self.emit_y = emittance
         self.externally_defined_field = externally_defined_field
-        
 
     def update_weights(self):
         """
