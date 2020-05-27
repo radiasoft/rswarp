@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.constants import c as c0
 from scipy.constants import e, m_e
-
+np.seterr(all='raise')
 def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds):
     """
     Create normally distributed partices in x, y and vx, vy, vz. Particle positions
@@ -126,14 +126,15 @@ class DriftWeightUpdate:
     Coded for electrons
     """
 
-    def __init__(self, top, species, gamma0, twiss, emittance):
+    def __init__(self, top, species, gamma0, twiss, emittance, externally_defined_field=True):
         self.top = top
         self.species = species
         self.twiss = twiss
         self.gamma0 = gamma0
         self.beta0 =  np.sqrt(1. - 1. / (gamma0**2))
         self.emit_x, self.emit_y = emittance
-        pass
+        self.externally_defined_field = externally_defined_field
+        
 
     def update_weights(self):
         # Needs to be before udpates for the step
@@ -145,31 +146,48 @@ class DriftWeightUpdate:
         # Current particle quantities from Warp
         weights = self.top.pgroup.pid[:self.top.nplive, self.top.wpid - 1]
         x = self.top.pgroup.xp[:self.top.nplive]
-        y = self.top.pgroup.xp[:self.top.nplive]
-        # z = self.top.pgroup.xp[:self.top.nplive]
+        y = self.top.pgroup.yp[:self.top.nplive]
+        z = self.top.pgroup.zp[:self.top.nplive]
 
         # Warp keeps gamma * v for the velocity component
-        # gamma_inv = self.top.pgroup.gaminv[:self.top.nplive]
-        vx_n = self.top.pgroup.uxp[:self.top.nplive] / c0 / (self.gamma0**2 * self.beta0)
-        vy_n = self.top.pgroup.uyp[:self.top.nplive] / c0 / (self.gamma0**2 * self.beta0)
-        vz_n = self.top.pgroup.uyp[:self.top.nplive] / c0
-
-        E_x = self.top.pgroup.ex[:self.top.nplive]
-        E_y = self.top.pgroup.ey[:self.top.nplive]
-        E_z = self.top.pgroup.ez[:self.top.nplive]
+        gamma_inv = self.top.pgroup.gaminv[:self.top.nplive]
+        vx_n = self.top.pgroup.uxp[:self.top.nplive] * gamma_inv / c0 / (self.gamma0 * self.beta0)
+        vy_n = self.top.pgroup.uyp[:self.top.nplive] * gamma_inv / c0 / (self.gamma0 * self.beta0)
+        vz_n = self.top.pgroup.uzp[:self.top.nplive] * gamma_inv / c0
+        
+        if self.externally_defined_field:
+            E_x = self.top.pgroup.ex[:self.top.nplive]
+            E_y = self.top.pgroup.ey[:self.top.nplive]
+            E_z = self.top.pgroup.ez[:self.top.nplive]
+        else:
+            E_x, E_y, E_z = ion_electric_field(x, y, z, np.array([0., 0., 0.]), charge=79, coreSq=1.0e-13)
+            E_x = 29.9792458 * np.abs(-1.6021766208e-19) * E_x
+            E_y = 29.9792458 * np.abs(-1.6021766208e-19) * E_y
+            E_z = 29.9792458 * np.abs(-1.6021766208e-19) * E_z
 
         # Weight before update will be needed in the middle of the update sequence
         weights_minus = weights.copy()
 
         # Start updates
         # x component update
+        if self.top.it == 250:
+            print('dt', dt)
+            print('q2m', q2m)
+            print('alpha term', self.alphax * x[:5])
+            print('beta', self.betax)
+            print('vel term', vx_n[:5])
+            print('ion ex', E_x[:5])
+            print('denom', self.gamma0 * self.beta0 * self.emit_x)
+    
+
+
         weights += dt * q2m * (1. - weights_minus) * \
-                   (self.alphax * x + self.betax * vx_n * E_x) / \
+                   (self.alphax * x + self.betax * vx_n) * E_x / \
                    (self.gamma0 * self.beta0 * self.emit_x)
 
         # y component update
         weights += dt * q2m * (1. - weights_minus) * \
-                   (self.alphay * y + self.betay * vy_n * E_y) / \
+                   (self.alphay * y + self.betay * vy_n) * E_y / \
                    (self.gamma0 * self.beta0 * self.emit_y)
 
         # z component update
@@ -177,6 +195,14 @@ class DriftWeightUpdate:
         vz_std = np.std(vz_n)
         weights += dt * q2m * (1. - weights_minus) * \
                    (1. / (vz_std * vz_std)) * (vz_n - vz_mean) * E_z
+        
+        if self.top.it == 250:
+            # long. printout
+            print('')
+            print('bzm_rms', vz_std)
+            print('bzm_mean', vz_mean)
+            print('ion ez', E_z[:5])
+            print('beam_z_minus', vz_n[:5])
 
     def _set_twiss_at_s(self):
         """

@@ -93,9 +93,9 @@ particle_diagnostic_switch = True  # Record particle data periodically
 ##########################
 
 # Set cells
-wp.w3d.nx = 20
-wp.w3d.ny = 20
-wp.w3d.nz = 20
+wp.w3d.nx = 8
+wp.w3d.ny = 8
+wp.w3d.nz = 8
 
 # Boundaries don't matter here (no field solve)
 wp.w3d.bound0 = wp.neumann
@@ -146,6 +146,8 @@ transverse_sigmas = [x_rms_ini, y_rms_ini, vx_rms_ini, vy_rms_ini]
 initial_distribution_f0 = dft.create_distribution(Npart=Npart, transverse_sigmas=transverse_sigmas,
                                                   length=z_max-z_min, z_sigma=vz_rms_ini, seeds=seeds)
 
+# ion = wp.Species(type=wp.Gold, name='Gold')
+# ion.sw = 1
 
 def load_particles():
     beam.addparticles(x=initial_distribution_f0[:, 0],
@@ -154,6 +156,12 @@ def load_particles():
                       vx=initial_distribution_f0[:, 3],
                       vy=initial_distribution_f0[:, 4],
                       vz=initial_distribution_f0[:, 5])
+#     ion.addparticles(x=[0.],
+#                      y=[0.],
+#                      z=[0.],
+#                      vx=[1000000],
+#                      vy=[1000000],
+#                      vz=[100000])
 
 
 wp.installparticleloader(load_particles)
@@ -168,16 +176,19 @@ wp.installparticleloader(load_particles)
 #                           (2*wp.w3d.nx, 2*wp.w3d.ny, 2*wp.w3d.nz))
 
 # ex, ey, ez = dft.ion_electric_field(X, Y, Z, X_ion, charge=Z_ion, coreSq=coreSq)
-
+# ex = 29.9792458 * np.abs(-1.6021766208e-19) * ex
+# ey = 29.9792458 * np.abs(-1.6021766208e-19) * ey
+# ez = 29.9792458 * np.abs(-1.6021766208e-19) * ez
 
 # z_start = wp.w3d.zmmin
 # z_stop = wp.w3d.zmmax
 
 # # Add B-Field to simulation
 # wp.addnewegrd(z_start, z_stop,
-#               xs=wp.w3d.xmmin / 2., dx=dx/2.,
-#               ys=wp.w3d.ymmin, dy=(wp.w3d.ymmax - wp.w3d.ymmin),
-#               nx=wp.w3d.nx, ny=wp.w3d.ny, nz=wp.w3d.nz,
+#               xs=wp.w3d.xmmin, dx=dx/2.,
+#               ys=wp.w3d.ymmin, dy=dy/2., 
+#               nx=2*wp.w3d.nx, ny=2*wp.w3d.ny, 
+#               nz=2*wp.w3d.nz,
 #               ex=ex, ey=ey, ez=ez)
 
 
@@ -212,6 +223,16 @@ if particle_diagnostic_switch:
                                                write_dir=diagDir[:-5])
     wp.installafterstep(particle_diagnostic_0.write)  # Write method is installed as an after-step action
 
+    
+#######################
+# Install Weight Update
+#######################
+
+
+twiss_init = (beta_x_ini, alpha_x_ini, beta_y_ini, alpha_y_ini)
+emit_init = (eps_rms_x, eps_rms_y)
+weight_update = dft.DriftWeightUpdate(wp.top, beam, gamma0, twiss_init, emit_init, externally_defined_field=False)
+wp.installbeforestep(weight_update.update_weights)
 
 ###########################
 # Generate and Run PIC Code
@@ -221,6 +242,12 @@ wp.derivqty()
 wp.package("w3d")
 wp.generate()
 
+np.save('diags/bef.npy', wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1])
+wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1] *= 0
+np.save('diags/aft.npy', wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1])
+
 wp.step(1)
+print(np.array(wp.top.pgroup.uxp).shape)
 particle_diagnostic_0.period = 250
 wp.step(Nsteps - 1)
+np.save('diags/final_weights.npy', wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1])
