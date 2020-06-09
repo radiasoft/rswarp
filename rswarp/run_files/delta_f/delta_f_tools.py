@@ -127,12 +127,13 @@ class DriftWeightUpdate:
     Coded for electrons
     """
 
-    def __init__(self, top, species, gamma0, twiss, emittance, externally_defined_field=True):
+    def __init__(self, top, comm_world, species, gamma0, twiss, emittance, externally_defined_field=True):
         """
         Prepare to calculate weight updates for delta-f method
         For drift case the update method `update_weights` may be installed before step only
         Args:
             top: Warp's top object
+            comm_world: Warp's MPI communicator object
             species: Warp species object for the electron beam
             gamma0: (float) Reference relativistic gamma for the beam frame
             twiss: (float)*4 Initial Twiss values in form (betax, alphax, betay, alphay)
@@ -143,6 +144,8 @@ class DriftWeightUpdate:
             care in setting grid resolution.
         """
         self.top = top
+        self.comm_world = comm_world
+        self.mpi_size = comm_world.size
         self.species = species
         self.twiss = twiss
         self.gamma0 = gamma0
@@ -197,8 +200,25 @@ class DriftWeightUpdate:
                    (self.gamma0 * self.beta0 * self.emit_y)
 
         # z component update
-        vz_mean = np.mean(vz_n)
-        vz_std = np.std(vz_n)
+        if self.mpi_size > 1:
+            # Perform sums over local particles
+            vz_local_size = vz_n.size
+            vz_sum_local = np.sum(vz_n)
+            vz_sq_sum_local = np.sum(vz_n * vz_n)
+            local_data = np.array([vz_local_size, vz_sum_local, vz_sq_sum_local], dtype=float).reshape(1, 3)
+            local_data = np.repeat(local_data, self.mpi_size, axis=0)
+            all_data = np.zeros([3, self.mpi_size])
+
+            # Calculate global Avg. StD. from collected sums
+            self.comm_world.Alltoall(local_data, all_data)
+            vz_size = np.sum(all_data[:, 0])
+            vz_mean = np.sum(all_data[:, 1]) / vz_size
+            vz_sq_mean = np.sum(all_data[:, 2]) / vz_size
+            vz_std = np.sqrt(vz_sq_mean - vz_mean * vz_mean)
+        else:
+            vz_mean = np.mean(vz_n)
+            vz_std = np.std(vz_n)
+
         weights += dt * q2m * (1. - weights_minus) * \
                    (1. / (vz_std * vz_std)) * (vz_n - vz_mean) * E_z
 
