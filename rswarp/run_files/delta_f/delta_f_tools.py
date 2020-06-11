@@ -152,6 +152,9 @@ class DriftWeightUpdate:
         self.beta0 =  np.sqrt(1. - 1. / (gamma0**2))
         self.emit_x, self.emit_y = emittance
         self.externally_defined_field = externally_defined_field
+        self.softening_parameter = 1.0e-13  # Only used if externally_defined_field == False
+        self.ion_velocity = np.array([0., 0., 0.])
+        self._ion_position = np.array([0., 0., 0.])
 
     def update_weights(self):
         """
@@ -159,6 +162,8 @@ class DriftWeightUpdate:
         """
         # Needs to be before udpates for the step
         self._set_twiss_at_s()
+        if np.any(np.abs(self.ion_velocity) > 0.):
+            self._update_ion_position()
 
         dt = self.top.dt
         q2m = -e / m_e
@@ -180,7 +185,7 @@ class DriftWeightUpdate:
             E_y = self.top.pgroup.ey[:self.top.nplive]
             E_z = self.top.pgroup.ez[:self.top.nplive]
         else:
-            E_x, E_y, E_z = ion_electric_field(x, y, z, np.array([0., 0., 0.]), charge=79, coreSq=1.0e-13)
+            E_x, E_y, E_z = ion_electric_field(x, y, z, self._ion_position, charge=79, coreSq=self.softening_parameter)
             E_x = 29.9792458 * np.abs(-1.6021766208e-19) * E_x
             E_y = 29.9792458 * np.abs(-1.6021766208e-19) * E_y
             E_z = 29.9792458 * np.abs(-1.6021766208e-19) * E_z
@@ -237,6 +242,20 @@ class DriftWeightUpdate:
 
         self.alphax, self.betax, _ = drift_twiss(s, betax, alphax)
         self.alphay, self.betay, _ = drift_twiss(s, betay, alphay)
+
+    def _update_ion_position(self):
+        # Non-relativistic position update of the ion in the beam frame
+        # Only can be used if externally_defined_field == False
+
+        dt = self.top.dt
+        self._ion_position += self.ion_velocity * dt
+
+        if np.any(self._ion_position < [self.top.xmmin, self.top.ymmin, self.top.zmmin]) or \
+           np.any(self._ion_position > [self.top.xmmax, self.top.ymmax, self.top.zmmax]):
+
+            print("WARNING: Ion is outside the simulation domain")
+
+
 
 
 
