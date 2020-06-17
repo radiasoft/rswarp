@@ -3,7 +3,7 @@ from scipy.constants import c as c0
 from scipy.constants import e, m_e
 
 
-def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds):
+def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmetrize=False):
     """
     Create normally distributed partices in x, y and vx, vy, vz. Particle positions
     in z are created with spacing based on `length` / `Npart`.
@@ -14,6 +14,8 @@ def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds):
         length: (float) Total length of the distribution
         z_sigma: (float) rms size of vz
         seeds: (int)*6 seeds to use for initializing creation of each distribution
+        symmetrize: (bool) If true then for each particle coordinate vector 'v' append
+        '-v' to the distribution. Will result in creation of 2*`Npart` particles.
 
     Returns:
 
@@ -59,6 +61,8 @@ def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds):
 #     beam_z_minus /= c0
 
     distribution = np.column_stack([x, y , z, beam_x_minus, beam_y_minus, beam_z_minus])
+    if symmetrize:
+        distribution = np.column_stack([distribution, -distribution])
 
     return distribution
 
