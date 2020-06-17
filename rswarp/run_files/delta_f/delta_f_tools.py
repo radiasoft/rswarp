@@ -62,7 +62,7 @@ def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmet
 
     distribution = np.column_stack([x, y , z, beam_x_minus, beam_y_minus, beam_z_minus])
     if symmetrize:
-        distribution = np.column_stack([distribution, -distribution])
+        distribution = np.row_stack([distribution, -distribution])
 
     return distribution
 
