@@ -63,7 +63,7 @@ def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmet
 
     distribution = np.column_stack([x, y , z, beam_x_minus, beam_y_minus, beam_z_minus])
     if symmetrize:
-        distribution = np.column_stack([distribution, -distribution])
+        distribution = np.row_stack([distribution, -distribution])
 
     return distribution
 
@@ -273,7 +273,7 @@ class DriftWeightUpdate:
             vz_sq_sum_local = np.sum(vz_n * vz_n)
             local_data = np.array([vz_local_size, vz_sum_local, vz_sq_sum_local], dtype=float).reshape(1, 3)
             local_data = np.repeat(local_data, self.mpi_size, axis=0)
-            all_data = np.zeros([3, self.mpi_size])
+            all_data = np.zeros([self.mpi_size, 3])
 
             # Calculate global Avg. StD. from collected sums
             self.comm_world.Alltoall(local_data, all_data)
