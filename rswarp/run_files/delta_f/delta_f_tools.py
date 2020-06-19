@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.constants import c as c0
-from scipy.constants import e, m_e
-
+from scipy.constants import e, m_e, physical_constants
+from scipy.integrate import odeint
+e_r = physical_constants['classical electron radius'][0]
 
 def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmetrize=False):
     """
@@ -125,6 +126,58 @@ def drift_twiss(s, betas, alphas):
     return alpha, beta, gammas
 
 
+class SpaceChargeDrift:
+    # Only for round beam in a drift
+    def __init__(self, emittance, current, gamma0, initial_conditions):
+        """
+        Calculate beam envelope expansion in a drift. Right now just in 1D so should only be valid
+        for symmetric distribution right now.
+        Args:
+            emittance: (float) geometric emittance at the start
+            current: (float) Current to use for calculating K.
+            gamma0: (float) Relativistic gamma factor.
+            initial_conditions:
+        """
+        self.ex = emittance
+        self.current = current
+        self.gamma0 = gamma0
+        self.beta0 =  np.sqrt(1. - 1. / (gamma0**2))
+        self.I_a = e / (e_r / c0)
+
+        x, p = initial_conditions
+
+        self.x_rms = [x]
+        self.xp_rms = [p]
+
+    def substitution_update(self, z, _):
+        # z = [x', x]
+        exg = self.ex
+        slice_current = self.current
+        K = 2 * slice_current / (self.I_a * self.beta0 ** 3 * self.gamma0 ** 3)
+        xpp = exg ** 2 / z[1] ** 3 + K / (4 * z[1])
+
+        return np.array((xpp, z[0]))
+
+    def _get_next_step(self, ds):
+        p, x = odeint(self.substitution_update, [self.xp_rms[-1], self.x_rms[-1]], [0., ds, ]).T
+
+        return p[-1], x[-1]
+
+    def update(self, ds):
+        p, x = self._get_next_step(ds)
+        self.x_rms.append(x)
+        self.xp_rms.append(p)
+
+    def get_twiss(self, index=-1):
+        Sx, Sxp = self.x_rms[index], self.xp_rms[index]
+
+        alpha = - (Sxp * Sx) / self.ex
+        beta = Sx**2 / self.ex
+        gamma = (1 + alpha**2) / beta
+
+        return alpha, beta, gamma
+
+
 class DriftWeightUpdate:
     """
     Update Weights for Delta-f PIC
@@ -194,6 +247,10 @@ class DriftWeightUpdate:
             E_y = 29.9792458 * np.abs(-1.6021766208e-19) * E_y
             E_z = 29.9792458 * np.abs(-1.6021766208e-19) * E_z
 
+            E_x += self.top.pgroup.ex[:self.top.nplive]
+            E_y += self.top.pgroup.ey[:self.top.nplive]
+            E_z += self.top.pgroup.ez[:self.top.nplive]
+
         # Weight before update will be needed in the middle of the update sequence
         weights_minus = weights.copy()
 
@@ -260,6 +317,23 @@ class DriftWeightUpdate:
             print("WARNING: Ion is outside the simulation domain")
 
 
+class SpaceChargeDriftWeightUpdate(DriftWeightUpdate):
 
+    def setup_twiss_calculation(self,emittance, current, gamma0, initial_conditions):
+        self.envelope_solver = SpaceChargeDrift(emittance, current, gamma0, initial_conditions)
 
+    def _set_twiss_at_s(self):
+        """
+        Assign betax, alphax, betay, alphay based on current time step in Warp
+        Currently calculates from Twiss at s=0
+        Returns:
+
+        """
+        # Time step is in the beam frame
+        # Convert to distance stepped in lab frame
+        ds = self.top.dt * self.beta0 * self.gamma0 * c0
+        self.envelope_solver.update(ds)
+
+        self.alphax, self.betax, _ = self.envelope_solver.get_twiss()
+        self.alphay, self.betay, _ = self.envelope_solver.get_twiss()
 
