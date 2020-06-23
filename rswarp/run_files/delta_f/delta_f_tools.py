@@ -4,7 +4,8 @@ from scipy.constants import e, m_e, physical_constants
 from scipy.integrate import odeint
 e_r = physical_constants['classical electron radius'][0]
 
-def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmetrize=False):
+
+def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmetrize=False, four_fold=False):
     """
     Create normally distributed partices in x, y and vx, vy, vz. Particle positions
     in z are created with spacing based on `length` / `Npart`.
@@ -17,6 +18,10 @@ def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmet
         seeds: (int)*6 seeds to use for initializing creation of each distribution
         symmetrize: (bool) If true then for each particle coordinate vector 'v' append
         '-v' to the distribution. Will result in creation of 2*`Npart` particles.
+        four_fold: (bool) If True and `symmetrize` is True then average angular momentum is also removed.
+        For each spatial coordinate vector 'v' the particle coordinates are replaced by [v,v,-v,-v] and the
+        momenta coordinate vectors 'w' are replaced by [w,-w, w,-w].
+        This will result in creation of 4*`Npart` particles.
 
     Returns:
 
@@ -61,8 +66,12 @@ def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmet
     beam_z_minus *= vz_rms_ini / np.std(beam_z_minus)
 #     beam_z_minus /= c0
 
-    distribution = np.column_stack([x, y , z, beam_x_minus, beam_y_minus, beam_z_minus])
-    if symmetrize:
+    distribution = np.column_stack([x, y, z, beam_x_minus, beam_y_minus, beam_z_minus])
+
+    if symmetrize and four_fold:
+        distribution = np.row_stack([distribution, distribution, -distribution, -distribution])
+        distribution[:, [3, 4, 5]] = distribution[:, [3, 4, 5]] * np.array([1, -1, 1, -1])
+    elif symmetrize:
         distribution = np.row_stack([distribution, -distribution])
 
     return distribution
