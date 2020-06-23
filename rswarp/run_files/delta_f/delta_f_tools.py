@@ -247,10 +247,6 @@ class DriftWeightUpdate:
             E_y = 29.9792458 * np.abs(-1.6021766208e-19) * E_y
             E_z = 29.9792458 * np.abs(-1.6021766208e-19) * E_z
 
-            E_x += self.top.pgroup.ex[:self.top.nplive]
-            E_y += self.top.pgroup.ey[:self.top.nplive]
-            E_z += self.top.pgroup.ez[:self.top.nplive]
-
         # Weight before update will be needed in the middle of the update sequence
         weights_minus = weights.copy()
 
