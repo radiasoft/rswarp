@@ -69,8 +69,10 @@ def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmet
     distribution = np.column_stack([x, y, z, beam_x_minus, beam_y_minus, beam_z_minus])
 
     if symmetrize and four_fold:
-        distribution = np.row_stack([distribution, distribution, -distribution, -distribution])
-        distribution[:, [3, 4, 5]] = distribution[:, [3, 4, 5]] * np.array([1, -1, 1, -1])
+        copy2 = distribution.copy() * np.array([1, 1, 1, -1, -1, -1])
+        copy3 = distribution.copy() * np.array([-1, -1, -1, 1, 1, 1])
+        copy4 = distribution.copy() * np.array([-1, -1, -1, -1, -1, -1])
+        distribution = np.row_stack([distribution, copy2, copy3, copy4])
     elif symmetrize:
         distribution = np.row_stack([distribution, -distribution])
 
