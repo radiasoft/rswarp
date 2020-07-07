@@ -27,7 +27,8 @@ if wp.comm_world.size != 1:
 # Simulation Setup
 ####################
 
-Npart = 65536 * 120
+# Npart = 65536 * 120
+Npart = 65536 * 12
 Nstep_tw = 3700  # number of loc-ns at which Courant-Snyder params are computed (interp-n in between)
 
 gamma0 = 42.66  # assumed exact
