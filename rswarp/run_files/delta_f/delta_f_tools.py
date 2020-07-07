@@ -2,6 +2,7 @@ import numpy as np
 from scipy.constants import c as c0
 from scipy.constants import e, m_e, physical_constants
 from scipy.integrate import odeint
+from warp import toperror
 e_r = physical_constants['classical electron radius'][0]
 
 
@@ -237,16 +238,47 @@ class DriftWeightUpdate:
         q2m = -e / m_e
 
         # Current particle quantities from Warp
-        weights = self.top.pgroup.pid[:self.top.nplive, self.top.wpid - 1]
-        x = self.top.pgroup.xp[:self.top.nplive]
-        y = self.top.pgroup.yp[:self.top.nplive]
-        z = self.top.pgroup.zp[:self.top.nplive]
+        try:
+            weights = self.top.pgroup.pid[:self.top.nplive, self.top.wpid - 1]
+            x = self.top.pgroup.xp[:self.top.nplive]
+            y = self.top.pgroup.yp[:self.top.nplive]
+            z = self.top.pgroup.zp[:self.top.nplive]
 
-        # Warp keeps gamma * v for the velocity component
-        gamma_inv = self.top.pgroup.gaminv[:self.top.nplive]
-        vx_n = self.top.pgroup.uxp[:self.top.nplive] * gamma_inv / c0 / (self.gamma0 * self.beta0)
-        vy_n = self.top.pgroup.uyp[:self.top.nplive] * gamma_inv / c0 / (self.gamma0 * self.beta0)
-        vz_n = self.top.pgroup.uzp[:self.top.nplive] * gamma_inv / c0
+            # Warp keeps gamma * v for the velocity component
+            gamma_inv = self.top.pgroup.gaminv[:self.top.nplive]
+            vx_n = self.top.pgroup.uxp[:self.top.nplive] * gamma_inv / c0 / (self.gamma0 * self.beta0)
+            vy_n = self.top.pgroup.uyp[:self.top.nplive] * gamma_inv / c0 / (self.gamma0 * self.beta0)
+            vz_n = self.top.pgroup.uzp[:self.top.nplive] * gamma_inv / c0
+
+            rank_is_live = True
+        except toperror:
+            # Prepare empty array for comms then prepare to exit early
+            vz_n = np.array([])
+            rank_is_live = False
+
+        # z component update
+        if self.mpi_size > 1:
+            # Perform sums over local particles
+            vz_local_size = vz_n.size
+            vz_sum_local = np.sum(vz_n)
+            vz_sq_sum_local = np.sum(vz_n * vz_n)
+            local_data = np.array([vz_local_size, vz_sum_local, vz_sq_sum_local], dtype=float).reshape(1, 3)
+            local_data = np.repeat(local_data, self.mpi_size, axis=0)
+            all_data = np.zeros([self.mpi_size, 3])
+
+            # Calculate global Avg. StD. from collected sums
+            self.comm_world.Alltoall(local_data, all_data)
+            vz_size = np.sum(all_data[:, 0])
+            vz_mean = np.sum(all_data[:, 1]) / vz_size
+            vz_sq_mean = np.sum(all_data[:, 2]) / vz_size
+            vz_std = np.sqrt(vz_sq_mean - vz_mean * vz_mean)
+        else:
+            vz_mean = np.mean(vz_n)
+            vz_std = np.std(vz_n)
+
+        if not rank_is_live:
+            # Exit after passing on empty vz data
+            return
         
         if self.externally_defined_field:
             E_x = self.top.pgroup.ex[:self.top.nplive]
@@ -271,26 +303,6 @@ class DriftWeightUpdate:
         weights += dt * q2m * (1. - weights_minus) * \
                    (self.alphay * y + self.betay * vy_n) * E_y / \
                    (self.gamma0 * self.beta0 * self.emit_y)
-
-        # z component update
-        if self.mpi_size > 1:
-            # Perform sums over local particles
-            vz_local_size = vz_n.size
-            vz_sum_local = np.sum(vz_n)
-            vz_sq_sum_local = np.sum(vz_n * vz_n)
-            local_data = np.array([vz_local_size, vz_sum_local, vz_sq_sum_local], dtype=float).reshape(1, 3)
-            local_data = np.repeat(local_data, self.mpi_size, axis=0)
-            all_data = np.zeros([self.mpi_size, 3])
-
-            # Calculate global Avg. StD. from collected sums
-            self.comm_world.Alltoall(local_data, all_data)
-            vz_size = np.sum(all_data[:, 0])
-            vz_mean = np.sum(all_data[:, 1]) / vz_size
-            vz_sq_mean = np.sum(all_data[:, 2]) / vz_size
-            vz_std = np.sqrt(vz_sq_mean - vz_mean * vz_mean)
-        else:
-            vz_mean = np.mean(vz_n)
-            vz_std = np.std(vz_n)
 
         weights += dt * q2m * (1. - weights_minus) * \
                    (1. / (vz_std * vz_std)) * (vz_n - vz_mean) * E_z
