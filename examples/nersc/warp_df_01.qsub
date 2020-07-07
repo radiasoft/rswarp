@@ -1,0 +1,25 @@
+#!/bin/bash
+#SBATCH --error=run.log
+#SBATCH --ntasks=32
+#SBATCH --output=run.log
+#SBATCH --time=0:02:00
+#SBATCH --image=radiasoft/sirepo:prod
+#SBATCH --constraint=haswell
+#SBATCH --qos=debug
+#SBATCH --tasks-per-node=32
+
+cat > bash.stdin <<'EOF'
+ulimit -c 0
+unset PYTHONPATH
+unset PYTHONSTARTUP
+export PYENV_ROOT=/home/vagrant/.pyenv
+export HOME=/home/vagrant
+source /home/vagrant/.bashrc >& /dev/null
+eval export HOME=~$USER
+if [[ ! $LD_LIBRARY_PATH =~ /usr/lib64/mpich/lib ]]; then
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64/mpich/lib
+fi
+python warp_df_01.py
+EOF
+
+exec srun --cpu-bind=cores shifter /bin/bash bash.stdin
