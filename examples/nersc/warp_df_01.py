@@ -140,7 +140,7 @@ wp.top.dt = T_mod / np.float64(Nsteps)
 ####################################
 # separate RNG seeds for different phase space coords, so that increasing the number
 # of particles from N1 to N2 > N1 we get the same initial N1 particles among the N2
-seeds = [98765, 87654, 76543, 65432, 54321, 43210]
+seeds = np.array([98765, 87654, 76543, 65432, 54321, 43210]) * (wp.comm_world.rank + 1)
 
 # If species weight is 0 and variable weights are set I think there will be no deposition
 # Since weight is based on sw * weight_array
@@ -148,7 +148,8 @@ beam = wp.Species(type=wp.Electron, name='Electron', lvariableweights=True)
 beam.sw = 0
 
 transverse_sigmas = [x_rms_ini, y_rms_ini, vx_rms_ini, vy_rms_ini]
-initial_distribution_f0 = dft.create_distribution(Npart=Npart, transverse_sigmas=transverse_sigmas,
+Npart_create = int(Npart / wp.comm_world.size)
+initial_distribution_f0 = dft.create_distribution(Npart=Npart_create, transverse_sigmas=transverse_sigmas,
                                                   length=z_max-z_min, z_sigma=vz_rms_ini, seeds=seeds,
                                                   symmetrize=True, four_fold=True)
 
@@ -158,7 +159,8 @@ def load_particles():
                       z=initial_distribution_f0[:, 2],
                       vx=initial_distribution_f0[:, 3],
                       vy=initial_distribution_f0[:, 4],
-                      vz=initial_distribution_f0[:, 5])
+                      vz=initial_distribution_f0[:, 5],
+                      unique_particles=True)
 
 
 wp.installparticleloader(load_particles)
