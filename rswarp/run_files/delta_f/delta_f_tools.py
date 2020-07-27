@@ -196,7 +196,8 @@ class DriftWeightUpdate:
     Coded for electrons
     """
 
-    def __init__(self, top, comm_world, species, gamma0, twiss, emittance, externally_defined_field=True):
+    def __init__(self, top, comm_world, species, gamma0, twiss, emittance, externally_defined_field=True,
+                 include_self_fields=False):
         """
         Prepare to calculate weight updates for delta-f method
         For drift case the update method `update_weights` may be installed before step only
@@ -221,6 +222,7 @@ class DriftWeightUpdate:
         self.beta0 =  np.sqrt(1. - 1. / (gamma0**2))
         self.emit_x, self.emit_y = emittance
         self.externally_defined_field = externally_defined_field
+        self.include_self_fields = include_self_fields
         self.softening_parameter = 1.0e-13  # Only used if externally_defined_field == False
         self.ion_velocity = np.array([0., 0., 0.])
         self._ion_position = np.array([0., 0., 0.])
@@ -289,6 +291,11 @@ class DriftWeightUpdate:
             E_x = 29.9792458 * np.abs(-1.6021766208e-19) * E_x
             E_y = 29.9792458 * np.abs(-1.6021766208e-19) * E_y
             E_z = 29.9792458 * np.abs(-1.6021766208e-19) * E_z
+            
+            if self.include_self_fields:            
+                E_x += self.top.pgroup.ex[:self.top.nplive] / c0
+                E_y += self.top.pgroup.ey[:self.top.nplive] / c0
+                E_z += self.top.pgroup.ez[:self.top.nplive] / c0
 
         # Weight before update will be needed in the middle of the update sequence
         weights_minus = weights.copy()
