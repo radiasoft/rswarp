@@ -128,7 +128,16 @@ def calculate_power_flux(velocity, weight, phi, run_time, A_em, **kwargs):
     N = v_sqr.size
     E_tot = ke + phi * e * N
     print("Etot: {}".format(E_tot))
-    return E_tot * weight / run_time / A_em
+    return 2 * E_tot * weight / run_time / A_em
+
+def calculate_analytic_power_flux(scraped_charge, phi_em, A_em, T_em, **kwargs):
+    phi_em, A_em, T_em = phi_em[0], A_em[0], T_em[0]
+    # Make very rough assumption that all particles coming back follow distribution of emitter
+    back_c = scraped_charge
+    forward_current = rd_current(phi_em, T_em)  # A / cm**2
+    total_power = (forward_current - scraped_charge / A_em) * (phi_em + 2 * k_ev * T_em)
+
+    return total_power  # W/cm**2
 
 
 def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
@@ -192,8 +201,10 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
         V_load = R_total * J_ec - V_lead
     else:
         R_total = rho_cw + rho_ew
-        V_load = (phi_em - phi_coll) + R_total * J_ec - V_lead
+        # ignore voltage drop on leads
+        V_load = (phi_em - phi_coll) #+ R_total * J_ec - V_lead
     print("current on collector", J_ec)
+    print("Backwards power from collector", t * J_coll * (phi_em + 2 * k_ev * T_coll))
     print("The load voltage", V_load)
     P_load = J_ec * V_load
 

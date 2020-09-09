@@ -21,7 +21,7 @@ tec:
   channel_width: 50.0e-6
   run_id: 0
   # V_grid is used to set external circuit contact voltage (if install_circuit == true)
-  V_grid: 1.793
+  V_grid: 14.793
   # Not used - grid not installed
   grid_height: 0.5
   strut_height: 1.0e-08

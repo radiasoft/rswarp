@@ -588,7 +588,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     background_beam.rnpinject = 0
 
     # Install Zcrossing Diagnostic
-    ZCross = ZCrossingParticles(zz=grid_height * gap_distance / 200., laccumulate=1)
+    ZCross = ZCrossingParticles(zz=grid_height * gap_distance / 800., laccumulate=1)
     emitter_flux = []
 
     crossing_wall_time = times[-1] * steps_per_crossing / ss_check_interval  # Estimate wall time for one crossing
@@ -612,10 +612,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
         velocity_array = np.array([ZCross.getvx(js=measurement_beam.js),
                                    ZCross.getvy(js=measurement_beam.js),
                                    ZCross.getvz(js=measurement_beam.js)]).transpose()
-        velocity_array_refl = np.array([ZCross.getvx(js=reflected_beam.js),
-                                        ZCross.getvy(js=reflected_beam.js),
-                                        ZCross.getvz(js=reflected_beam.js)]).transpose()
-        velocity_array = np.vstack([velocity_array, velocity_array_refl])
+        # velocity_array_refl = np.array([ZCross.getvx(js=reflected_beam.js),
+        #                                 ZCross.getvy(js=reflected_beam.js),
+        #                                 ZCross.getvz(js=reflected_beam.js)]).transpose()
+        # velocity_array = np.vstack([velocity_array, velocity_array_refl])
         # velocity_array = velocity_array[velocity_array[:, 2] >= 0.]  # Filter particles moving to emitter
         emitter_flux.append(velocity_array)
 
@@ -648,10 +648,10 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
             velocity_array = np.array([ZCross.getvx(js=measurement_beam.js),
                                        ZCross.getvy(js=measurement_beam.js),
                                        ZCross.getvz(js=measurement_beam.js)]).transpose()
-            velocity_array_refl = np.array([ZCross.getvx(js=reflected_beam.js),
-                                            ZCross.getvy(js=reflected_beam.js),
-                                            ZCross.getvz(js=reflected_beam.js)]).transpose()
-            velocity_array = np.vstack([velocity_array, velocity_array_refl])
+            # velocity_array_refl = np.array([ZCross.getvx(js=reflected_beam.js),
+            #                                 ZCross.getvy(js=reflected_beam.js),
+            #                                 ZCross.getvz(js=reflected_beam.js)]).transpose()
+            # velocity_array = np.vstack([velocity_array, velocity_array_refl])
             print("Backwards particles: {}".format(np.where(velocity_array[:, 2] < 0.)[0].shape[0]))
             # velocity_array = velocity_array[velocity_array[:, 2] >= 0.]  # Filter particles moving to emitter
             emitter_flux.append(velocity_array)
@@ -712,7 +712,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
                                             efficiency.tec_parameters['run_time'][0] / \
                                             (efficiency.tec_parameters['occlusion'][0] *
                                              efficiency.tec_parameters['A_em'][0])
-        raise(NotImplementedError)  # grid current calculation not adjusted to use reflections yet
+        raise NotImplementedError  # grid current calculation not adjusted to use reflections yet
     except KeyError:
         efficiency.tec_parameters['J_grid'][0] = 0.0
     
@@ -720,9 +720,8 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     efficiency.tec_parameters['J_ec'][0] /= efficiency.tec_parameters['run_time'][0]
     efficiency.tec_parameters['J_ec'][0] /= efficiency.tec_parameters['A_em'][0]
 
-    efficiency.tec_parameters['P_em'][0] = efficiency.calculate_power_flux(emitter_flux, measurement_beam.sw,
-                                                                        efficiency.tec_parameters['phi_em'][0],
-                                                                        **efficiency.tec_parameters)
+    efficiency.tec_parameters['P_em'][0] = efficiency.calculate_analytic_power_flux(measured_charge[scraper_dictionary['source']],
+                                                                                    **efficiency.tec_parameters)
 
     # Efficiency calculation
     print("Efficiency")
