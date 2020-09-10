@@ -65,7 +65,7 @@ wp.w3d.boundnz = wp.neumann  # wp.neumann
 wp.w3d.boundxy = wp.dirichlet  # wp.neumann
 
 
-width = 600*wp.um   # really half width
+width = 20 * 600*wp.um   # really half width
 # Set boundary dimensions
 wp.w3d.xmmin = -width
 wp.w3d.xmmax = width
@@ -91,7 +91,7 @@ wp.top.dt = T_total / np.float64(Nsteps)
 ####################################
 # Create Beam and Set its Parameters
 ####################################
-load_external_definition = False
+load_external_definition = True
 
 beam = wp.Species(type=wp.Electron, name='Electron', lvariableweights=True)
 
@@ -114,7 +114,7 @@ if load_external_definition:
                           z=init_distr[:, 4] - np.max(init_distr[:, 4]) * 1.05,  # We start head of bunch at z = 0
                           vx=init_distr[:, 1] / gamma0,
                           vy=init_distr[:, 3] / gamma0,
-                          vz=init_distr[:, 5] - beta0 * wp.clight)# + np.ones_like(initial_distribution_f0[:, 5]) * beta0 * wp.clight)
+                          vz=init_distr[:, 5])
 
 
     wp.installparticleloader(load_particles)
@@ -187,9 +187,9 @@ angle=0.5235987755982988
 dip_l=0.49430796473268457
 dip_rc = dip_l / angle
 
-drift_und2quads = wp.Drft(l=0.1)  # TODO: Changed from 1.0 m to get to quad quicker during testing
+drift_und2quads = wp.Drft(l=1.0)
 q_def = wp.Quad(l=0.074, db=opal_k1)
-drift_quad2quad = wp.Drft(l=1.074)
+drift_quad2quad = wp.Drft(l=0.03)
 q_foc = wp.Quad(l=0.074, db=-opal_k1)
 drift_quad2dip = wp.Drft(l=1.5)
 spectr_dipole = wp.Bend(l=dip_l, rc=dip_rc)
