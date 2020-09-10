@@ -22,7 +22,7 @@ if wp.comm_world.rank == 0:
 # Simulation Setup
 ####################
 wp.top.lrelativ = 1
-# wp.top.relativity = 1
+wp.top.relativity = 1
 
 path = 'opal_spectrometer/data/spectrometer_START_GAUSSIAN.dat'
 init_distr = np.loadtxt(path, skiprows=2)
@@ -33,8 +33,8 @@ gamma0 = 1. / np.sqrt(1 - beta0**2)
 beam_length_lab = 160 * wp.um  # Approximate length, with a little padding
 
 beamline_length = 3.5 # m, should be 3.472 meters in OPAL
-T_total = beamline_length / (gamma0 * beta0 * wp.clight)  # sim time in the _beam_ frame
-# T_total = beamline_length / (beta0 * wp.clight)  # sim time in the _lab_ frame
+# T_total = beamline_length / (gamma0 * beta0 * wp.clight)  # sim time in the _beam_ frame
+T_total = beamline_length / (beta0 * wp.clight)  # sim time in the _lab_ frame
 
 ####################
 # General Parameters
