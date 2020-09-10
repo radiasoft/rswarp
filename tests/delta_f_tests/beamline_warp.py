@@ -32,7 +32,7 @@ gamma0 = 1. / np.sqrt(1 - beta0**2)
 
 beam_length_lab = 160 * wp.um  # Approximate length, with a little padding
 
-beamline_length = 3.5 # m, should be 3.472 meters in OPAL
+beamline_length = 3.5 # m, should be exactly 3.472 meters in OPAL
 # T_total = beamline_length / (gamma0 * beta0 * wp.clight)  # sim time in the _beam_ frame
 T_total = beamline_length / (beta0 * wp.clight)  # sim time in the _lab_ frame
 
@@ -48,7 +48,7 @@ wp.w3d.solvergeom = wp.w3d.XYZgeom
 
 # Switches
 particle_diagnostic_switch = True  # Record particle data periodically
-
+particle_diag_period = 100  # step period for recording
 
 ##########################
 # 3D Simulation Parameters
@@ -59,14 +59,13 @@ wp.w3d.nx = 64
 wp.w3d.ny = 64
 wp.w3d.nz = 16
 
-# Boundaries don't matter here (no field solve)
+# Boundaries
 wp.w3d.bound0 = wp.neumann  # wp.neumann
 wp.w3d.boundnz = wp.neumann  # wp.neumann
 wp.w3d.boundxy = wp.dirichlet  # wp.neumann
 
 
 width = 600*wp.um   # really half width
-
 # Set boundary dimensions
 wp.w3d.xmmin = -width
 wp.w3d.xmmax = width
@@ -92,28 +91,53 @@ wp.top.dt = T_total / np.float64(Nsteps)
 ####################################
 # Create Beam and Set its Parameters
 ####################################
+load_external_definition = False
+
 beam = wp.Species(type=wp.Electron, name='Electron', lvariableweights=True)
-beam.sw = 1
-beam.ibeam = 1.
-# Beam velocity must be set manually here to be loaded into top
-# Not set by derivqty otherwise because we use a addparticles call to set particles
-beam.vbeam = wp.clight * beta0
 
-# Convert from beta*gamma to velocity
-init_distr[:, 1] = init_distr[:, 1] / np.sqrt(1 + init_distr[:, 1]**2) * wp.clight
-init_distr[:, 3] = init_distr[:, 3] / np.sqrt(1 + init_distr[:, 3]**2) * wp.clight
-init_distr[:, 5] = init_distr[:, 5] / np.sqrt(1 + init_distr[:, 5]**2) * wp.clight
+if load_external_definition:
+    print("\nLoading external beam definition\n")
+    beam.ibeam = 10.
+    beam.sw = 435.
+    # Beam velocity must be set manually here to be loaded into top
+    # Not set by derivqty otherwise because we use a addparticles call to set particles
+    beam.vbeam = wp.clight * beta0
 
-def load_particles():
-    beam.addparticles(x=init_distr[:, 0],
-                      y=init_distr[:, 2],
-                      z=init_distr[:, 4] - np.max(init_distr[:, 4]) * 1.05,  # We start head of bunch at z = 0
-                      vx=init_distr[:, 1] / gamma0,
-                      vy=init_distr[:, 3] / gamma0,
-                      vz=init_distr[:, 5] - beta0 * wp.clight)# + np.ones_like(initial_distribution_f0[:, 5]) * beta0 * wp.clight)
+    # Convert from beta*gamma to velocity
+    init_distr[:, 1] = init_distr[:, 1] / np.sqrt(1 + init_distr[:, 1]**2) * wp.clight
+    init_distr[:, 3] = init_distr[:, 3] / np.sqrt(1 + init_distr[:, 3]**2) * wp.clight
+    init_distr[:, 5] = init_distr[:, 5] / np.sqrt(1 + init_distr[:, 5]**2) * wp.clight
+
+    def load_particles():
+        beam.addparticles(x=init_distr[:, 0],
+                          y=init_distr[:, 2],
+                          z=init_distr[:, 4] - np.max(init_distr[:, 4]) * 1.05,  # We start head of bunch at z = 0
+                          vx=init_distr[:, 1] / gamma0,
+                          vy=init_distr[:, 3] / gamma0,
+                          vz=init_distr[:, 5] - beta0 * wp.clight)# + np.ones_like(initial_distribution_f0[:, 5]) * beta0 * wp.clight)
 
 
-wp.installparticleloader(load_particles)
+    wp.installparticleloader(load_particles)
+else:
+    print("\nWarp is defining beam parameters\n")
+    wp.top.emitx = 1e-7
+    wp.top.emity = 1e-7
+
+    beam.a0 = np.sqrt(wp.top.emitx * 1.0)
+    beam.b0 = np.sqrt(wp.top.emitx * 1.0)
+    beam.ap0 = 0.
+    beam.bp0 = 0.
+    beam.zimin = -wp.w3d.zmmin * 0.95
+    beam.zimax = -5*wp.um
+
+    beam.ibeam = 10. / wp.top.gammabar**2
+    beam.ekin = 139e6
+
+    wp.top.npmax = 25000
+    wp.w3d.distrbtn = "semigaus"
+    wp.w3d.cylinder = wp.true
+    wp.w3d.cigarld  = wp.true
+
 wp.derivqty()
 
 ##############################
@@ -131,7 +155,7 @@ wp.top.lprntpara = False
 wp.top.lpsplots = False
 
 solverE = wp.MultiGrid3D()
-solverE.mgtol = 1e-2  # TODO: right now we don't account for space charge
+solverE.mgtol = 1e-2
 wp.registersolver(solverE)
 solverE.mgverbose = -1
 wp.top.verbosity = -1
@@ -143,8 +167,7 @@ wp.top.verbosity = -1
 # HDF5 Particle/Field diagnostic options
 
 if particle_diagnostic_switch:
-    particleperiod = 1
-    particle_diagnostic_0 = ParticleDiagnostic(period=particleperiod, top=wp.top, w3d=wp.w3d,
+    particle_diagnostic_0 = ParticleDiagnostic(period=particle_diag_period, top=wp.top, w3d=wp.w3d,
                                                # Include data from all existing species in write
                                                species={species.name: species for species in wp.listofallspecies},
                                                comm_world=wp.comm_world, lparallel_output=False,
@@ -178,7 +201,7 @@ wp.madtowarp(beamline)
 ###########################
 # Generate and Run PIC Code
 ###########################
-# TODO: top.depos temporarily turned off during generate call in HlF_strip (ln 245)
+# TODO: top.depos temporarily turned off during generate call in HlF_strip (ln 245)?
 
 wp.package("w3d")
 wp.generate()
@@ -186,6 +209,7 @@ wp.generate()
 # Quantities of interest
 print('Beam velocity', wp.top.vbeam)
 print('Frame velocity', wp.top.vbeamfrm)
+print('top.gammabar etc.', wp.top.gammabar, beam.ibeam, beam.sw)
 print('Number of Steps',Nsteps)
 print('Time step size', wp.top.dt)
 
@@ -199,16 +223,5 @@ while n_step_taken < Nsteps:
     print('Average z * gamma', np.average(beam.getz()) * gamma0)
     print('RMS sizes (um): ', np.std(beam.getx()) * 1e6, np.std(beam.gety()) * 1e6, np.std(beam.getz()) * 1e6)
     print('Live particles', beam.getz().size)
-    print('Magnetic Field:', beam.getbx()[:20])
+    print('Magnetic Field:', beam.getbx()[:20], np.max(beam.getbx()), np.max(beam.getby()))
     print('')
-
-# Initialize weights to 0 for delta-f algorithm
-# wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1] *= 0
-# print(wp.top.zbeam)
-# wp.step(1)
-# print(wp.top.zbeam)
-# particle_diagnostic_0.period = 250
-# wp.step(Nsteps - 1)
-# print(wp.top.zbeam)
-# print('lab frame location?', wp.top.hzbeam)
-# np.save('diags/final_weights.npy', wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1])
