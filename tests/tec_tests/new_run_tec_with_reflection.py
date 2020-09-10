@@ -81,7 +81,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Hard code reflection settings during testing
     reflections = True
     srefprob = 0.
-    drefprob = 0.0
+    drefprob = 0.5
     reflection_scheme = 'uniform'
     
     # Settings for schottky_emission
