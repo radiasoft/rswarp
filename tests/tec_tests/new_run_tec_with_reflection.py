@@ -776,6 +776,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
 
             h5file.create_dataset('times', data=times)
 
+    return efficiency_result['eta']
 
 def create_grid(nx, ny, volts,
                 grid_height, strut_width, strut_height,
