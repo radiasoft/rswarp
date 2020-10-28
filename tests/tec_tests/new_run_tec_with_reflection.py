@@ -81,7 +81,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     # Hard code reflection settings during testing
     reflections = True
     srefprob = 0.
-    drefprob = 0.5
+    drefprob = 0.
     reflection_scheme = 'uniform'
     
     # Settings for schottky_emission
@@ -701,7 +701,7 @@ def main(x_struts, y_struts, V_grid, grid_height, strut_width, strut_height,
     total_macroparticles = measurement_beam.npsim[0] * measurement_beam.sw * measurement_beam.sq
     total_macroparticles += np.sum([measured_charge[key] for key in surface_charge])
     # I don't understand why total_macroparticles is used here. Don't you just want the scraped current?
-    efficiency.tec_parameters['J_em'][0] = -(total_macroparticles - measured_charge[scraper_dictionary['source']])
+    efficiency.tec_parameters['J_em'][0] = (total_macroparticles - measured_charge[scraper_dictionary['source']])
     efficiency.tec_parameters['J_em'][0] /= efficiency.tec_parameters['run_time'][0]
     efficiency.tec_parameters['J_em'][0] /= efficiency.tec_parameters['A_em'][0]
 

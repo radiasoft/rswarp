@@ -2,7 +2,7 @@ other: {}
 simulation:
   injection_type: 2
   install_grid: false
-  install_circuit: true
+  install_circuit: false
   # Analysis/Misc. Switches
   field_diagnostic_switch: false
   lost_diagnostic_switch: false
@@ -11,14 +11,14 @@ simulation:
   random_seed: true
 tec:
   T_coll: 323.15
-  T_em: 1687.15
+  T_em: 1873.
   gap_distance: 1.0e-06
   phi_coll: 0.381
   phi_em: 2.174
-  rho_cw: 0.0011984448
-  rho_ew: 0.0011984448
-  rho_load: 0.021766967676390664
-  channel_width: 50.0e-6
+  rho_cw: 0.001
+  rho_ew: 0.001
+  rho_load: 0.001
+  channel_width: 1.0e-2
   run_id: 0
   # V_grid is used to set external circuit contact voltage (if install_circuit == true)
   V_grid: 1.793
