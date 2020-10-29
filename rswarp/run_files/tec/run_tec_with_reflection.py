@@ -19,8 +19,6 @@ import os,sys
 from copy import deepcopy
 from random import randint
 
-sys.path.insert(1, '/home/vagrant/jupyter/research/heat_engine_sims/optimization/paper_2020/voesch_tests')
-import efficiency
 
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from warp.particles.extpart import ZCrossingParticles
@@ -28,6 +26,7 @@ from warp.utils.loadbalance import LoadBalancer
 
 # Path to current rswarp implementation needs to be inserted when running on rsmpi
 sys.path.insert(1, '/home/vagrant/jupyter/repos/rswarp')
+import rswarp.run_files.tec.efficiency as efficiency
 from rswarp.particlecollector.particlereflector import *
 from rswarp.cathode import sources
 from rswarp.diagnostics import FieldDiagnostic
