@@ -130,12 +130,21 @@ def calculate_power_flux(velocity, weight, phi, run_time, A_em, **kwargs):
     print("Etot: {}".format(E_tot))
     return 2 * E_tot * weight / run_time / A_em
 
-def calculate_analytic_power_flux(scraped_charge, phi_em, A_em, T_em, **kwargs):
+def calculate_analytic_power_flux(scraped_current, phi_em, A_em, T_em, **kwargs):
     phi_em, A_em, T_em = phi_em[0], A_em[0], T_em[0]
+    
     # Make very rough assumption that all particles coming back follow distribution of emitter
-    back_c = scraped_charge
+
     forward_current = rd_current(phi_em, T_em)  # A / cm**2
-    total_power = (forward_current - scraped_charge / A_em) * (phi_em + 2 * k_ev * T_em)
+    forward_power = forward_current * (phi_em + 2 * k_ev * T_em)
+    backward_power = (scraped_current / A_em) * (phi_em + 2 * k_ev * T_em)
+    
+    print('forward current', forward_current)
+    print('forward power', forward_power)
+    print('backward current', (scraped_current / A_em))
+    print('backward power', backward_power)
+    
+    total_power = forward_power - backward_power
 
     return total_power  # W/cm**2
 
@@ -214,6 +223,7 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
     eta = (P_load - P_gate) / (P_ec + P_r + P_ew)
 
     efficiency_data = {}
+    efficiency_data['V_load'] = V_load
     efficiency_data['P_ew'] = P_ew
     efficiency_data['P_r'] = P_r
     efficiency_data['P_ec'] = P_ec
