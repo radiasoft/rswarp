@@ -292,6 +292,12 @@ class DriftWeightUpdate:
             E_y = 29.9792458 * np.abs(-1.6021766208e-19) * E_y
             E_z = 29.9792458 * np.abs(-1.6021766208e-19) * E_z
             
+            # Apply field to particles directly
+            print('before application: ',  self.top.pgroup.ex[:50])
+            self.top.pgroup.ex[:self.top.nplive] += E_x[:]
+            self.top.pgroup.ey[:self.top.nplive] += E_y[:]
+            self.top.pgroup.ez[:self.top.nplive] += E_z[:]
+            print('after application: ',  self.top.pgroup.ex[:50])
             if self.include_self_fields:            
                 E_x += self.top.pgroup.ex[:self.top.nplive] / c0
                 E_y += self.top.pgroup.ey[:self.top.nplive] / c0
