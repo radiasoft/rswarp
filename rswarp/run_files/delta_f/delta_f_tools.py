@@ -287,6 +287,7 @@ class DriftWeightUpdate:
             E_y = self.top.pgroup.ey[:self.top.nplive]
             E_z = self.top.pgroup.ez[:self.top.nplive]
         else:
+            # Must turn off field reset to apply electric field here and have Warp use it for push
             self.top.lresetparticlee = False
             E_x, E_y, E_z = ion_electric_field(x, y, z, self._ion_position, charge=79, coreSq=self.softening_parameter)
             E_x = 29.9792458 * np.abs(-1.6021766208e-19) * E_x
@@ -294,11 +295,9 @@ class DriftWeightUpdate:
             E_z = 29.9792458 * np.abs(-1.6021766208e-19) * E_z
             
             # Apply field to particles directly
-            print('before application: ',  self.top.pgroup.ex[:50])
             self.top.pgroup.ex[:self.top.nplive] += E_x[:]
             self.top.pgroup.ey[:self.top.nplive] += E_y[:]
             self.top.pgroup.ez[:self.top.nplive] += E_z[:]
-            print('after application: ',  self.top.pgroup.ex[:50])
             if self.include_self_fields:            
                 E_x += self.top.pgroup.ex[:self.top.nplive] / c0
                 E_y += self.top.pgroup.ey[:self.top.nplive] / c0
