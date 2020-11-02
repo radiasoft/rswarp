@@ -287,6 +287,7 @@ class DriftWeightUpdate:
             E_y = self.top.pgroup.ey[:self.top.nplive]
             E_z = self.top.pgroup.ez[:self.top.nplive]
         else:
+            self.top.lresetparticlee = False
             E_x, E_y, E_z = ion_electric_field(x, y, z, self._ion_position, charge=79, coreSq=self.softening_parameter)
             E_x = 29.9792458 * np.abs(-1.6021766208e-19) * E_x
             E_y = 29.9792458 * np.abs(-1.6021766208e-19) * E_y
