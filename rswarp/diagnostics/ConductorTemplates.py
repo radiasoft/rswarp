@@ -60,7 +60,12 @@ class Conductor(object):
                 bandwdith = scraped_parts.shape[1]**(-1. / (scraped_parts.shape[0] + 4)) / 3.0
                 kernel = gaussian_kde(scraped_parts, bw_method=bandwdith)
                 # Remove gaussian normalization factor
-                s = kernel(mesh).T * kernel._norm_factor
+                # This code recreates the previous scipy calculation of the _norm_factor, and accounts for singular matrices by excepting errors
+                try:
+                    _norm_factor = np.sqrt(scipy.linalg.det(2*pi*kernel.covariance))
+                except LinAlgError:
+                    _norm_factor = 1
+                s = kernel(mesh).T * _norm_factor
         else:
             s = np.ones_like(mesh[0, :]) * -1.0
 
