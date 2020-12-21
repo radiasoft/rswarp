@@ -196,7 +196,8 @@ class DriftWeightUpdate:
     Coded for electrons
     """
 
-    def __init__(self, top, comm_world, species, gamma0, twiss, emittance, externally_defined_field=True,
+    def __init__(self, top, comm_world, species, gamma0, twiss, emittance, ion_charge=1,
+                 externally_defined_field=True,
                  include_self_fields=False):
         """
         Prepare to calculate weight updates for delta-f method
@@ -221,6 +222,7 @@ class DriftWeightUpdate:
         self.gamma0 = gamma0
         self.beta0 =  np.sqrt(1. - 1. / (gamma0**2))
         self.emit_x, self.emit_y = emittance
+        self.ion_charge = ion_charge
         self.externally_defined_field = externally_defined_field
         self.include_self_fields = include_self_fields
         self.softening_parameter = 1.0e-13  # Only used if externally_defined_field == False
@@ -289,15 +291,16 @@ class DriftWeightUpdate:
         else:
             # Must turn off field reset to apply electric field here and have Warp use it for push
             self.top.lresetparticlee = False
-            E_x, E_y, E_z = ion_electric_field(x, y, z, self._ion_position, charge=79, coreSq=self.softening_parameter)
+            E_x, E_y, E_z = ion_electric_field(x, y, z, self._ion_position, charge=self.ion_charge, coreSq=self.softening_parameter)
             E_x = 29.9792458 * np.abs(-1.6021766208e-19) * E_x
             E_y = 29.9792458 * np.abs(-1.6021766208e-19) * E_y
             E_z = 29.9792458 * np.abs(-1.6021766208e-19) * E_z
             
-            # Apply field to particles directly
-            self.top.pgroup.ex[:self.top.nplive] += E_x[:]
-            self.top.pgroup.ey[:self.top.nplive] += E_y[:]
-            self.top.pgroup.ez[:self.top.nplive] += E_z[:]
+            # Apply field to particles directly 
+            # This overwrites the arrays!!! It will not work if there is some other source of electric field present in simulation
+            self.top.pgroup.ex[:self.top.nplive] = E_x[:] * c0
+            self.top.pgroup.ey[:self.top.nplive] = E_y[:] * c0
+            self.top.pgroup.ez[:self.top.nplive] = E_z[:] * c0
             if self.include_self_fields:            
                 E_x += self.top.pgroup.ex[:self.top.nplive] / c0
                 E_y += self.top.pgroup.ey[:self.top.nplive] / c0
