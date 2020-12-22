@@ -2,11 +2,7 @@ import warpoptions
 warpoptions.ignoreUnknownArgs = True
 
 import matplotlib as mpl
-
-import h5py
 import numpy as np
-import pykern
-import sys
 import warp
 import matplotlib.pyplot as plt
 
