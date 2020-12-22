@@ -413,16 +413,23 @@ class STLconductor(Assembly):
         """
 
         mglevel = intercepts.mglevel
+        intercept_id = id(intercepts)
         if mglevel == 0:
             self._dx0 = np.array([intercepts.dx, intercepts.dy, intercepts.dz])
 
-        if not mglevel in self.installedintercepts:
+        if not intercept_id in self.installedintercepts:
             if self._verbose:
                 print(" ---  generating intercepts for mglevel = {}".format(mglevel))
+                print("Given new intercept object:", id(intercepts))
+                print("Cached intercept objects:", self.installedintercepts.keys())
             xi, yi, zi = self._conductorfnew_impl(intercepts)
-            self.installedintercepts[mglevel] = (xi, yi, zi)
+            self.installedintercepts[intercept_id] = (xi, yi, zi)
         else:
-            xi, yi, zi = self.installedintercepts[mglevel]
+            if self._verbose:
+                print("Using cached intercepts for mglevel", mglevel)
+                print("Return cache for intercept object:", id(intercepts))
+                print("Cached intercept objects:", self.installedintercepts.keys())
+            xi, yi, zi = self.installedintercepts[intercept_id]
 
         intercepts.nxicpt = xi.shape[0]
         intercepts.nyicpt = yi.shape[0]
