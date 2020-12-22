@@ -16,14 +16,12 @@ from warp import *
 
 import numpy as np
 import h5py as h5
-import sys, os
-
-sys.path.insert(2, '/home/vagrant/jupyter/repos/rswarp/rswarp/run_files/tec/')
+import os
 
 from copy import deepcopy
 from random import randint
 from rswarp.cathode import sources
-import efficiency
+import rswarp.run_files.tec.efficiency as efficiency
 from warp.data_dumping.openpmd_diag import ParticleDiagnostic
 from warp.particles.extpart import ZCrossingParticles
 from warp.utils.loadbalance import LoadBalancer
