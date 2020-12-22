@@ -289,7 +289,6 @@ def plot_xy_phi(block, show_grid=False, scale=1e6, z_loc=None, svnm='phi', **kwa
     
     
     
-    
 def plot_cathode_phi(block, show_grid=False, scale=1e6, z_loc=None, svnm='field', **kwargs):
     '''
     This function will recursively grab each block and the corresponding potential/mesh for plotting on the same figure.
@@ -374,7 +373,64 @@ def plot_cathode_phi(block, show_grid=False, scale=1e6, z_loc=None, svnm='field'
         svnm+='_grid'
         
     fig.savefig(svnm + '.png')
+
+def get_block_fields(block,scale=1e6):
+    '''
+    Return the electric fields of a block to be plotted along with the imshow extent in the X-Z plane.
     
+    Returns the tuple of arrays (Ex, Ey, Ez, extent).
+    '''
+          
+    #Define mesh on which to calculate fields
+    xm, ym, zm = np.meshgrid(block.xmesh, block.ymesh, block.zmesh, indexing='ij')
+
+    #Flatten for fetching
+    xmf = xm.flatten()
+    ymf = zm.flatten()
+    zmf = zm.flatten()
+
+    #Define flattened arrays for in-place fetch
+    Exf = fzeros(xmf.shape)
+    Eyf = fzeros(ymf.shape)
+    Ezf = fzeros(zmf.shape)
+    Bxf = fzeros(xmf.shape)
+    Byf = fzeros(ymf.shape)
+    Bzf = fzeros(zmf.shape)
+
+    #Field fields
+    block.fetchfieldfrompositions(xmf, ymf, zmf, Exf, Eyf, Ezf, Bxf, Byf, Bzf)
+
+    #Now reshape fields for plotting
+    Ex = Exf.reshape(xm.shape)
+    Ey = Eyf.reshape(xm.shape)
+    Ez = Ezf.reshape(xm.shape) 
+    
+    #determine indexing for slicing
+    numx = xm.shape[0]
+    numy = ym.shape[0]
+    numz = zm.shape[0]
+    
+    x_mid = int(numx/2)
+    y_mid = int(numy/2)
+    
+    xl = 0
+    xu = numx-1
+    zl = 0 
+    zu = numz-1
+
+    #Extent of the array to plot -> in this case plot the entire scaled domain
+    pxmin = block.xmesh[xl] * scale
+    pxmax = block.xmesh[xu] * scale
+    pzmin = block.zmesh[zl] * scale
+    pzmax = block.zmesh[zu] * scale
+    
+    plot_extent = [pzmin, pzmax, pxmin, pxmax]
+   
+    if USE_3D:
+        return Ex[xl:xu+1,y_mid,zl:zu+1], Ey[xl:xu+1,y_mid,zl:zu+1], Ez[xl:xu+1,y_mid,zl:zu+1], plot_extent
+        
+    else:
+        return Ex[xl:xu+1,0,zl:zu+1], Ey[xl:xu+1,0,zl:zu+1], Ez[xl:xu+1,0,zl:zu+1], plot_extent
 
     
     
