@@ -5,6 +5,9 @@ from scipy.integrate import odeint
 from warp import toperror
 e_r = physical_constants['classical electron radius'][0]
 
+# Attribute name set for delta-f weight array
+_DFW = 'dfweight'
+_GDFW = 'get'+_DFW
 
 def create_distribution(Npart, transverse_sigmas, length, z_sigma, seeds, symmetrize=False, four_fold=False):
     """
@@ -218,6 +221,12 @@ class DriftWeightUpdate:
         self.comm_world = comm_world
         self.mpi_size = comm_world.size
         self.species = species
+        try:
+            self.species.__getattribute__(_DFW)
+        except ValueError:
+            # attribute should exist but array is normally not yet allocated because this is called before injection
+            pass
+
         self.twiss = twiss
         self.gamma0 = gamma0
         self.beta0 =  np.sqrt(1. - 1. / (gamma0**2))
@@ -232,6 +241,7 @@ class DriftWeightUpdate:
     def update_weights(self):
         """
         To be called by a Warp install wrapper
+        All quantities are calculated for local particles when Warp is being run in parallel
         """
         # Needs to be before udpates for the step
         self._set_twiss_at_s()
@@ -242,23 +252,21 @@ class DriftWeightUpdate:
         q2m = -e / m_e
 
         # Current particle quantities from Warp
-        try:
-            weights = self.top.pgroup.pid[:self.top.nplive, self.top.wpid - 1]
-            x = self.top.pgroup.xp[:self.top.nplive]
-            y = self.top.pgroup.yp[:self.top.nplive]
-            z = self.top.pgroup.zp[:self.top.nplive]
+        weights = self.species.__getattribute__(_GDFW)(gather=False)[:self.top.nplive]
+        x = self.species.getx(gather=False)
+        y = self.species.gety(gather=False)
+        z = self.species.getz(gather=False)
 
-            # Warp keeps gamma * v for the velocity component
-            gamma_inv = self.top.pgroup.gaminv[:self.top.nplive]
-            vx_n = self.top.pgroup.uxp[:self.top.nplive] * gamma_inv / c0 / (self.gamma0 * self.beta0)
-            vy_n = self.top.pgroup.uyp[:self.top.nplive] * gamma_inv / c0 / (self.gamma0 * self.beta0)
-            vz_n = self.top.pgroup.uzp[:self.top.nplive] * gamma_inv / c0
+        # Warp keeps gamma * v for the velocity component
+        gamma_inv = self.species.getgaminv(gather=False)
+        vx_n = self.species.getux(gather=False) * gamma_inv / c0 / (self.gamma0 * self.beta0)
+        vy_n = self.species.getuy(gather=False) * gamma_inv / c0 / (self.gamma0 * self.beta0)
+        vz_n = self.species.getuz(gather=False) * gamma_inv / c0
 
-            rank_is_live = True
-        except toperror:
+        rank_is_live = x.size > 0
+        if not rank_is_live:
             # Prepare empty array for comms then prepare to exit early
             vz_n = np.array([])
-            rank_is_live = False
 
         # z component update
         if self.mpi_size > 1:
@@ -285,6 +293,8 @@ class DriftWeightUpdate:
             return
         
         if self.externally_defined_field:
+            # Python getters are not used here because these quantities may need to be edited.
+            # Could probably use them, but this explicit formulation guarantees we get and set the right array values
             E_x = self.top.pgroup.ex[:self.top.nplive]
             E_y = self.top.pgroup.ey[:self.top.nplive]
             E_z = self.top.pgroup.ez[:self.top.nplive]

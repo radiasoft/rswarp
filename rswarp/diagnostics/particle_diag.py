@@ -61,7 +61,7 @@ class ParticleDiagnostic(OpenPMDDiagnostic) :
         particle_data : a list of strings, optional
             A list indicating which particle data should be written.
             The list can contain any of the following strings:
-            "position", "momentum", "E", "B", "id", "weighting"
+            "position", "momentum", "E", "B", "id", "weighting" or "dfweighting"
 
         select : dict, optional
             Either None or a dictionary of rules
@@ -177,6 +177,8 @@ class ParticleDiagnostic(OpenPMDDiagnostic) :
             The name of the record being setup
             e.g. "position", "momentum"
         """
+        if quantity == "dfweighting":
+            return
         # Generic setup
         self.setup_openpmd_record( grp, quantity )
 
@@ -307,6 +309,11 @@ class ParticleDiagnostic(OpenPMDDiagnostic) :
                 quantity_path = "id"
                 self.write_dataset( species_grp, species, quantity_path,
                                     quantity, n_rank, select_array )
+            elif particle_var == "dfweighting":
+                quantity = "dfw"
+                quantity_path = "dfweighting"
+                self.write_dataset( species_grp, species, quantity_path,
+                                    quantity, n_rank, select_array )
 
             else :
                 raise ValueError("Invalid string in %s of species"
@@ -431,7 +438,7 @@ class ParticleDiagnostic(OpenPMDDiagnostic) :
                                                            particle_var)
 
                     # Scalar quantity
-                    elif particle_var in ["weighting", "id", "t"]:
+                    elif particle_var in ["weighting", "id", "t", "dfweighting"]:
                         # Choose the type of the output
                         if particle_var == "id":
                             dtype = 'uint64'
@@ -473,7 +480,7 @@ class ParticleDiagnostic(OpenPMDDiagnostic) :
 
         quantity : string
             Describes which quantity is written
-            x, y, z, ux, uy, uz, w, ex, ey, ez,
+            x, y, z, ux, uy, uz, w, dfw, ex, ey, ez,
             bx, by or bz
 
         n_rank: an array with dtype = int of size = n_procs
@@ -595,6 +602,9 @@ class ParticleDiagnostic(OpenPMDDiagnostic) :
         if "bz" in quantity :
             dict_keys_val["b3"]=species.getbz(gather=False)
             quantity=quantity.replace("bz","b3")
+        if "dfw" in quantity:
+            dict_keys_val["df"]=species.getdfweight(gather=False)
+            quantity=quantity.replace("dfw", "df")
         if "w" in quantity  :
             dict_keys_val["w"]=species.getw(gather=False)
         if "x" in quantity :

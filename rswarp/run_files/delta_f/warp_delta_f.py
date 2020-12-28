@@ -6,7 +6,7 @@ import numpy as np
 import warp as wp
 import rswarp.run_files.delta_f.delta_f_tools as dft
 
-from warp.data_dumping.openpmd_diag import ParticleDiagnostic
+from rswarp.diagnostics.particle_diag import ParticleDiagnostic
 from rswarp.utilities.file_utils import cleanupPrevious
 
 diagDir = 'diags/hdf5'
@@ -138,7 +138,8 @@ seeds = [98765, 87654, 76543, 65432, 54321, 43210]
 
 # If species weight is 0 and variable weights are set I think there will be no deposition
 # Since weight is based on sw * weight_array
-beam = wp.Species(type=wp.Electron, name='Electron', lvariableweights=True)
+beam = wp.Species(type=wp.Electron, name='Electron')
+beam.addpid("dfweight")
 beam.sw = 0
 
 transverse_sigmas = [x_rms_ini, y_rms_ini, vx_rms_ini, vy_rms_ini]
@@ -160,26 +161,26 @@ wp.installparticleloader(load_particles)
 ##############################
 # Install Single Ion Field
 ##############################
-# External B-Field can be added by setting vector components at each cell
-X, Y, Z = dft.create_grid((wp.w3d.xmmin, wp.w3d.ymmin, wp.w3d.zmmin),
-                          (wp.w3d.xmmax, wp.w3d.ymmax, wp.w3d.zmmax),
-                          (2*wp.w3d.nx, 2*wp.w3d.ny, 2*wp.w3d.nz))
-
-ex, ey, ez = dft.ion_electric_field(X, Y, Z, X_ion, charge=Z_ion, coreSq=0.)
-ex = 29.9792458 * np.abs(-1.6021766208e-19) * ex
-ey = 29.9792458 * np.abs(-1.6021766208e-19) * ey
-ez = 29.9792458 * np.abs(-1.6021766208e-19) * ez
-
-z_start = wp.w3d.zmmin
-z_stop = wp.w3d.zmmax
-
-# Add B-Field to simulation
-wp.addnewegrd(z_start, z_stop,
-              xs=wp.w3d.xmmin, dx=dx/2.,
-              ys=wp.w3d.ymmin, dy=dy/2., 
-              nx=2*wp.w3d.nx, ny=2*wp.w3d.ny, 
-              nz=2*wp.w3d.nz,
-              ex=ex, ey=ey, ez=ez)
+# # External B-Field can be added by setting vector components at each cell
+# X, Y, Z = dft.create_grid((wp.w3d.xmmin, wp.w3d.ymmin, wp.w3d.zmmin),
+#                           (wp.w3d.xmmax, wp.w3d.ymmax, wp.w3d.zmmax),
+#                           (2*wp.w3d.nx, 2*wp.w3d.ny, 2*wp.w3d.nz))
+#
+# ex, ey, ez = dft.ion_electric_field(X, Y, Z, X_ion, charge=Z_ion, coreSq=0.)
+# ex = 29.9792458 * np.abs(-1.6021766208e-19) * ex
+# ey = 29.9792458 * np.abs(-1.6021766208e-19) * ey
+# ez = 29.9792458 * np.abs(-1.6021766208e-19) * ez
+#
+# z_start = wp.w3d.zmmin
+# z_stop = wp.w3d.zmmax
+#
+# # Add B-Field to simulation
+# wp.addnewegrd(z_start, z_stop,
+#               xs=wp.w3d.xmmin, dx=dx/2.,
+#               ys=wp.w3d.ymmin, dy=dy/2.,
+#               nx=2*wp.w3d.nx, ny=2*wp.w3d.ny,
+#               nz=2*wp.w3d.nz,
+#               ex=ex, ey=ey, ez=ez)
 
 
 ########################
@@ -209,6 +210,7 @@ if particle_diagnostic_switch:
                                                # Include data from all existing species in write
                                                species={species.name: species for species in wp.listofallspecies},
                                                comm_world=wp.comm_world, lparallel_output=False,
+                                               particle_data=["position", "dfweighting"],
                                                # `ParticleDiagnostic` automatically append 'hdf5' to path name
                                                write_dir=diagDir[:-5])
     wp.installafterstep(particle_diagnostic_0.write)  # Write method is installed as an after-step action
@@ -221,7 +223,8 @@ if particle_diagnostic_switch:
 
 twiss_init = (beta_x_ini, alpha_x_ini, beta_y_ini, alpha_y_ini)
 emit_init = (eps_rms_x, eps_rms_y)
-weight_update = dft.DriftWeightUpdate(wp.top, beam, gamma0, twiss_init, emit_init, externally_defined_field=False)
+weight_update = dft.DriftWeightUpdate(wp.top, wp.comm_world,
+                                      beam, gamma0, twiss_init, emit_init, externally_defined_field=False)
 wp.installbeforestep(weight_update.update_weights)
 
 ###########################
@@ -236,6 +239,7 @@ wp.generate()
 wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1] *= 0
 
 wp.step(1)
+wp.step(1)
+wp.step(1)
 particle_diagnostic_0.period = 250
 wp.step(Nsteps - 1)
-np.save('diags/final_weights.npy', wp.top.pgroup.pid[:wp.top.nplive, wp.top.wpid - 1])
