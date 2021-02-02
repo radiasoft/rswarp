@@ -128,7 +128,25 @@ def calculate_power_flux(velocity, weight, phi, run_time, A_em, **kwargs):
     N = v_sqr.size
     E_tot = ke + phi * e * N
     print("Etot: {}".format(E_tot))
-    return E_tot * weight / run_time / A_em
+    return 2 * E_tot * weight / run_time / A_em
+
+def calculate_analytic_power_flux(scraped_current, phi_em, A_em, T_em, **kwargs):
+    phi_em, A_em, T_em = phi_em[0], A_em[0], T_em[0]
+    
+    # Make very rough assumption that all particles coming back follow distribution of emitter
+
+    forward_current = rd_current(phi_em, T_em)  # A / cm**2
+    forward_power = forward_current * (phi_em + 2 * k_ev * T_em)
+    backward_power = (scraped_current / A_em) * (phi_em + 2 * k_ev * T_em)
+    
+    print('forward current', forward_current)
+    print('forward power', forward_power)
+    print('backward current', (scraped_current / A_em))
+    print('backward power', backward_power)
+    
+    total_power = forward_power - backward_power
+
+    return total_power  # W/cm**2
 
 
 def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
@@ -167,7 +185,7 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
     t = 1. - occlusion
     # Turning off analytic backward current. Is a small effect but creates misleading results in low forward current
     #  cases encountered frequently in optimization
-    J_coll = 0.0  # rd_current(phi_coll, T_coll)
+    J_coll = rd_current(phi_coll, T_coll)
 
     # Modify measured J_ec (emitter to collector current) to remove analytical collector produced current
     J_ec = J_ec - J_coll
@@ -192,8 +210,10 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
         V_load = R_total * J_ec - V_lead
     else:
         R_total = rho_cw + rho_ew
-        V_load = (phi_em - phi_coll) + R_total * J_ec - V_lead
+        # ignore voltage drop on leads
+        V_load = (phi_em - phi_coll) #+ R_total * J_ec - V_lead
     print("current on collector", J_ec)
+    print("Backwards power from collector", t * J_coll * (phi_em + 2 * k_ev * T_coll))
     print("The load voltage", V_load)
     P_load = J_ec * V_load
 
@@ -203,6 +223,7 @@ def calculate_efficiency(rho_ew, J_em, P_em, phi_em, T_em,
     eta = (P_load - P_gate) / (P_ec + P_r + P_ew)
 
     efficiency_data = {}
+    efficiency_data['V_load'] = V_load
     efficiency_data['P_ew'] = P_ew
     efficiency_data['P_r'] = P_r
     efficiency_data['P_ec'] = P_ec
