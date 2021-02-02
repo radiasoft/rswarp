@@ -105,7 +105,7 @@ class PlotDensity(object):
     def generate_plots_2d(self):
         minS, maxS = maxsize, 0
         scatter_plots = []
-        for cond in self.conductors.itervalues():
+        for cond in self.conductors.values():
             minS, maxS, face_data = self.generate_plot_data_for_faces_2d(cond, minS, maxS)
             for (x, z, s) in face_data:
                 if np.min(s) < 0.0:
