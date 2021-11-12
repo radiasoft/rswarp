@@ -10,8 +10,7 @@ from warp.particles import ionization
 from rswarp.utilities.beam_manipulation import rotateVec
 import numpy as np
 import time
-import types
-from shutil import os
+import os
 import h5py
 
 __all__ = ['Ionization']
@@ -295,7 +294,7 @@ class Ionization(ionization.Ionization):
                     # --- get local target density
                     if ndens is None:
                         ndens = self.target_dens[target_species]['ndens']
-                    if isinstance(ndens, (types.IntType, float)):
+                    if isinstance(ndens, (int, float)):
                         dp = ones(ni, 'd') * ndens
                         if target_fluidvel is None:
                             xmin = self.xmin
