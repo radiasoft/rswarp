@@ -1,0 +1,30 @@
+codes:
+  - python:
+      parameters:  # arguments of function given in setup.function
+        x:
+          min: 0.5e-9
+          max: 1.5e-9
+          start: 1.e-9
+          samples: 1
+        y:
+          min: 40e-6
+          max: 60e-6
+          start: 50e-6
+          samples: 1
+        z:
+          min: 20e-6
+          max: 35e-6
+          start: 30e-6
+          samples: 1
+      setup:
+        input_file: ebunch_impact_ionization.py  # File where function is defined
+        function: ebunch_impact_ionization_func  # Name of function to execute from input_file
+        execution_type: rsmpi  # serial, parallel, or rsmpi
+         cores: 4  # if using parallel or rsmpi
+options:
+  software: mesh_scan  #  
+  nworkers: 4  # How many simultaneous evaluations to be running
+  mesh_file: mesh_file.npy  # Run create_mesh.py before using. If mesh_file not given then uniform mesh is created from parameters above
+  run_dir: user_scan_data  # Directory that will hold worker and simulation subdirectories
+  sim_dirs_make: True #False  #  Set to True if each simulation should be run in a new subdirectory under `run_dir`
+
