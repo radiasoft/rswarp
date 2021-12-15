@@ -649,6 +649,3 @@ def ebunch_impact_ionization_func(x,y,z):
         fig.tight_layout()
         
         fig.savefig('sliced_primaries.png')
-        
-        
-ebunch_impact_ionization_func(9.82244808540038e-10, 4.926591351752005e-05, 2.4002097157113458e-05)        
