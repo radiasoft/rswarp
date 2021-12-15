@@ -106,8 +106,8 @@ SECONDARY_WEIGHT = PRIMARY_WEIGHT #1e2 #fix secondary weight
 
 #Simulation parameters
 N_STEPS = 200 #200 steps for simulation
-FIELD_PERIOD = 50
-PARTICLE_PERIOD = 50
+FIELD_PERIOD = 200
+PARTICLE_PERIOD = 200
 FILE_PATH = 'diags/'
 
 params = {}
