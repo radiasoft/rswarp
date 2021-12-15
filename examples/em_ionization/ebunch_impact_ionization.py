@@ -106,8 +106,8 @@ SECONDARY_WEIGHT = PRIMARY_WEIGHT #1e2 #fix secondary weight
 
 #Simulation parameters
 N_STEPS = 200 #200 steps for simulation
-FIELD_PERIOD = 50
-PARTICLE_PERIOD = 50
+FIELD_PERIOD = 200
+PARTICLE_PERIOD = 200
 FILE_PATH = 'diags/'
 
 params = {}
@@ -470,8 +470,8 @@ if simulateIonization:
 #Define and install field and particle diagnostics
 #User defined FIELD_PERIOD and PARTICLE_PERIOD for each diagnostic
 
-field_diag = FieldDiagnostic( period=FIELD_PERIOD, top=top, w3d=w3d, em=EM, comm_world=comm_world, lparallel_output=False)
-installafterstep( field_diag.write )
+#field_diag = FieldDiagnostic( period=FIELD_PERIOD, top=top, w3d=w3d, em=EM, comm_world=comm_world, lparallel_output=False)
+#installafterstep( field_diag.write )
 
 particle_diagnostic_0 = ParticleDiagnostic(period=PARTICLE_PERIOD, top=top, w3d=w3d,
                                            species={species.name: species for species in listofallspecies},
