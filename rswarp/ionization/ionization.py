@@ -13,13 +13,17 @@ import time
 import os
 import h5py
 
+
+_DEBUG = False
 __all__ = ['Ionization']
 
 
 def tryFunctionalForm(f, *args, **kwargs):
     try:
         res = f(*args, **kwargs)
-    except TypeError:
+    except TypeError as e:
+        if _DEBUG:
+            print("error ", e)
         res = f
     return res
 
@@ -69,13 +73,22 @@ class Ionization(ionization.Ionization):
         return [uxnew, uynew, uznew]
 
     def _scale_primary_momenta(self, incident_species, ipg, energy, i1, i2, io):
+        if _DEBUG:
+            print('indicies:', io)
         m = incident_species.mass
         Erest = m*clight**2
         uxi = ipg.uxp[i1:i2:self.stride][io]
         uyi = ipg.uyp[i1:i2:self.stride][io]
         uzi = ipg.uzp[i1:i2:self.stride][io]
-        gaminviold = ipg.gaminv[i1:i2:self.stride][io]
+        if _DEBUG:
+            print("vel mag:", np.sqrt(uxi**2 + uyi**2 + uzi**2))
+        gaminviold = np.sqrt(1. - (uxi**2 + uyi**2 + uzi**2) / clight**2)
+        # gaminviold = ipg.gaminv[i1:i2:self.stride][io]
+        if _DEBUG:
+            print("gammainv Eold:", gaminviold)
         Eold = Erest * 1./gaminviold
+        if _DEBUG:
+            print("Eold in eV:", Eold / np.abs(incident_species.charge))
         Enew = Eold - energy * jperev
         if np.any(Enew < Erest):
             print("WARNING: requested emitted_energy0 would reduce energy of {} "
@@ -386,6 +399,8 @@ class Ionization(ionization.Ionization):
                     # Get a count of the number of collisions for each particle. A random number is added to
                     # ncol so that a fractional value has chance to result in a collision.
                     ncoli = aint(ncol + ranf(ncol))
+                    if _DEBUG:
+                        print("starting ncoli:", ncoli)
 
                     # Select the particles that will collide
                     io = compress(ncoli > 0, arange(ni))
@@ -414,6 +429,7 @@ class Ionization(ionization.Ionization):
                     recoilangles = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
 
                     # Loop until there are no more collision events that need handling
+                    _counter = 0
                     while nnew > 0:
 
                         # The emitted particles positions, in some cases, are slightly
@@ -456,7 +472,10 @@ class Ionization(ionization.Ionization):
                                     emitted_energy_sigma = 0
                                 else:
                                     emitted_energy_sigma = np.random.normal(loc=0., scale=emitted_energy_sigma, size=nnew)
-
+                                print('incident:', incident_species.name, ',', 'emitted:', emitted_species.name)
+                                print("  emitted_energy0", emitted_energy0)
+                                print("  emitted_energy_sigma", emitted_energy_sigma)
+                                print()
                                 emitted_energy = emitted_energy0 + emitted_energy_sigma
                                 # Initial calculation of emitted particle velocity components
                                 gnew = 1. + emitted_energy * jperev / (emitted_species.mass * clight ** 2)
@@ -477,6 +496,9 @@ class Ionization(ionization.Ionization):
 
                             # Remove energy from incident particle if energy is not attributed to thermal motion
                             if not self.inter[incident_species]['thermal'][it][ie]:
+                                print("scaling:", incident_species.name)
+                                print("ratios", 
+                                      emitted_energy / (incident_species.mass * warp.clight**2 / np.abs(incident_species.charge)))
                                 scale = self._scale_primary_momenta(incident_species, ipg, emitted_energy, i1, i2, io)
                             else:
                                 # Set emitted momenta from thermal motion but do not remove energy from incident
@@ -538,8 +560,17 @@ class Ionization(ionization.Ionization):
                                 self.addpart(nnew, xnew, ynew, znew, uxnew, uynew, uznew, ginew, epg, emitted_species.jslist[0],
                                              self.inter[incident_species]['emitted_tag'][it], injdatapid, w)
                         ncoli = ncoli[io] - 1
+                        if _DEBUG:
+                            print("ncoli:", ncoli)
                         io = arange(nnew)[ncoli > 0]
+                        if _DEBUG:
+                            print("io:", io)
                         nnew = len(io)
+                        if _DEBUG:
+                            print("nnew new", nnew)
+                        _counter += 1
+                        if _DEBUG:
+                            print(_counter)
                     try:
                         rank = comm_world.rank
                     except NameError:
@@ -555,7 +586,8 @@ class Ionization(ionization.Ionization):
                                     f['data/{}/{}/{}/emittedvelocities'.format(*fmt)] = emittedvelocities[em]
                                     f['data/{}/{}/{}/emissionangles'.format(*fmt)] = emissionangles[em]
                                     f['data/{}/{}/{}/recoilangles'.format(*fmt)] = recoilangles[em]
-                                print("Spent {} ms on hdf5 writing".format((time.time() - start)*1000))
+                                if _DEBUG:
+                                    print("Spent {} ms on hdf5 writing".format((time.time() - start)*1000))
 
         # make sure that all particles are added and cleared
         for pg in self.x:
