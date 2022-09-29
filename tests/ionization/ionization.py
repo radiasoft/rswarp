@@ -147,13 +147,17 @@ if simulateIonization is True:
     h2xs = Xsect.H2IonizationEvent()
     def xswrapper(vi):
         return h2xs.getCrossSection(vi)
+
+    def eewrapper(self, vi, nnew):
+        return h2crosssections.ejectedEnergy(vi, nnew)
+
     ioniz.add(
         incident_species=beam,
         emitted_species=[h2plus, emittedelec],
         #cross_section=h2crosssections.h2_ioniz_crosssection,
         # cross_section=lambda nnew, vi: 1e-20,
         cross_section=xswrapper,
-        emitted_energy0=[0, h2crosssections.ejectedEnergy],
+        emitted_energy0=[0, eewrapper],
         # emitted_energy0=[0, lambda nnew, vi: 1./np.sqrt(1.-((vi/2.)/clight)**2) * emass*clight/jperev],
         emitted_energy_sigma=[0, 0],
         # sampleEmittedAngle=lambda nnew, emitted_energy, incident_energy: np.random.uniform(0, 2*np.pi, size=nnew),

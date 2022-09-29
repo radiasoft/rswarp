@@ -18,14 +18,11 @@ _DEBUG = False
 __all__ = ['Ionization']
 
 
-def tryFunctionalForm(f, *args, **kwargs):
-    try:
-        res = f(*args, **kwargs)
-    except TypeError as e:
-        if _DEBUG:
-            print("error ", e)
-        res = f
-    return res
+def _make_callable(arg):
+    if callable(arg):
+        return arg
+
+    return lambda *args, **kwargs: arg
 
 
 class Ionization(ionization.Ionization):
@@ -33,6 +30,11 @@ class Ionization(ionization.Ionization):
     Extension of Warp's warp.particles.ionization.Ionization class
      including provisions for more detailed ionization physics.
     """
+    def _add_bound(self, method):
+        new_method = method.__get__(self)
+        self.__setattr__(method.__name__, new_method)
+        return self.__getattribute__(method.__name__)
+
     def _generate_emitted_velocity(self, nnew, emitted_energy0, emitted_energy_sigma=None):
         """
         Generate array of emitted particle velocities
@@ -178,7 +180,9 @@ class Ionization(ionization.Ionization):
         """
         # Do all of Warp's normal initialization
         if not iterable(emitted_species):
+            # Ionization.add checks lengths of emitted_energy0 and emitted_energy_sigma
             emitted_species = [emitted_species]
+
         for i in range(len(emitted_species)):
             if emitted_species[i].sw != emitted_species[i - 1].sw:
                 print("WARNING: Not all emitted species have the same weight\n"
@@ -194,6 +198,14 @@ class Ionization(ionization.Ionization):
                                   )
 
         # Extended class-specific operations following Warp's initialization
+        for i in range(len(self.inter[incident_species]['emitted_energy0'])):
+            for j, (ee, ees) in enumerate(zip(self.inter[incident_species]['emitted_energy0'][i],
+                                            self.inter[incident_species]['emitted_energy_sigma'][i])):
+                bound_method = self._add_bound(_make_callable(ee))
+                self.inter[incident_species]['emitted_energy0'][i][j] = bound_method
+                bound_method = self._add_bound(_make_callable(ees))
+                self.inter[incident_species]['emitted_energy_sigma'][i][j] = bound_method
+
         self.sampleIncidentAngle = sampleIncidentAngle
         self.sampleEmittedAngle = sampleEmittedAngle
         self.writeAngleDataDir = writeAngleDataDir
@@ -466,8 +478,8 @@ class Ionization(ionization.Ionization):
                             # If no emitted_energy0 then emission particle velocity set to incident particle velocity
                             if self.inter[incident_species]['emitted_energy0'][it][ie] is not None:
                                 # Create new momenta for the emitted particles.
-                                emitted_energy0 = tryFunctionalForm(self.inter[incident_species]['emitted_energy0'][it][ie], vi=vi, nnew=nnew)
-                                emitted_energy_sigma = tryFunctionalForm(self.inter[incident_species]['emitted_energy_sigma'][it][ie], vi=vi, nnew=nnew)
+                                emitted_energy0 = self.inter[incident_species]['emitted_energy0'][it][ie](vi=vi, nnew=nnew)
+                                emitted_energy_sigma = self.inter[incident_species]['emitted_energy_sigma'][it][ie](vi=vi, nnew=nnew)
                                 if emitted_energy_sigma is None:
                                     emitted_energy_sigma = 0
                                 else:
