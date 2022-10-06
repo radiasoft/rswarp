@@ -415,6 +415,7 @@ class Ionization(ionization.Ionization):
                         print("starting ncoli:", ncoli)
 
                     # Select the particles that will collide
+                    # I think this is just equivalent to np.where(ncoli>0) - cch
                     io = compress(ncoli > 0, arange(ni))
                     nnew = len(io)
 
@@ -478,16 +479,21 @@ class Ionization(ionization.Ionization):
                             # If no emitted_energy0 then emission particle velocity set to incident particle velocity
                             if self.inter[incident_species]['emitted_energy0'][it][ie] is not None:
                                 # Create new momenta for the emitted particles.
-                                emitted_energy0 = self.inter[incident_species]['emitted_energy0'][it][ie](vi=vi, nnew=nnew)
-                                emitted_energy_sigma = self.inter[incident_species]['emitted_energy_sigma'][it][ie](vi=vi, nnew=nnew)
+                                # Only macro particles participating in collisions (vi[io]) should be used in
+                                #  the calculation. So nnew is no longer necessary if io is used to select indices
+                                #  from vi, however, it is left as an argument to maintain backwards compatibility
+                                emitted_energy0 = self.inter[incident_species]['emitted_energy0'][it][ie](vi=vi[io], nnew=nnew)
+                                emitted_energy_sigma = self.inter[incident_species]['emitted_energy_sigma'][it][ie](vi=vi[io], nnew=nnew)
                                 if emitted_energy_sigma is None:
                                     emitted_energy_sigma = 0
                                 else:
                                     emitted_energy_sigma = np.random.normal(loc=0., scale=emitted_energy_sigma, size=nnew)
-                                print('incident:', incident_species.name, ',', 'emitted:', emitted_species.name)
-                                print("  emitted_energy0", emitted_energy0)
-                                print("  emitted_energy_sigma", emitted_energy_sigma)
-                                print()
+
+                                if self.l_verbose:
+                                    print('incident:', incident_species.name, ',', 'emitted:', emitted_species.name)
+                                    print("  emitted_energy0", emitted_energy0)
+                                    print("  emitted_energy_sigma", emitted_energy_sigma)
+                                    print()
                                 emitted_energy = emitted_energy0 + emitted_energy_sigma
                                 # Initial calculation of emitted particle velocity components
                                 gnew = 1. + emitted_energy * jperev / (emitted_species.mass * clight ** 2)
@@ -508,9 +514,10 @@ class Ionization(ionization.Ionization):
 
                             # Remove energy from incident particle if energy is not attributed to thermal motion
                             if not self.inter[incident_species]['thermal'][it][ie]:
-                                print("scaling:", incident_species.name)
-                                print("ratios", 
-                                      emitted_energy / (incident_species.mass * warp.clight**2 / np.abs(incident_species.charge)))
+                                if self.l_verbose:
+                                    print("scaling:", incident_species.name)
+                                    print("ratios",
+                                          emitted_energy / (incident_species.mass * warp.clight**2 / np.abs(incident_species.charge)))
                                 scale = self._scale_primary_momenta(incident_species, ipg, emitted_energy, i1, i2, io)
                             else:
                                 # Set emitted momenta from thermal motion but do not remove energy from incident
