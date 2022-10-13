@@ -69,7 +69,7 @@ def j_sl(Te, Tr, phi):
     Arguments:
         Te (float)   : temperature of the cathode in K
         Tr (float)  : temperature of the reservoir in K
-        phi (float) : neutral plasma workfunction in eV
+        phi (float) : effective workfunction in eV
 
     Returns:
         J (float)   : current density in Amp/m^2
