@@ -60,6 +60,31 @@ def j_rd(T, phi):
     A = 1.20e6  # amp/m^2/degK^2
 
     return A*T**2*np.exp(-1.*phi/(kb_eV*T))
+    
+    
+def j_sl(Te, Tr, phi):
+    """Returns the Saha-Langmuir ion emission given a temperature
+    and effective work function``. See Page 182 of Rasor (eq. 37).
+
+    Arguments:
+        Te (float)   : temperature of the cathode in K
+        Tr (float)  : temperature of the reservoir in K
+        phi (float) : neutral plasma workfunction in eV
+
+    Returns:
+        J (float)   : current density in Amp/m^2
+
+    """
+    Vi = 3.9 #Ionization potential of Cesium in eV
+    h = 0.75 #eV - empirical - see page 180 of Rasor
+    A = 1.20e6  # amp/m^2/degK^2
+    D = 1e27 #cm^-2
+    
+    #rate of arrival of Cs atoms
+    mu = D*np.exp(-1.*h/(kb_eV*Tr))
+    
+    return e*mu/(1.+2*np.exp((Vi-phi)/(kb_eV*Te)))
+
 
 
 def get_MB_velocities(n_part, T):
