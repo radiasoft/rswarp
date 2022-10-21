@@ -18,6 +18,11 @@ _DEBUG = False
 __all__ = ['Ionization']
 
 
+class DummySpecies:
+    def __init__(self):
+        self.name = 'dummy'
+        self.sw = 1.0
+
 def _make_callable(arg):
     if callable(arg):
         return arg
@@ -174,7 +179,12 @@ class Ionization(ionization.Ionization):
                 of emitted species.
             writeAngleDataDir: Directory to write HDF5 files with incident and emission angle data. Optional.
             writeAnglePeriod: Default - 100. Step period to write out angle data.
-
+        
+        Attributes:
+            _incident_species: Current incident species in generate loop
+            _target_species: Current target species in generate loop
+            io: Indices of colliding macroparticles in _incident_species
+        
         Returns:
                 None
         """
@@ -201,10 +211,10 @@ class Ionization(ionization.Ionization):
         for i in range(len(self.inter[incident_species]['emitted_energy0'])):
             for j, (ee, ees) in enumerate(zip(self.inter[incident_species]['emitted_energy0'][i],
                                             self.inter[incident_species]['emitted_energy_sigma'][i])):
-                bound_method = self._add_bound(_make_callable(ee))
-                self.inter[incident_species]['emitted_energy0'][i][j] = bound_method
-                bound_method = self._add_bound(_make_callable(ees))
-                self.inter[incident_species]['emitted_energy_sigma'][i][j] = bound_method
+                # bound_method = self._add_bound(_make_callable(ee))
+                self.inter[incident_species]['emitted_energy0'][i][j] = _make_callable(ee)
+                # bound_method = self._add_bound(_make_callable(ees))
+                self.inter[incident_species]['emitted_energy_sigma'][i][j] = _make_callable(ees)
 
         self.sampleIncidentAngle = sampleIncidentAngle
         self.sampleEmittedAngle = sampleEmittedAngle
@@ -266,9 +276,10 @@ class Ionization(ionization.Ionization):
                     ndens[...] = 0.
 
                     for jstarget in target_species.jslist:
-                        self._deposit_target_species(jstarget)
+                        self._deposit_target_species(incident_species, target_species, jstarget)
 
         for incident_species in self.inter:
+            self._incident_species = incident_species
             npinc = 0
             ispushed = 0
             ipg = self.inter[incident_species]['incident_pgroup']
@@ -280,20 +291,21 @@ class Ionization(ionization.Ionization):
             if npinc == 0 or not ispushed:
                 continue
             for it, target_species in enumerate(self.inter[incident_species]['target_species']):
+                self._target_species = target_species
                 ndens = self.inter[incident_species]['ndens'][it]
                 target_fluidvel = self.inter[
                     incident_species]['target_fluidvel'][it]
                 for js in incident_species.jslist:
                     i1 = ipg.ins[js] - 1 + top.it % self.stride
                     i2 = ipg.ins[js] + ipg.nps[js] - 1
-                    xi = ipg.xp[i1:i2:self.stride]  # .copy()
-                    yi = ipg.yp[i1:i2:self.stride]  # .copy()
-                    zi = ipg.zp[i1:i2:self.stride]  # .copy()
-                    ni = shape(xi)[0]
+                    self.xi = ipg.xp[i1:i2:self.stride]  # .copy()
+                    self.yi = ipg.yp[i1:i2:self.stride]  # .copy()
+                    self.zi = ipg.zp[i1:i2:self.stride]  # .copy()
+                    ni = shape(self.xi)[0]
                     gaminvi = ipg.gaminv[i1:i2:self.stride]  # .copy()
-                    uxi = ipg.uxp[i1:i2:self.stride]  # .copy()
-                    uyi = ipg.uyp[i1:i2:self.stride]  # .copy()
-                    uzi = ipg.uzp[i1:i2:self.stride]  # .copy()
+                    self.uxi = ipg.uxp[i1:i2:self.stride]  # .copy()
+                    self.uyi = ipg.uyp[i1:i2:self.stride]  # .copy()
+                    self.uzi = ipg.uzp[i1:i2:self.stride]  # .copy()
                     if top.wpid > 0:
                         # --- Save the wpid of the incident particles so that it can be
                         # --- passed to the emitted particles.
@@ -310,12 +322,12 @@ class Ionization(ionization.Ionization):
                     # --- get velocity in lab frame if using a boosted frame of reference
                     if top.boost_gamma > 1.:
                         uzboost = clight * sqrt(top.boost_gamma**2 - 1.)
-                        setu_in_uzboosted_frame3d(ni, uxi, uyi, uzi, gaminvi,
+                        setu_in_uzboosted_frame3d(ni, self.uxi, self.uyi, self.uzi, gaminvi,
                                                   -uzboost,
                                                   top.boost_gamma)
-                    vxi = uxi * gaminvi
-                    vyi = uyi * gaminvi
-                    vzi = uzi * gaminvi
+                    self.vxi = self.uxi * gaminvi
+                    self.vyi = self.uyi * gaminvi
+                    self.vzi = self.uzi * gaminvi
                     # --- get local target density
                     if ndens is None:
                         ndens = self.target_dens[target_species]['ndens']
@@ -339,16 +351,16 @@ class Ionization(ionization.Ionization):
                             zmin = self.zmin + vztf * top.time
                             zmax = self.zmax + vztf * top.time
                         if w3d.solvergeom == w3d.RZgeom:
-                            ri = sqrt(xi * xi + yi * yi)
+                            ri = sqrt(self.xi * self.xi + self.yi * self.yi)
                             dp = where((ri >= xmin) & (ri <= xmax) &
-                                       (zi >= zmin) & (zi <= zmax), dp, 0.)
+                                       (self.zi >= zmin) & (self.zi <= zmax), dp, 0.)
                         else:
-                            dp = where((xi >= xmin) & (xi <= xmax) &
-                                       (yi >= ymin) & (yi <= ymax) &
-                                       (zi >= zmin) & (zi <= zmax), dp, 0.)
+                            dp = where((self.xi >= xmin) & (self.xi <= xmax) &
+                                       (self.yi >= ymin) & (self.yi <= ymax) &
+                                       (self.zi >= zmin) & (self.zi <= zmax), dp, 0.)
                     else:
                         dp = zeros(ni, 'd')
-                        getgrid3d(ni, xi, yi, zi, dp,
+                        getgrid3d(ni, self.xi, self.yi, self.zi, dp,
                                   self.nx, self.ny, self.nz, ndens,
                                   self.xmin, self.xmax, self.ymin, self.ymax, self.zmin, self.zmax,
                                   w3d.l2symtry, w3d.l4symtry)
@@ -367,17 +379,17 @@ class Ionization(ionization.Ionization):
                         vxtf = zeros(ni, 'd')
                         vytf = zeros(ni, 'd')
                         vztf = zeros(ni, 'd')
-                        getgrid3d(ni, xi, yi, zi, vxtf,
+                        getgrid3d(ni, self.xi, self.yi, self.zi, vxtf,
                                   self.nx, self.ny, self.nz, target_fluidvel[
                                       ..., 0],
                                   self.xmin, self.xmax, self.ymin, self.ymax, self.zmin, self.zmax,
                                   w3d.l2symtry, w3d.l4symtry)
-                        getgrid3d(ni, xi, yi, zi, vytf,
+                        getgrid3d(ni, self.xi, self.yi, self.zi, vytf,
                                   self.nx, self.ny, self.nz, target_fluidvel[
                                       ..., 1],
                                   self.xmin, self.xmax, self.ymin, self.ymax, self.zmin, self.zmax,
                                   w3d.l2symtry, w3d.l4symtry)
-                        getgrid3d(ni, xi, yi, zi, vztf,
+                        getgrid3d(ni, self.xi, self.yi, self.zi, vztf,
                                   self.nx, self.ny, self.nz, target_fluidvel[
                                       ..., 2],
                                   self.xmin, self.xmax, self.ymin, self.ymax, self.zmin, self.zmax,
@@ -387,14 +399,15 @@ class Ionization(ionization.Ionization):
                     # NOTE that at this point, the target species is assumed to have a negligible velocity.
                     # this needs to be modified if this approximation is not
                     # valid.
-                    vxr = vxi - vxtf
-                    vyr = vyi - vytf
-                    vzr = vzi - vztf
+                    vxr = self.vxi - vxtf
+                    vyr = self.vyi - vytf
+                    vzr = self.vzi - vztf
                     vi = sqrt(vxr * vxr + vyr * vyr + vzr * vzr)
                     cross_section = self.getcross_section(
                         self.inter[incident_species]['cross_section'][it], vi)
 
                     # Number of collisions
+                    print('hi')
                     ncol = dp * cross_section * vi * dt * ipg.ndts[js] * \
                         self.stride / self.inter[incident_species]['emitted_species'][0][0].sw * \
                         ipg.sw[js]
@@ -416,24 +429,24 @@ class Ionization(ionization.Ionization):
 
                     # Select the particles that will collide
                     # I think this is just equivalent to np.where(ncoli>0) - cch
-                    io = compress(ncoli > 0, arange(ni))
-                    nnew = len(io)
+                    self.io = compress(ncoli > 0, arange(ni))
+                    nnew = len(self.io)
 
                     if None in self.inter[incident_species]['emitted_energy0'][it]:
                         # When emitted_energy0 is not specified, use the velocity of
                         # the incident particles for the emitted particles.
-                        uxnewsave = uxi
-                        uynewsave = uyi
-                        uznewsave = uzi
+                        uxnewsave = self.uxi
+                        uynewsave = self.uyi
+                        uznewsave = self.uzi
 
                     if self.inter[incident_species]['remove_incident'][it]:
                         # If projectile is modified, then need to delete it
-                        put(ipg.gaminv, array(io) * self.stride + i1, 0.)
+                        put(ipg.gaminv, array(self.io) * self.stride + i1, 0.)
 
                     # The position of the incident particle is at or near the incident particle
-                    xnew = xi
-                    ynew = yi
-                    znew = zi
+                    xnew = self.xi
+                    ynew = self.yi
+                    znew = self.zi
 
                     incidentvelocities = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
                     originalvelocities = {species: np.array([]) for species in self.inter[incident_species]['emitted_species'][it]}
@@ -447,34 +460,34 @@ class Ionization(ionization.Ionization):
 
                         # The emitted particles positions, in some cases, are slightly
                         # offset from the incident
-                        xnewp = xnew[io]
-                        ynewp = ynew[io]
-                        znewp = znew[io]
+                        xnewp = xnew[self.io]
+                        ynewp = ynew[self.io]
+                        znewp = znew[self.io]
                         xnew = xnewp + (ranf(xnewp) - 0.5) * 1.e-10 * self.dx
                         ynew = ynewp + (ranf(ynewp) - 0.5) * 1.e-10 * self.dy
                         znew = znewp + (ranf(znewp) - 0.5) * 1.e-10 * self.dz
                         if top.wpid == 0:
                             w = 1.
                         else:
-                            w = wi[io]
+                            w = wi[self.io]
 
                         # The injdatapid value needs to be copied to the emitted particles
                         # so that they are handled properly in the region near the source.
                         if top.injdatapid > 0:
-                            injdatapid = injdatapid[io]
+                            injdatapid = injdatapid[self.io]
 
                         # If the emitted energy was not specified, the emitted particle will be
                         # given the same velocity of the incident particle.
                         # TODO: Not sure if the None case for emitted_energy0 is properly handled
                         if None in self.inter[incident_species]['emitted_energy0'][it]:
-                            uxnewsave = uxnewsave[io]
-                            uynewsave = uynewsave[io]
-                            uznewsave = uznewsave[io]
+                            uxnewsave = uxnewsave[self.io]
+                            uynewsave = uynewsave[self.io]
+                            uznewsave = uznewsave[self.io]
 
                         # For each collision calculate product velocity components and modify incident particle
                         for ie, emitted_species in enumerate(self.inter[incident_species]['emitted_species'][it]):
 
-                            incident_ke = (incident_species.mass*clight**2)/jperev * (1. / ipg.gaminv[io * self.stride + i1] - 1.)
+                            incident_ke = (incident_species.mass*clight**2)/jperev * (1. / ipg.gaminv[self.io * self.stride + i1] - 1.)
 
                             # If no emitted_energy0 then emission particle velocity set to incident particle velocity
                             if self.inter[incident_species]['emitted_energy0'][it][ie] is not None:
@@ -482,8 +495,8 @@ class Ionization(ionization.Ionization):
                                 # Only macro particles participating in collisions (vi[io]) should be used in
                                 #  the calculation. So nnew is no longer necessary if io is used to select indices
                                 #  from vi, however, it is left as an argument to maintain backwards compatibility
-                                emitted_energy0 = self.inter[incident_species]['emitted_energy0'][it][ie](vi=vi[io], nnew=nnew)
-                                emitted_energy_sigma = self.inter[incident_species]['emitted_energy_sigma'][it][ie](vi=vi[io], nnew=nnew)
+                                emitted_energy0 = self.inter[incident_species]['emitted_energy0'][it][ie](self, vi=vi[self.io], nnew=nnew)
+                                emitted_energy_sigma = self.inter[incident_species]['emitted_energy_sigma'][it][ie](self, vi=vi[self.io], nnew=nnew)
                                 if emitted_energy_sigma is None:
                                     emitted_energy_sigma = 0
                                 else:
@@ -499,13 +512,13 @@ class Ionization(ionization.Ionization):
                                 gnew = 1. + emitted_energy * jperev / (emitted_species.mass * clight ** 2)
                                 bnew = np.sqrt(1 - 1 / gnew ** 2)
 
-                                ui = np.vstack((uxi[io], uyi[io], uzi[io])).T
+                                ui = np.vstack((self.uxi[self.io], self.uyi[self.io], self.uzi[self.io])).T
                                 incidentvelocities[emitted_species] = np.append(incidentvelocities[emitted_species], ui)
                                 norm = np.linalg.norm(ui, axis=1)
 
-                                uxnew = uxi[io] / norm * bnew * gnew * clight
-                                uynew = uyi[io] / norm * bnew * gnew * clight
-                                uznew = uzi[io] / norm * bnew * gnew * clight
+                                uxnew = self.uxi[self.io] / norm * bnew * gnew * clight
+                                uynew = self.uyi[self.io] / norm * bnew * gnew * clight
+                                uznew = self.uzi[self.io] / norm * bnew * gnew * clight
 
                             else:
                                 uxnew = uxnewsave
@@ -518,20 +531,20 @@ class Ionization(ionization.Ionization):
                                     print("scaling:", incident_species.name)
                                     print("ratios",
                                           emitted_energy / (incident_species.mass * warp.clight**2 / np.abs(incident_species.charge)))
-                                scale = self._scale_primary_momenta(incident_species, ipg, emitted_energy, i1, i2, io)
+                                scale = self._scale_primary_momenta(incident_species, ipg, emitted_energy, i1, i2, self.io)
                             else:
                                 # Set emitted momenta from thermal motion but do not remove energy from incident
                                 scale = 1.0
                                 temperature = self.inter[incident_species]['temperature'][it][ie]
                                 uxnew, uynew, uznew = self._generate_thermal_momentum(nnew, temperature, incident_species)
 
-                            uxi[io] *= scale
-                            uyi[io] *= scale
-                            uzi[io] *= scale
+                            self.uxi[self.io] *= scale
+                            self.uyi[self.io] *= scale
+                            self.uzi[self.io] *= scale
 
-                            assert np.all(vzi != 0), "Not all components of vzi are non-zero"
+                            assert np.all(self.vzi != 0), "Not all components of vzi are non-zero"
 
-                            v1 = np.vstack((vxi, vyi, vzi)).T[io]
+                            v1 = np.vstack((self.vxi, self.vyi, self.vzi)).T[self.io]
                             v2 = v1.copy()
                             v2[:, 2] = 0
                             rotvec = np.cross(v1, v2)
@@ -560,8 +573,8 @@ class Ionization(ionization.Ionization):
                                     rangles = np.array(self.sampleIncidentAngle(nnew=nnew, emitted_energy=emitted_energy, incident_energy=incident_ke, emitted_theta=emissionangles))
                                     if self.writeAngleDataDir and top.it % self.writeAnglePeriod == 0:
                                         recoilangles[emitted_species] = np.append(recoilangles[emitted_species], rangles)
-                                    vin = np.vstack((vxi[io], vyi[io], vzi[io])).T
-                                    vxi[io], vyi[io], vzi[io] = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=rangles)]
+                                    vin = np.vstack((self.vxi[self.io], self.vyi[self.io], self.vzi[self.io])).T
+                                    self.vxi[self.io], self.vyi[self.io], self.vzi[self.io] = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=rangles)]
 
                             ginew = 1. / sqrt(1. + (uxnew**2 + uynew ** 2 + uznew**2) / clight**2)
                             # get velocity in boosted frame if using a boosted frame of reference
@@ -578,13 +591,13 @@ class Ionization(ionization.Ionization):
                             else:
                                 self.addpart(nnew, xnew, ynew, znew, uxnew, uynew, uznew, ginew, epg, emitted_species.jslist[0],
                                              self.inter[incident_species]['emitted_tag'][it], injdatapid, w)
-                        ncoli = ncoli[io] - 1
+                        ncoli = ncoli[self.io] - 1
                         if _DEBUG:
                             print("ncoli:", ncoli)
-                        io = arange(nnew)[ncoli > 0]
+                        self.io = arange(nnew)[ncoli > 0]
                         if _DEBUG:
-                            print("io:", io)
-                        nnew = len(io)
+                            print("io:", self.io)
+                        nnew = len(self.io)
                         if _DEBUG:
                             print("nnew new", nnew)
                         _counter += 1
@@ -621,7 +634,7 @@ class Ionization(ionization.Ionization):
                 if self.l_timing:
                     print('time ionization = ', time.clock() - t1, 's')
 
-    def _deposit_target_species(self, jstarget):
+    def _deposit_target_species(self, incident_species, target_species, jstarget):
         """ Depositing target species to the grid """
         tpg = self.inter[incident_species]['target_pgroup']
         i1 = tpg.ins[jstarget] - 1  # ins is index of first member of species
@@ -648,13 +661,15 @@ class Ionization(ionization.Ionization):
         # deposit density
         deposgrid3d(1, tpg.nps[jstarget], xt, yt, zt,
                     tpg.sw[jstarget] * self.invvol * fact * weights,
-                    self.nx, self.ny, self.nz, ndens, self.ndensc,
+                    self.nx, self.ny, self.nz, self.target_dens[target_species]['ndens'],
+                    self.ndensc,
                     self.xmin, self.xmax, self.ymin, self.ymax,
                     self.zmin, self.zmax)
         # computes target fluid velocity
         deposgrid3dvect(0, tpg.nps[jstarget], xt, yt, zt, vxt, vyt, vzt,
                         tpg.sw[jstarget] * self.invvol * fact * weights,
-                        self.nx, self.ny, self.nz, target_fluidvel, self.ndensc,
+                        self.nx, self.ny, self.nz, self.target_dens[target_species]['target_fluidvel'],
+                        self.ndensc,
                         self.xmin, self.xmax, self.ymin, self.ymax,
                         self.zmin, self.zmax)
 
