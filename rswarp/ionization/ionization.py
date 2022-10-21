@@ -184,6 +184,8 @@ class Ionization(ionization.Ionization):
             _incident_species: Current incident species in generate loop
             _target_species: Current target species in generate loop
             io: Indices of colliding macroparticles in _incident_species
+            xi, yi, zi: Incident particle positions
+            uxi, uyi, uzi: Incident particle momenta
         
         Returns:
                 None
