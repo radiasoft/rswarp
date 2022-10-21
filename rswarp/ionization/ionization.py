@@ -112,7 +112,7 @@ class Ionization(ionization.Ionization):
 
     def add(self, incident_species, emitted_species, cross_section=None,
             target_species=None, ndens=None, target_fluidvel=None,
-            emitted_energy0=None, emitted_energy_sigma=None, temperature=None,
+            emitted_energy0=None, emitted_energy_sigma=None, temperature=None, conserve_energy=None,
             incident_pgroup=top.pgroup, target_pgroup=top.pgroup, emitted_pgroup=top.pgroup,
             l_remove_incident=None, l_remove_target=None, emitted_tag=None,
             sampleIncidentAngle=None, sampleEmittedAngle=None, writeAngleDataDir=None,
@@ -224,7 +224,12 @@ class Ionization(ionization.Ionization):
         self.writeAnglePeriod = writeAnglePeriod
         self.inter[incident_species]['thermal'] = []
         self.inter[incident_species]['temperature'] = []
+        self.inter[incident_species]['conserve_energy'] = []
         self.inter[incident_species]['thermal'].append([energy == 'thermal' for energy in emitted_energy0])
+        if conserve_energy:
+            self.inter[incident_species]['conserve_energy'].append([conserve for conserve in conserve_energy])
+        else:
+            self.inter[incident_species]['conserve_energy'].append([True, ]*len(emitted_species))
         self.inter[incident_species]['temperature'].append(temperature)
         for i, ip in enumerate(self.inter[incident_species]['thermal']):
             for j, ep in enumerate(ip):
@@ -528,17 +533,20 @@ class Ionization(ionization.Ionization):
                                 uznew = uznewsave
 
                             # Remove energy from incident particle if energy is not attributed to thermal motion
-                            if not self.inter[incident_species]['thermal'][it][ie]:
+                            if (not self.inter[incident_species]['thermal'][it][ie]) and self.inter[incident_species]['conserve_energy'][it][ie]:
                                 if self.l_verbose:
                                     print("scaling:", incident_species.name)
                                     print("ratios",
                                           emitted_energy / (incident_species.mass * warp.clight**2 / np.abs(incident_species.charge)))
                                 scale = self._scale_primary_momenta(incident_species, ipg, emitted_energy, i1, i2, self.io)
-                            else:
+                            elif self.inter[incident_species]['thermal'][it][ie]:
                                 # Set emitted momenta from thermal motion but do not remove energy from incident
                                 scale = 1.0
                                 temperature = self.inter[incident_species]['temperature'][it][ie]
                                 uxnew, uynew, uznew = self._generate_thermal_momentum(nnew, temperature, incident_species)
+                            else:
+                                scale = 1.0
+                                print("No energy removed from incident")
 
                             self.uxi[self.io] *= scale
                             self.uyi[self.io] *= scale
