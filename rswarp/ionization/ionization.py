@@ -414,7 +414,6 @@ class Ionization(ionization.Ionization):
                         self.inter[incident_species]['cross_section'][it], vi)
 
                     # Number of collisions
-                    print('hi')
                     ncol = dp * cross_section * vi * dt * ipg.ndts[js] * \
                         self.stride / self.inter[incident_species]['emitted_species'][0][0].sw * \
                         ipg.sw[js]
@@ -546,7 +545,6 @@ class Ionization(ionization.Ionization):
                                 uxnew, uynew, uznew = self._generate_thermal_momentum(nnew, temperature, incident_species)
                             else:
                                 scale = 1.0
-                                print("No energy removed from incident")
 
                             self.uxi[self.io] *= scale
                             self.uyi[self.io] *= scale
