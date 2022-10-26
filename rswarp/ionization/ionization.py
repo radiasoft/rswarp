@@ -35,6 +35,13 @@ class Ionization(ionization.Ionization):
     Extension of Warp's warp.particles.ionization.Ionization class
      including provisions for more detailed ionization physics.
     """
+    
+    def _get_volume(self):
+        v = (w3d.xmmax - w3d.xmmin) * \
+            (w3d.ymmax - w3d.ymmin) * \
+            (w3d.zmmax - w3d.zmmin)
+        return v
+    
     def _add_bound(self, method):
         new_method = method.__get__(self)
         self.__setattr__(method.__name__, new_method)
@@ -414,6 +421,7 @@ class Ionization(ionization.Ionization):
                         self.inter[incident_species]['cross_section'][it], vi)
 
                     # Number of collisions
+                    #print("dp: {}".format(dp))
                     ncol = dp * cross_section * vi * dt * ipg.ndts[js] * \
                         self.stride / self.inter[incident_species]['emitted_species'][0][0].sw * \
                         ipg.sw[js]
@@ -489,10 +497,12 @@ class Ionization(ionization.Ionization):
                             uxnewsave = uxnewsave[self.io]
                             uynewsave = uynewsave[self.io]
                             uznewsave = uznewsave[self.io]
-
+                        
+                        n_emitted = len(self.inter[incident_species]['emitted_species'][it])
+                        
                         # For each collision calculate product velocity components and modify incident particle
                         for ie, emitted_species in enumerate(self.inter[incident_species]['emitted_species'][it]):
-
+                            
                             incident_ke = (incident_species.mass*clight**2)/jperev * (1. / ipg.gaminv[self.io * self.stride + i1] - 1.)
 
                             # If no emitted_energy0 then emission particle velocity set to incident particle velocity
@@ -513,9 +523,12 @@ class Ionization(ionization.Ionization):
                                     print("  emitted_energy0", emitted_energy0)
                                     print("  emitted_energy_sigma", emitted_energy_sigma)
                                     print()
+                                #print("  emitted_energy0", emitted_energy0)
                                 emitted_energy = emitted_energy0 + emitted_energy_sigma
                                 # Initial calculation of emitted particle velocity components
                                 gnew = 1. + emitted_energy * jperev / (emitted_species.mass * clight ** 2)
+                                #if self.l_verbose:
+                                #print("gamma new: ", gnew)
                                 bnew = np.sqrt(1 - 1 / gnew ** 2)
 
                                 ui = np.vstack((self.uxi[self.io], self.uyi[self.io], self.uzi[self.io])).T
@@ -585,6 +598,7 @@ class Ionization(ionization.Ionization):
                                     self.vxi[self.io], self.vyi[self.io], self.vzi[self.io] = [l.flatten() for l in rotateVec(vec=vin, rotaxis=rotvec, theta=rangles)]
 
                             ginew = 1. / sqrt(1. + (uxnew**2 + uynew ** 2 + uznew**2) / clight**2)
+                            #print("gamma inverse new: ", ginew)
                             # get velocity in boosted frame if using a boosted frame of reference
                             if top.boost_gamma > 1.:
                                 setu_in_uzboosted_frame3d(shape(ginew)[0], uxnew, uynew, uznew, ginew,
@@ -599,6 +613,17 @@ class Ionization(ionization.Ionization):
                             else:
                                 self.addpart(nnew, xnew, ynew, znew, uxnew, uynew, uznew, ginew, epg, emitted_species.jslist[0],
                                              self.inter[incident_species]['emitted_tag'][it], injdatapid, w)
+                                #print("Adding particle. nnew: {} and ndens: {}".format(nnew,ndens))
+
+                                v0 = self._get_volume()
+                                #weight decrement modified by n_emitted
+                                d0 = emitted_species.sw/v0/n_emitted
+                                new_ndens = ndens - d0*nnew
+                                ndens = new_ndens
+                        
+                        
+                        #finally update dictionary ndens
+                        self.inter[incident_species]['ndens'][it] = ndens       
                         ncoli = ncoli[self.io] - 1
                         if _DEBUG:
                             print("ncoli:", ncoli)
