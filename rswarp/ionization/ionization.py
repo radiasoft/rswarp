@@ -118,7 +118,7 @@ class Ionization(ionization.Ionization):
         return uscale
 
     def add(self, incident_species, emitted_species, cross_section=None,
-            target_species=None, ndens=None, target_fluidvel=None,
+            target_species=None, ndens=None, reservoir=None, target_fluidvel=None,
             emitted_energy0=None, emitted_energy_sigma=None, temperature=None, conserve_energy=None,
             incident_pgroup=top.pgroup, target_pgroup=top.pgroup, emitted_pgroup=top.pgroup,
             l_remove_incident=None, l_remove_target=None, emitted_tag=None,
@@ -209,6 +209,12 @@ class Ionization(ionization.Ionization):
                 print("         Using weighting of species: {}".format(emitted_species[0].name))
                 break
 
+        if reservoir:
+            self.reservoir = reservoir
+            if ndens:
+                print("ndens and reservoir given to Ionization setup. reservoir will be used.")
+            ndens = self.reservoir.get_density()
+
         ionization.Ionization.add(self, incident_species, emitted_species, cross_section,
                                   target_species, ndens, target_fluidvel,
                                   emitted_energy0, emitted_energy_sigma,
@@ -272,6 +278,8 @@ class Ionization(ionization.Ionization):
                 target_fluidvel = self.inter[
                     incident_species]['target_fluidvel'][it]
                 if ndens is not None:
+                    if self.reservoir and self.reservoir.species == target_species:
+                        self.inter[incident_species]['ndens'][it] = self.reservoir.get_density()
                     continue
                 else:
                     if self.target_dens[target_species]['ndens_updated']:
@@ -615,15 +623,10 @@ class Ionization(ionization.Ionization):
                                              self.inter[incident_species]['emitted_tag'][it], injdatapid, w)
                                 #print("Adding particle. nnew: {} and ndens: {}".format(nnew,ndens))
 
-                                v0 = self._get_volume()
-                                #weight decrement modified by n_emitted
-                                d0 = emitted_species.sw/v0/n_emitted
-                                new_ndens = ndens - d0*nnew
-                                ndens = new_ndens
-                        
-                        
-                        #finally update dictionary ndens
-                        self.inter[incident_species]['ndens'][it] = ndens       
+                                if self.reservoir and self.reservoir.species == emitted_species:
+                                    # -1 because ionizatino removes density from neutral particle reservoir
+                                    self.reservoir.deposit_density(xnew, ynew, znew, -1. * emitted_species.sw * np.ones_like(xnew))
+    
                         ncoli = ncoli[self.io] - 1
                         if _DEBUG:
                             print("ncoli:", ncoli)
