@@ -116,6 +116,20 @@ class Ionization(ionization.Ionization):
         uold = sqrt(uxi**2 + uyi**2 + uzi**2)
         uscale = unew / uold
         return uscale
+    
+
+    def getcross_section(self, cross_section, vi):
+        """The cross section can either be a scalar or a functional that returns
+        a value given a velocity. This returns the Appropriate value.
+        """
+        try:
+            result = cross_section(self, vi)
+        except TypeError:
+            try:
+                result = cross_section(vi)
+            except TypeError:
+                result = cross_section
+        return result
 
     def add(self, incident_species, emitted_species, cross_section=None,
             target_species=None, ndens=None, reservoir=None, target_fluidvel=None,
