@@ -5,6 +5,8 @@ u"""?
 :license: http://www.apache.org/licenses/LICENSE-2.0.html
 """
 from __future__ import absolute_import, division, print_function
+import warpoptions
+warpoptions.ignoreUnknownArgs = True
 from warp import *
 from warp.particles import ionization
 from rswarp.utilities.beam_manipulation import rotateVec
