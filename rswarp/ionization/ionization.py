@@ -10,6 +10,7 @@ warpoptions.ignoreUnknownArgs = True
 from warp import *
 from warp.particles import ionization
 from rswarp.utilities.beam_manipulation import rotateVec
+from rsbeams.rsstats import kinematic
 import numpy as np
 import time
 import os
@@ -98,7 +99,8 @@ class Ionization(ionization.Ionization):
         uzi = ipg.uzp[i1:i2:self.stride][io]
         if _DEBUG:
             print("vel mag:", np.sqrt(uxi**2 + uyi**2 + uzi**2))
-        gaminviold = np.sqrt(1. - (uxi**2 + uyi**2 + uzi**2) / clight**2)
+        betagamma = np.sqrt(uxi ** 2 + uyi ** 2 + uzi ** 2) / clight
+        gaminviold = np.sqrt(1. - betagamma**2 / (1 + betagamma**2))
         # gaminviold = ipg.gaminv[i1:i2:self.stride][io]
         if _DEBUG:
             print("gammainv Eold:", gaminviold)
