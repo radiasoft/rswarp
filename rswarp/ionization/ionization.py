@@ -225,8 +225,8 @@ class Ionization(ionization.Ionization):
                 print("         Using weighting of species: {}".format(emitted_species[0].name))
                 break
 
+        self.reservoir = reservoir
         if reservoir:
-            self.reservoir = reservoir
             if ndens:
                 print("ndens and reservoir given to Ionization setup. reservoir will be used.")
             ndens = self.reservoir.get_density()
