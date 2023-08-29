@@ -78,7 +78,7 @@ def j_sl(Te, Tr, phi):
     Vi = 3.9 #Ionization potential of Cesium in eV
     h = 0.75 #eV - empirical - see page 180 of Rasor
     A = 1.20e6  # amp/m^2/degK^2
-    D = 1e27 #cm^-2
+    D = 1e31 #1e27 cm^-2s^-1 -> convert to m^-2s^-1
     
     #rate of arrival of Cs atoms
     mu = D*np.exp(-1.*h/(kb_eV*Tr))
