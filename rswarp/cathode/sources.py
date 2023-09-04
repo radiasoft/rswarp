@@ -61,8 +61,41 @@ def j_rd(T, phi):
 
     return A*T**2*np.exp(-1.*phi/(kb_eV*T))
     
-    
 def j_sl(Te, Tr, phi):
+    """Returns the Saha-Langmuir ion emission given a temperature
+    and effective work function``. This approach is derived from an
+    earlier Rasor work - equation (4.7), and follows closely with the
+    representation given by equation (23) on page 172 of Houston & Webster.
+
+    Arguments:
+        Te (float)   : temperature of the cathode in K
+        Tr (float)  : temperature of the reservoir in K
+        phi (float) : effective workfunction in eV
+
+    Returns:
+        J (float)   : current density in Amp/m^2
+
+    """
+    Vi = 3.9 #Ionization potential of Cesium in eV
+    h = 0.75 #eV - empirical - see page 180 of Rasor
+    A = 1.20e6  # amp/m^2/degK^2
+    #D = 1e27 #cm^-2
+    
+    m_cs = 132.90545*amu #Cs mass
+    
+    #compute Cs pressure via Rasor
+    p_cs = lambda Tr: (2.45e8/np.sqrt(Tr))*np.exp(-8910/Tr)
+    
+    D = p_cs(Tr)/(np.sqrt(2*np.pi*m_cs*k*Te)) #This should be in meters so no need to modify
+    
+    #rate of arrival of Cs atoms
+    #mu = D*np.exp(-1.*h/(kb_eV*Tr))
+    
+    return e*D/(1.+2*np.exp((Vi-phi)/(kb_eV*Te))) #no mu
+    
+    
+    
+def j_sl_rasor_182(Te, Tr, phi):
     """Returns the Saha-Langmuir ion emission given a temperature
     and effective work function``. See Page 182 of Rasor (eq. 37).
 
