@@ -13,6 +13,7 @@ from rswarp.cathode import injectors
 
 # Specify constants
 from scipy.constants import e, m_e, c, k, epsilon_0
+from scipy.constants import atomic_mass as amu
 kb_eV = 8.6173324e-5  # Bolztmann constant in eV/K
 kb_J = k  # Boltzmann constant in J/K
 m = m_e  # mass of electron
@@ -64,7 +65,7 @@ def j_rd(T, phi):
 def j_sl(Te, Tr, phi):
     """Returns the Saha-Langmuir ion emission given a temperature
     and effective work function``. This approach is derived from an
-    earlier Rasor work - equation (4.7), and follows closely with the
+    earlier Hatsopoulos work - equation (4.7), and follows closely with the
     representation given by equation (23) on page 172 of Houston & Webster.
 
     Arguments:
@@ -77,22 +78,18 @@ def j_sl(Te, Tr, phi):
 
     """
     Vi = 3.9 #Ionization potential of Cesium in eV
-    h = 0.75 #eV - empirical - see page 180 of Rasor
-    A = 1.20e6  # amp/m^2/degK^2
-    #D = 1e27 #cm^-2
     
     m_cs = 132.90545*amu #Cs mass
     
-    #compute Cs pressure via Rasor
+    #compute Cs pressure in Torr
     p_cs = lambda Tr: (2.45e8/np.sqrt(Tr))*np.exp(-8910/Tr)
     
-    D = p_cs(Tr)/(np.sqrt(2*np.pi*m_cs*k*Te)) #This should be in meters so no need to modify
+    #Torr to pascal conversion
+    Torr_2_Pa = 133.32
     
-    #rate of arrival of Cs atoms
-    #mu = D*np.exp(-1.*h/(kb_eV*Tr))
+    D = p_cs(Tr)*Torr_2_Pa/(np.sqrt(2*np.pi*m_cs*k*Tr)) #This should be in meters so no need to modify
     
-    return e*D/(1.+2*np.exp((Vi-phi)/(kb_eV*Te))) #no mu
-    
+    return e*D/(1.+2*np.exp((Vi-phi)/(kb_eV*Te)))
     
     
 def j_sl_rasor_182(Te, Tr, phi):
