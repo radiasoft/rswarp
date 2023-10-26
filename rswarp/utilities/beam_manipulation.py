@@ -13,22 +13,20 @@ def rotationMatrix3D(rotaxis, theta):
     rotaxis - vector (x, y, z) specifying the axis of rotation
     theta - angle (in radians) of rotation
     """
-    # print("In rotationMarix3D(): rotaxis={}, theta={}".format(rotaxis, theta))
-    assert np.ndim(rotaxis) == np.ndim(theta)+1 == 1, "Dimension mismatch in rotationMatrix3D()"
     norm = np.linalg.norm(rotaxis)
     assert norm > 0, "Rotation axis has norm of zero"
+
     rotaxis = np.array(rotaxis) / norm
-    ux = rotaxis[0]
-    uy = rotaxis[1]
-    uz = rotaxis[2]
     costh = np.cos(theta)
     sinth = np.sin(theta)
 
-    R = np.matrix('{} {} {}; {} {} {}; {} {} {}'.format(
-        costh+ux**2 * (1 - costh), ux*uy*(1-costh) - uz*sinth, ux*uz*(1-costh) + uy*sinth,
-        uy*ux*(1-costh) + uz*sinth, costh + uy**2 * (1-costh), uy*uz*(1-costh) - ux*sinth,
-        uz*ux*(1-costh) - uy*sinth, uz*uy * (1-costh) + ux*sinth, costh + uz**2 * (1-costh)
-    ))
+    skew_matrix = np.array([[   0, -rotaxis[2], rotaxis[1]],
+                            [ rotaxis[2],   0, -rotaxis[0]],
+                            [-rotaxis[1], rotaxis[0],   0]])
+
+    R = costh * np.identity(3) + \
+        sinth * skew_matrix + \
+        (1 - costh) * np.outer(rotaxis, rotaxis)
 
     return R
 
