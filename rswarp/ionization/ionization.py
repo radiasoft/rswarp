@@ -139,7 +139,7 @@ class Ionization(ionization.Ionization):
             target_species=None, ndens=None, reservoir=None, target_fluidvel=None,
             emitted_energy0=None, emitted_energy_sigma=None, temperature=None, conserve_energy=None,
             incident_pgroup=top.pgroup, target_pgroup=top.pgroup, emitted_pgroup=top.pgroup,
-            l_remove_incident=None, l_remove_target=None, emitted_tag=None,
+            l_remove_incident=None, l_remove_target=None, emitted_tag=None, custom_emission_energy=None,
             sampleIncidentAngle=None, sampleEmittedAngle=None, writeAngleDataDir=None,
             writeAnglePeriod=100):
         """
@@ -581,7 +581,19 @@ class Ionization(ionization.Ionization):
                                 # Set emitted momenta from thermal motion but do not remove energy from incident
                                 scale = 1.0
                                 temperature = self.inter[incident_species]['temperature'][it][ie]
-                                uxnew, uynew, uznew = self._generate_thermal_momentum(nnew, temperature, incident_species)
+                                uxnew, uynew, uznew = self._generate_thermal_momentum(nnew, temperature,
+                                                                                      incident_species)
+                            elif self.inter[incident_species]['custom'][it][ie]:
+                                # Incident particle kinetic energy is reassigned by user-provided function
+                                ke = self.inter[incident_species]['custom'][it][ie](self, self.io, None)
+                                frac = np.random.rand(self.io.size)
+                                xsgn = np.random.randint(0, 2, self.io.size) * 2 - 1
+                                zsgn = np.random.randint(0, 2, self.io.size) * 2 - 1
+                                self.uxi[self.io] = kinematic.Converter(kenergy=ke * frac)(silent=True)[
+                                                        'betagamma'] * clight * xsgn
+                                self.uzi[self.io] = kinematic.Converter(kenergy=ke * (1 - frac))(silent=True)[
+                                                        'betagamma'] * clight * zsgn
+                                scale = 1.0
                             else:
                                 scale = 1.0
 
