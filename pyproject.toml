@@ -16,7 +16,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
-,
+    "pykern",
 ]
 description = "Python tools for use with Warp"
 dynamic = ["version"]
