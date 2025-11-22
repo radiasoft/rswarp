@@ -2,12 +2,12 @@
 
 Python tools for use with Warp
 
-Learn more at https://github.com/radiasoft/rswarp.
+Learn more at https://git.radiasoft.org/rswarp.
 
-Documentation: http://rswarp.readthedocs.org/en/latest/
+Documentation: https://rswarp.readthedocs.io
 
 #### License
 
-License: http://www.apache.org/licenses/LICENSE-2.0.html
+License: https://www.apache.org/licenses/LICENSE-2.0.html
 
-Copyright (c) 2016 RadiaSoft LLC.  All Rights Reserved.
+Copyright (c) 2025 RadiaSoft LLC.  All Rights Reserved.

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["chronver", "setuptools>=66"]
+build-backend = "setuptools.build_meta"
+
+[project]
+authors = [
+    { name = "RadiaSoft LLC", email = "pip@radiasoft.net" },
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
+    "Programming Language :: Python",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "pykern",
+]
+description = "Python tools for use with Warp"
+dynamic = ["version"]
+name = "rswarp"
+readme = "README.md"
+
+[project.scripts]
+rswarp = "rswarp.rswarp_console:main"
+
+[project.urls]
+Homepage = "https://git.radiasoft.org/rswarp"
+
+[tool.setuptools.package-data]
+rswarp = ["package_data/**"]
+
+[tool.setuptools.packages.find]
+include = ["rswarp*"]
