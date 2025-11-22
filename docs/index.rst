@@ -3,6 +3,10 @@ Welcome to rswarp
 
 Python tools for use with Warp
 
+.. autosummary::
+   :toctree: _autosummary
+   :recursive:
+
 .. toctree::
    :maxdepth: 2
 
